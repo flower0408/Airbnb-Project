@@ -1,0 +1,18 @@
+<nav class="nav">
+  <ul class="navbar">
+    <li class="nav-item">
+      <a class="nav-link" *ngIf="isLoggedIn()" (click)="logout()">Logout</a>
+    </li>
+
+    <li class="nav-item">
+      <a class="nav-link" *ngIf="!isLoggedIn()" aria-pressed="true" routerLink="/Login">Login</a>
+
+      <a class="nav-link" *ngIf="!isLoggedIn()" aria-pressed="true" routerLink="/Register">Register</a>
+    </li>
+
+    <li class="nav-item">
+      <a class="nav-link" *ngIf="isLoggedIn()" aria-pressed="true" routerLink="/myProfile">Profile</a>
+      <a class="nav-link" *ngIf="isLoggedIn()" aria-pressed="true" routerLink="/Main-Page">Main Page</a>
+    </li>
+  </ul>
+</nav>
