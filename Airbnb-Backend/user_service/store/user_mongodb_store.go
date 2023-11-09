@@ -26,7 +26,7 @@ func NewUserMongoDBStore(client *mongo.Client) domain.UserStore {
 	}
 }
 
-func (store *UserMongoDBStore) Post(user *domain.User) (*domain.User, error) {
+func (store *UserMongoDBStore) Register(user *domain.User) (*domain.User, error) {
 	fmt.Println(json.Marshal(user))
 	user.ID = primitive.NewObjectID()
 	result, err := store.users.InsertOne(context.TODO(), user)

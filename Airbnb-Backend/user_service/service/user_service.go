@@ -22,7 +22,7 @@ func (service *UserService) Get(id primitive.ObjectID) (*domain.User, error) {
 func (service *UserService) GetAll() ([]*domain.User, error) {
 	return service.store.GetAll()
 }
-func (service *UserService) Post(user *domain.User) (*domain.User, error) {
+func (service *UserService) Register(user *domain.User) (*domain.User, error) {
 
 	userInfo := domain.User{
 		ID:        user.ID,
@@ -35,6 +35,6 @@ func (service *UserService) Post(user *domain.User) (*domain.User, error) {
 		Email:     user.Email,
 	}
 
-	return service.store.Post(&userInfo)
+	return service.store.Register(&userInfo)
 
 }

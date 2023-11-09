@@ -25,7 +25,7 @@ func NewUserHandler(service *application.UserService) *UserHandler {
 func (handler *UserHandler) Init(router *mux.Router) {
 	router.HandleFunc("/{id}", handler.Get).Methods("GET")
 	router.HandleFunc("/", handler.GetAll).Methods("GET")
-	router.HandleFunc("/", handler.Post).Methods("POST")
+	router.HandleFunc("/", handler.Register).Methods("POST")
 	http.Handle("/", router)
 }
 
@@ -92,7 +92,7 @@ func validateUser(user *domain.User) *ValidationError {
 	return nil
 }
 
-func (handler *UserHandler) Post(writer http.ResponseWriter, req *http.Request) {
+func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Request) {
 	var user domain.User
 	err := json.NewDecoder(req.Body).Decode(&user)
 	if err != nil {
@@ -106,7 +106,7 @@ func (handler *UserHandler) Post(writer http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	saved, err := handler.service.Post(&user)
+	saved, err := handler.service.Register(&user)
 	if err != nil {
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return

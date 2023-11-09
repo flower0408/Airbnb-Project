@@ -16,7 +16,6 @@ const (
 
 type AuthMongoDBStore struct {
 	credentials *mongo.Collection
-	//users       *mongo.Collection
 }
 
 func NewAuthMongoDBStore(client *mongo.Client) domain.AuthStore {
