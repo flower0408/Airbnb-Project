@@ -25,16 +25,18 @@
               <div *ngIf="f['firstName'].errors['required']">First Name is required.</div>
               <div *ngIf="f['firstName'].errors['minlength']">First Name must be at least 3 characters long.</div>
               <div *ngIf="f['firstName'].errors['maxlength']">First Name must not exceed 20 characters.</div>
+              <div *ngIf="f['firstName'].errors['pattern']">Numbers and Special Characters are not allowed.</div>
             </div>
           </div>
           <label for="lastName"><b>Last Name:</b></label>
           <div>
             <input type="text" id="lastName" maxlength="21" placeholder="Last name" class="form-control" formControlName="lastName"
                    [ngClass]="{ 'is-invalid': submitted && f['lastName'].errors}">
-            <div *ngIf="submitted && f['firstName'].errors" class="invalid-feedback">
-              <div *ngIf="f['firstName'].errors['required']">First Name is required.</div>
-              <div *ngIf="f['firstName'].errors['minlength']">First Name must be at least 3 characters long.</div>
-              <div *ngIf="f['firstName'].errors['maxlength']">First Name must not exceed 20 characters.</div>
+            <div *ngIf="submitted && f['lastName'].errors" class="invalid-feedback">
+              <div *ngIf="f['lastName'].errors['required']">Last Name is required.</div>
+              <div *ngIf="f['lastName'].errors['minlength']">Last Name must be at least 3 characters long.</div>
+              <div *ngIf="f['lastName'].errors['maxlength']">Last Name must not exceed 20 characters.</div>
+              <div *ngIf="f['lastName'].errors['pattern']">Numbers and Special Characters are not allowed.</div>
             </div>
           </div>
 
@@ -58,6 +60,7 @@
               <div *ngIf="f['username'].errors['required']">Username is required.</div>
               <div *ngIf="f['username'].errors['minlength']">Username must be at least 4 characters long.</div>
               <div *ngIf="f['username'].errors['maxlength']">Username must not exceed 30 characters.</div>
+              <div *ngIf="f['username'].errors['pattern']">Special Characters are not allowed.</div>
             </div>
           </div>
 
@@ -119,6 +122,7 @@
               <div *ngIf="f['residence'].errors['required']">Residence is required.</div>
               <div *ngIf="f['residence'].errors['minlength']">Residence must be at least 3 characters long.</div>
               <div *ngIf="f['residence'].errors['maxlength']">Residence must not exceed 35 characters.</div>
+              <div *ngIf="f['residence'].errors['pattern']">Special Characters are not allowed.</div>
             </div>
           </div>
 

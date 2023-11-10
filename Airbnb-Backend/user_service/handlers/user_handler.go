@@ -7,8 +7,8 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"unicode"
 	"user_service/domain"
+	"user_service/errors"
 	"user_service/service"
 )
 
@@ -33,39 +33,22 @@ type ValidationError struct {
 	Message string `json:"message"`
 }
 
-func verifyPassword(s string) (valid bool) {
-	hasUpperCase := false
-	hasLowerCase := false
-	hasDigit := false
-	hasSpecial := false
-
-	for _, c := range s {
-		switch {
-		case unicode.IsNumber(c):
-			hasDigit = true
-		case unicode.IsUpper(c):
-			hasUpperCase = true
-		case unicode.IsLower(c):
-			hasLowerCase = true
-		case unicode.Is(unicode.S, c) || unicode.IsPunct(c):
-			hasSpecial = true
-		}
-	}
-
-	valid = len(s) >= 11 && hasUpperCase && hasLowerCase && hasDigit && hasSpecial
-	return
-}
-
 func validateUser(user *domain.User) *ValidationError {
 	emailRegex := regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
-	residenceRegex := regexp.MustCompile(`^[a-zA-Z\s,'-]*$`)
+	residenceRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,35}$`)
 
 	// Validate Email
+	if user.Email == "" {
+		return &ValidationError{Message: "Email cannot be empty"}
+	}
 	if !emailRegex.MatchString(user.Email) {
 		return &ValidationError{Message: "Invalid email format"}
 	}
 
 	// Validate Residence
+	if user.Residence == "" {
+		return &ValidationError{Message: "Residence cannot be empty"}
+	}
 	if !residenceRegex.MatchString(user.Residence) {
 		return &ValidationError{Message: "Invalid residence format"}
 	}
@@ -76,15 +59,24 @@ func validateUser(user *domain.User) *ValidationError {
 	}
 
 	// Validate Firstname and Lastname
+	if user.Firstname == "" {
+		return &ValidationError{Message: "FirstName cannot be empty"}
+	}
 	nameRegex := regexp.MustCompile(`^[a-zA-Z]{3,20}$`)
 	if !nameRegex.MatchString(user.Firstname) {
 		return &ValidationError{Message: "Invalid firstname format. It must contain only letters and be 3-20 characters long"}
+	}
+	if user.Lastname == "" {
+		return &ValidationError{Message: "LastName cannot be empty"}
 	}
 	if !nameRegex.MatchString(user.Lastname) {
 		return &ValidationError{Message: "Invalid lastname format. It must contain only letters and be 3-20 characters long"}
 	}
 
 	// Validate UserType
+	if user.UserType == "" {
+		return &ValidationError{Message: "UserType cannot be empty"}
+	}
 	if user.UserType != "Guest" && user.UserType != "Host" {
 		return &ValidationError{Message: "UserType should be either 'Guest' or 'Host'"}
 	}
@@ -108,7 +100,11 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 
 	saved, err := handler.service.Register(&user)
 	if err != nil {
-		http.Error(writer, err.Error(), http.StatusBadRequest)
+		if err.Error() == errors.DatabaseError {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+		} else {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+		}
 		return
 	}
 	newUser, err := json.Marshal(saved)
@@ -116,7 +112,8 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writer.Write(newUser)
+	writer.WriteHeader(200)
+	jsonResponse(newUser, writer)
 
 }
 

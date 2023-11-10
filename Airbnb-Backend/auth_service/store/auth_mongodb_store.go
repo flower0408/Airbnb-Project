@@ -53,12 +53,13 @@ func (store *AuthMongoDBStore) GetOneUser(username string) (*domain.User, error)
 }
 
 func (store *AuthMongoDBStore) filter(filter interface{}) ([]*domain.User, error) {
-	cursor, err := store.credentials.Find(context.TODO(), filter)
-	defer cursor.Close(context.TODO())
-
+	ctx := context.TODO()
+	cursor, err := store.credentials.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
+	defer cursor.Close(ctx)
+
 	return decode(cursor)
 }
 
