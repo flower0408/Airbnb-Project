@@ -47,7 +47,7 @@ services:
     container_name: accommodations_service
     build:
       context: .
-      dockerfile: ../Airbnb-Project/Airbnb-Backend/accommodations_service/Dockerfile
+      dockerfile: ./accommodations_service/Dockerfile
     restart: always
     ports:
       - ${ACCOMMODATIONS_SERVICE_PORT}:${ACCOMMODATIONS_SERVICE_PORT}
