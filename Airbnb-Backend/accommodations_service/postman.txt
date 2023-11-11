@@ -1,0 +1,32 @@
+{
+  "name":"Apartman na Zlatiboru",
+  "description":"opis",
+  "images":"slika",
+  "location": {
+    "Country":"Srbija",
+    "City":"Zlatibor",
+    "Street":"Glavna",
+    "Number": 180
+  },
+  "benefits":"bazen, klima, internet",
+  "minGuest": 10,
+  "maxGuest": 50,
+  "ownerId": nestoo
+
+}
+
+{
+  "name": "Sample Accommodation",
+  "description": "A cozy place for your stay",
+  "images": "image1.jpg,image2.jpg,image3.jpg",
+  "location": {
+    "country": "Sample Country",
+    "city": "Sample City",
+    "street": "123 Sample Street",
+    "number": 456
+  },
+  "benefits": "Free Wi-Fi, Parking, Breakfast",
+  "minGuest": 1,
+  "maxGuest": 2,
+  "ownerId": nestoo
+}
