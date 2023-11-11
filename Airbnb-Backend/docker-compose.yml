@@ -41,6 +41,26 @@ services:
     networks:
       - network
 
+
+  accommodations_service:
+    image: accommodations_service
+    container_name: accommodations_service
+    build:
+      context: .
+      dockerfile: ../Airbnb-Project/Airbnb-Backend/accommodations_service/Dockerfile
+    restart: always
+    ports:
+      - ${ACCOMMODATIONS_SERVICE_PORT}:${ACCOMMODATIONS_SERVICE_PORT}
+    environment:
+      ACCOMMODATIONS_DB_HOST: ${ACCOMMODATIONS_DB_HOST}
+      ACCOMMODATIONS_DB_PORT: ${ACCOMMODATIONS_DB_PORT}
+      ACCOMMODATIONS_SERVICE_PORT: ${ACCOMMODATIONS_SERVICE_PORT}
+    depends_on:
+      - accommodations_db
+    networks:
+      - network
+
+
   api_gateway:
     build:
       context: ./api_gateway/
@@ -63,6 +83,13 @@ services:
   auth_db:
     image: mongo
     container_name: auth_db
+    restart: on-failure
+    networks:
+      - network
+
+  accommodations_db:
+    image: cassandra
+    container_name: accommodations_db
     restart: on-failure
     networks:
       - network
