@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"auth_service/domain"
+	"auth_service/errors"
 	"auth_service/service"
 	"auth_service/store"
+	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -24,9 +27,32 @@ func NewAuthHandler(service *application.AuthService) *AuthHandler {
 }
 
 func (handler *AuthHandler) Init(router *mux.Router) {
+
+	loginRouter := router.Methods(http.MethodPost).Subrouter()
+	loginRouter.HandleFunc("/login", handler.Login)
+
+	registerRouter := router.Methods(http.MethodPost).Subrouter()
+	registerRouter.HandleFunc("/register", handler.Register)
+	registerRouter.Use(MiddlewareUserValidation)
+
+	verifyRouter := router.Methods(http.MethodPost).Subrouter()
+	verifyRouter.HandleFunc("/verifyAccount", handler.VerifyAccount)
+
+	router.HandleFunc("/", handler.GetAll).Methods("GET")
 	router.HandleFunc("/login", handler.Login).Methods("POST")
 	router.HandleFunc("/register", handler.Register).Methods("POST")
+	router.HandleFunc("/verifyAccount", handler.VerifyAccount).Methods("POST")
+	router.HandleFunc("/resendVerify", handler.ResendVerificationToken).Methods("POST")
 	http.Handle("/", router)
+}
+
+func (handler *AuthHandler) GetAll(writer http.ResponseWriter, req *http.Request) {
+	users, err := handler.service.GetAll()
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(users, writer)
 }
 
 type ValidationError struct {
@@ -126,44 +152,125 @@ func validateUser(user *domain.User) *ValidationError {
 
 func (handler *AuthHandler) Register(writer http.ResponseWriter, req *http.Request) {
 
-	var request domain.User
-	err := json.NewDecoder(req.Body).Decode(&request)
+	myUser := req.Context().Value(domain.User{}).(domain.User)
 
+	if err := validateUser(&myUser); err != nil {
+		http.Error(writer, err.Message, http.StatusBadRequest)
+		return
+	}
+
+	token, statusCode, err := handler.service.Register(&myUser)
+	if statusCode == 55 {
+		writer.WriteHeader(http.StatusFound)
+		http.Error(writer, err.Error(), 302)
+		return
+	}
+	if err != nil {
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}
+
+	jsonResponse(token, writer)
+}
+
+func (handler *AuthHandler) VerifyAccount(writer http.ResponseWriter, req *http.Request) {
+
+	var request domain.RegisterValidation
+	err := json.NewDecoder(req.Body).Decode(&request)
 	if err != nil {
 		log.Println(err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := validateUser(&request); err != nil {
-		http.Error(writer, err.Message, http.StatusBadRequest)
+	if len(request.UserToken) == 0 {
+		http.Error(writer, errors.InvalidUserTokenError, http.StatusBadRequest)
 		return
 	}
 
-	code, err := handler.service.Register(&request)
+	err = handler.service.VerifyAccount(&request)
 	if err != nil {
-		http.Error(writer, err.Error(), code)
+		if err.Error() == errors.InvalidTokenError {
+			log.Println(err.Error())
+			http.Error(writer, errors.InvalidTokenError, http.StatusNotAcceptable)
+		} else if err.Error() == errors.ExpiredTokenError {
+			log.Println(err.Error())
+			http.Error(writer, errors.ExpiredTokenError, http.StatusNotFound)
+		}
 		return
 	}
 
 	writer.WriteHeader(http.StatusOK)
 }
 
-func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request) {
+func (handler *AuthHandler) ResendVerificationToken(writer http.ResponseWriter, req *http.Request) {
 
+	var request domain.ResendVerificationRequest
+	err := json.NewDecoder(req.Body).Decode(&request)
+	if err != nil {
+		http.Error(writer, errors.InvalidRequestFormatError, http.StatusBadRequest)
+		log.Fatal(err.Error())
+		return
+	}
+
+	err = handler.service.ResendVerificationToken(&request)
+	if err != nil {
+		if err.Error() == errors.InvalidResendMailError {
+			http.Error(writer, err.Error(), http.StatusNotAcceptable)
+			return
+		} else {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	writer.WriteHeader(http.StatusOK)
+}
+
+func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request) {
 	var request domain.Credentials
 	err := json.NewDecoder(req.Body).Decode(&request)
-
 	if err != nil {
-		log.Println(err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	token, err := handler.service.Login(&request)
 	if err != nil {
-		http.Error(writer, err.Error(), http.StatusNotFound)
+		if err.Error() == errors.NotVerificatedUser {
+			http.Error(writer, token, http.StatusLocked)
+			return
+		}
+		http.Error(writer, "Username not exist!", http.StatusBadRequest)
 		return
 	}
+
+	if token == "not_same" {
+		http.Error(writer, "Wrong password", http.StatusUnauthorized)
+		return
+	}
+
 	writer.Write([]byte(token))
+}
+
+func MiddlewareUserValidation(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+		user := &domain.User{}
+		err := user.FromJSON(request.Body)
+		if err != nil {
+			http.Error(responseWriter, "Unable to Decode JSON", http.StatusBadRequest)
+			return
+		}
+
+		err = user.ValidateUser()
+		if err != nil {
+			http.Error(responseWriter, fmt.Sprintf("Validation Error:\n %s.", err), http.StatusBadRequest)
+			return
+		}
+
+		ctx := context.WithValue(request.Context(), domain.User{}, *user)
+		request = request.WithContext(ctx)
+
+		next.ServeHTTP(responseWriter, request)
+	})
 }

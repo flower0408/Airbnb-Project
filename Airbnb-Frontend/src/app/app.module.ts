@@ -11,6 +11,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatSelectModule} from '@angular/material/select';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -20,6 +21,7 @@ import { HeaderComponent } from './components/header/header.component';
 import { RegisterComponent } from './components/register/register.component';
 import { LoginComponent } from './components/login/login.component';
 import { AuthInterceptor } from './services/auth.interceptor';
+import {VerifyAccountComponent} from "./components/verify-account/verify-account.component";
 
 @NgModule({
   declarations: [
@@ -27,7 +29,8 @@ import { AuthInterceptor } from './services/auth.interceptor';
     MainPageComponent,
     HeaderComponent,
     RegisterComponent,
-    LoginComponent
+    LoginComponent,
+    VerifyAccountComponent,
   ],
   imports: [
     BrowserModule,
@@ -43,7 +46,8 @@ import { AuthInterceptor } from './services/auth.interceptor';
     MatCardModule,
     MatFormFieldModule,
     MatSelectModule,
-    MatDividerModule
+    MatDividerModule,
+    MatSnackBarModule,
   ],
   providers: [{
     provide: HTTP_INTERCEPTORS,

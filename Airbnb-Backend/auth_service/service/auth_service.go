@@ -2,14 +2,17 @@ package application
 
 import (
 	"auth_service/domain"
+	"auth_service/errors"
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/cristalhq/jwt/v4"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/gomail.v2"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -21,18 +24,26 @@ import (
 var (
 	userServiceHost = os.Getenv("USER_SERVICE_HOST")
 	userServicePort = os.Getenv("USER_SERVICE_PORT")
+	smtpServer      = "smtp.office365.com"
+	smtpServerPort  = 587
+	smtpEmail       = os.Getenv("SMTP_AUTH_MAIL")
+	smtpPassword    = os.Getenv("SMTP_AUTH_PASSWORD")
 )
-
-var jwtKey = []byte("my_secret_key")
 
 type AuthService struct {
 	store domain.AuthStore
+	cache domain.AuthCache
 }
 
-func NewAuthService(store domain.AuthStore) *AuthService {
+func NewAuthService(store domain.AuthStore, cache domain.AuthCache) *AuthService {
 	return &AuthService{
 		store: store,
+		cache: cache,
 	}
+}
+
+func (service *AuthService) GetAll() ([]*domain.Credentials, error) {
+	return service.store.GetAll()
 }
 
 type ValidationError struct {
@@ -134,51 +145,55 @@ func validateUser(user *domain.User) *ValidationError {
 	return nil
 }
 
-func (service *AuthService) Register(user *domain.User) (int, error) {
+func (service *AuthService) Register(user *domain.User) (string, int, error) {
 
 	if err := validateUser(user); err != nil {
-		return 400, err
+		return "", 400, err
 	}
 
+	/* PAZI OVDE OVO JE TRENUTNO ZAKOMENTARISANO - PROVERA DA NE POSTOJI USER SA ISTIM MAILOM
 	existingUser, err := service.store.GetOneUser(user.Username)
 	if err != nil {
-		return 500, err
+		return "", 500, err
 	}
 
 	if existingUser != nil {
-		return 409, errors.New("Username already exists")
+		return "", 409, fmt.Errorf(errors.UsernameExist)
 	}
 
+	userServiceEndpointMail := fmt.Sprintf("http://%s:%s/mailExist/%s", userServiceHost, userServicePort, user.Email)
+	userServiceRequestMail, _ := http.NewRequest("GET", userServiceEndpointMail, nil)
+	response, _ := http.DefaultClient.Do(userServiceRequestMail)
+	if response.StatusCode != 404 {
+		return "", 406, fmt.Errorf(errors.EmailAlreadyExist)
+	}
+	*/
 	pass := []byte(user.Password)
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
 	if err != nil {
-		return 500, err
+		return "", 500, err
 	}
 	user.Password = string(hash)
 
 	body, err := json.Marshal(user)
 	if err != nil {
-		return 500, err
+		return "", 500, err
 	}
 
 	userServiceEndpoint := fmt.Sprintf("http://%s:%s/", userServiceHost, userServicePort)
-
 	userServiceRequest, _ := http.NewRequest("POST", userServiceEndpoint, bytes.NewReader(body))
 	responseUser, err := http.DefaultClient.Do(userServiceRequest)
-	if err != nil {
-		return 500, err
-	}
 
 	if responseUser.StatusCode != 200 {
 		buf := new(strings.Builder)
 		_, _ = io.Copy(buf, responseUser.Body)
-		return responseUser.StatusCode, fmt.Errorf(buf.String())
+		return "", responseUser.StatusCode, fmt.Errorf(buf.String())
 	}
 
 	var newUser domain.User
 	err = responseToType(responseUser.Body, newUser)
 	if err != nil {
-		return 500, err
+		return "", 500, err
 	}
 
 	credentials := domain.Credentials{
@@ -186,47 +201,185 @@ func (service *AuthService) Register(user *domain.User) (int, error) {
 		Username: user.Username,
 		Password: user.Password,
 		UserType: user.UserType,
+		Verified: false,
 	}
 
 	err = service.store.Register(&credentials)
 	if err != nil {
-		return 500, err
+		return "", 500, err
 	}
-	return 200, nil
+
+	/*  OVDE JE POKUSANO SA ID-EM DA SE URADI ALI KONVERZIJA NE RADI IZ NEKOG RAZLOGA
+	validationToken := uuid.New()
+	log.Printf("User ID (Hex): %s", newUser.ID.Hex())
+	log.Printf("Generated validation token: %s", validationToken.String())
+
+	err = service.cache.PostCacheData(newUser.ID.Hex(), validationToken.String())
+	if err != nil {
+		log.Fatalf("Failed to post validation data to redis: %s", err)
+		return "", 500, err
+	}
+
+	err = sendValidationMail(validationToken, user.Email)
+	if err != nil {
+		return "", 500, err
+	}
+
+	return newUser.ID.Hex(), 200, nil*/
+	validationToken := uuid.New()
+	log.Printf("Username: %s", user.Username)
+	log.Printf("Generated validation token: %s", validationToken.String())
+
+	err = service.cache.PostCacheData(user.Username, validationToken.String())
+	if err != nil {
+		log.Fatalf("Failed to post validation data to redis: %s", err)
+		return "", 500, err
+	}
+
+	err = sendValidationMail(validationToken, user.Email)
+	if err != nil {
+		return "", 500, err
+	}
+
+	return user.Username, 200, nil
+
+}
+
+func sendValidationMail(validationToken uuid.UUID, email string) error {
+	message := gomail.NewMessage()
+	message.SetHeader("From", smtpEmail)
+	message.SetHeader("To", email)
+	message.SetHeader("Subject", "Verify your for airbnb account")
+
+	bodyString := fmt.Sprintf("Your validation token for airbnb account is:\n%s", validationToken)
+	message.SetBody("text", bodyString)
+
+	client := gomail.NewDialer(smtpServer, smtpServerPort, smtpEmail, smtpPassword)
+
+	if err := client.DialAndSend(message); err != nil {
+		log.Fatalf("failed to send verification mail because of: %s", err)
+		return err
+	}
+
+	return nil
+}
+
+func (service *AuthService) VerifyAccount(validation *domain.RegisterValidation) error {
+
+	log.Printf("Validation token for verification: %s", validation.MailToken)
+	token, err := service.cache.GetCachedValue(validation.UserToken)
+	if err != nil {
+		log.Printf("Error fetching validation token from cache: %s", err)
+		log.Println(errors.ExpiredTokenError)
+		return fmt.Errorf(errors.ExpiredTokenError)
+	}
+
+	if validation.MailToken == token {
+		err = service.cache.DelCachedValue(validation.UserToken)
+		if err != nil {
+			log.Printf("error in deleting cached value: %s", err)
+			return err
+		}
+
+		log.Printf("validation.UserToken: %s", validation.UserToken)
+		/* ovaj deo je takodje vezan za pokusaj sa id-em
+		userID, err := primitive.ObjectIDFromHex(validation.UserToken)
+		user := service.store.GetOneUserByID(userID)
+
+		user.Verified = true*/
+		user, err := service.store.GetOneUser(validation.UserToken)
+		if user == nil {
+			log.Println("user not found")
+			return fmt.Errorf("user not found")
+		}
+		user.Verified = true
+
+		err = service.store.UpdateUser(user)
+		if err != nil {
+			log.Printf("error in updating user after changing status of verify: %s", err.Error())
+			return err
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf(errors.InvalidTokenError)
+}
+
+func (service *AuthService) ResendVerificationToken(request *domain.ResendVerificationRequest) error {
+	if len(request.UserMail) == 0 {
+		log.Println(errors.InvalidResendMailError)
+		return fmt.Errorf(errors.InvalidResendMailError)
+	}
+
+	tokenUUID, _ := uuid.NewUUID()
+
+	err := service.cache.PostCacheData(request.UserToken, tokenUUID.String())
+	if err != nil {
+		log.Println("POST CACHE DATA PROBLEM")
+		return err
+	}
+
+	err = sendValidationMail(tokenUUID, request.UserMail)
+	if err != nil {
+		log.Println("SEND VALIDATION MAIL PROBLEM")
+		return err
+	}
+
+	return nil
 }
 
 func (service *AuthService) Login(credentials *domain.Credentials) (string, error) {
 	user, err := service.store.GetOneUser(credentials.Username)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return "", errors.New("Invalid username or password")
+			return "", fmt.Errorf(errors.InvalidCredentials)
 		}
 		return "", fmt.Errorf("Error retrieving user: %v", err)
 	}
 
 	if user == nil {
-		return "", errors.New("Invalid username or password")
+		return "", fmt.Errorf(errors.InvalidCredentials)
+	}
+
+	if !user.Verified {
+		userServiceEndpoint := fmt.Sprintf("http://%s:%s/%s", userServiceHost, userServicePort, user.ID.Hex())
+		userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
+		response, _ := http.DefaultClient.Do(userServiceRequest)
+		if response.StatusCode != 200 {
+			if response.StatusCode == 404 {
+				return "", fmt.Errorf("user doesn't exist")
+			}
+		}
+
+		var userUser domain.User
+		err := responseToType(response.Body, &userUser)
+		if err != nil {
+			return "", err
+		}
+
+		verify := domain.ResendVerificationRequest{
+			UserToken: user.ID.Hex(),
+			UserMail:  userUser.Email,
+		}
+
+		err = service.ResendVerificationToken(&verify)
+		if err != nil {
+			return "", err
+		}
+
+		return user.ID.Hex(), fmt.Errorf(errors.NotVerificatedUser)
 	}
 
 	passError := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(credentials.Password))
 	if passError != nil {
-		return "", errors.New("Invalid username or password")
-	}
-	expirationTime := time.Now().Add(15 * time.Minute)
-
-	claims := &domain.Claims{
-		Username: user.Username,
-		Role:     user.UserType,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-		},
+		return "not_same", err
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := GenerateJWT(user)
 
-	tokenString, err := token.SignedString(jwtKey)
 	if err != nil {
-		return "", errors.New("Error generating token")
+		return "", err
 	}
 
 	return tokenString, nil
@@ -235,13 +388,40 @@ func (service *AuthService) Login(credentials *domain.Credentials) (string, erro
 func responseToType(response io.ReadCloser, any any) error {
 	responseBodyBytes, err := io.ReadAll(response)
 	if err != nil {
+		log.Printf("err in readAll %s", err.Error())
 		return err
 	}
 
 	err = json.Unmarshal(responseBodyBytes, &any)
 	if err != nil {
+		log.Printf("err in Unmarshal %s", err.Error())
 		return err
 	}
 
 	return nil
+}
+
+func GenerateJWT(user *domain.Credentials) (string, error) {
+
+	key := []byte(os.Getenv("SECRET_KEY"))
+	signer, err := jwt.NewSignerHS(jwt.HS256, key)
+	if err != nil {
+		log.Println(err)
+	}
+
+	builder := jwt.NewBuilder(signer)
+
+	claims := &domain.Claims{
+		UserID:    user.ID,
+		Username:  user.Username,
+		Role:      user.UserType,
+		ExpiresAt: time.Now().Add(time.Minute * 60),
+	}
+
+	token, err := builder.Build(claims)
+	if err != nil {
+		log.Println(err)
+	}
+
+	return token.String(), nil
 }

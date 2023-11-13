@@ -33,11 +33,17 @@ services:
     environment:
       AUTH_DB_HOST: ${AUTH_DB_HOST}
       AUTH_DB_PORT: ${AUTH_DB_PORT}
+      AUTH_CACHE_HOST: ${AUTH_CACHE_HOST}
+      AUTH_CACHE_PORT: ${AUTH_CACHE_PORT}
       AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT}
+      SECRET_KEY: ${SECRET_KEY}
       USER_SERVICE_HOST: ${USER_SERVICE_HOST}
       USER_SERVICE_PORT: ${USER_SERVICE_PORT}
+      SMTP_AUTH_MAIL: ${SMTP_AUTH_MAIL}
+      SMTP_AUTH_PASSWORD: ${SMTP_AUTH_PASSWORD}
     depends_on:
       - auth_db
+      - auth_cache
     networks:
       - network
 
@@ -66,6 +72,25 @@ services:
     restart: on-failure
     networks:
       - network
+
+  auth_cache:
+    image: redis
+    restart: always
+    environment:
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL,CONFIG
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - ${AUTH_CACHE_PORT}:${AUTH_CACHE_PORT}
+    command: redis-server --save 20 1 --loglevel warning
+    networks:
+      - network
+    volumes:
+      - auth_cache:/data
+
+volumes:
+
+  auth_cache:
+    driver: local
 
 
 networks:

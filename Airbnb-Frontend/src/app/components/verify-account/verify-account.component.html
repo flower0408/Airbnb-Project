@@ -1,0 +1,28 @@
+<div>
+  <mat-card class="verify-acc-card">
+    <mat-card-title class="verify-acc-title mx-auto w-50">Verification token has been re-sent. Please check both your email inbox and spam folder for further instructions.</mat-card-title>
+
+    <div class="form-group mx-auto w-50">
+      <form [formGroup]="formGroup">
+        <div class="mb-3">
+          <mat-card-title class="card-title">Type your verification token</mat-card-title>
+          <input type="text" maxlength="36" class="form-control" formControlName="verificationToken"
+                 [ngClass]="{ 'is-invalid': submitted && form['verificationToken'].errors }">
+          <div *ngIf="submitted && form['verificationToken'].errors" class="invalid-feedback">
+            <div *ngIf="form['verificationToken'].errors['required']">Verification token is required.</div>
+          </div>
+          <div *ngIf="formGroup.errors?.['invalidToken']" class="invalid-token">
+            Your token is invalid. Try again.
+          </div>
+          <div *ngIf="formGroup.errors?.['expiredToken']" class="invalid-token">
+            Your token is expired.<br>
+            <a *ngIf="!resend" (click)="resendVerifyToken()">Resend verification token.</a>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" (click)="onSubmit()">Verify</button>
+      </form>
+    </div>
+  </mat-card>
+</div>
+
+

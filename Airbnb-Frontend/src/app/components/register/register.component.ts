@@ -4,6 +4,7 @@ import { User } from 'src/app/models/user.model';
 import { AuthService } from 'src/app/services/auth.service';
 import { PasswordStrengthValidator } from 'src/app/services/customValidators';
 import {Router} from "@angular/router";
+import {VerificationService} from "../../services/verify.service";
 
 @Component({
   selector: 'app-register',
@@ -36,7 +37,8 @@ export class RegisterComponent implements OnInit {
 
   constructor(private authService: AuthService,
               private formBuilder: FormBuilder,
-              private router: Router) { }
+              private router: Router,
+              private verificationService: VerificationService) { }
 
   // @ts-ignore
   formGroup: FormGroup;
@@ -81,10 +83,10 @@ export class RegisterComponent implements OnInit {
 
     this.authService.Register(registerUser)
       .subscribe({
-        next: (data: User) => {
-          console.log(data);
-          alert("You have been successfully registered to Airbnb!");
-          this.router.navigate(['/Login']);
+        next: (registrationToken: string) => {
+          this.verificationService.updateUserMail(registerUser.email);
+          this.verificationService.updateVerificationToken(registrationToken);
+          this.router.navigate(['/Verify-Account']);
         },
         error: (error) => {
           console.log(error)
