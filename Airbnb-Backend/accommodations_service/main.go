@@ -25,12 +25,12 @@ func main() {
 	storeLogger := log.New(os.Stdout, "[acc-store] ", log.LstdFlags)
 
 	// NoSQL: Initialize Product Repository store
-	store, err := data.New(storeLogger)
+	store, err := data.New(timeoutContext, storeLogger)
 	if err != nil {
 		logger.Fatal(err)
 	}
-	defer store.CloseSession()
-	store.CreateTables()
+	defer store.DisconnectMongo(timeoutContext)
+	store.Ping()
 
 	accommodationHandler := handlers.NewAccommodationHandler(logger, store)
 

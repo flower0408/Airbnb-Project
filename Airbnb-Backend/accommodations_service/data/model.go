@@ -2,27 +2,27 @@ package data
 
 import (
 	"encoding/json"
-	"github.com/gocql/gocql"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"io"
 )
 
 type Accommodation struct {
-	ID          gocql.UUID `json:"id" db:"accommodation_id"`
-	Name        string     `json:"name" db:"accommodation_name"`
-	Description string     `json:"description" db:"accommodation_description"`
-	Images      string     `json:"images" db:"accommodation_images"`
-	Location    Location   `json:"location" db:"-"`
-	Benefits    string     `json:"benefits" db:"accommodation_benefits"`
-	MinGuest    int        `json:"minGuest" db:"minGuest"`
-	MaxGuest    int        `json:"maxGuest" db:"maxGuest"`
-	OwnerId     gocql.UUID `json:"ownerId" db:"ownerId"`
+	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Name        string             `bson:"name,omitempty" json:"name"`
+	Description string             `bson:"description,omitempty" json:"description"`
+	Images      string             `bson:"images,omitempty" json:"images"`
+	Location    Location           `bson:"location,omitempty" json:"location"`
+	Benefits    string             `bson:"benefits,omitempty" json:"benefits"`
+	MinGuest    int                `bson:"minGuest,omitempty" json:"minGuest"`
+	MaxGuest    int                `bson:"maxGuest,omitempty" json:"maxGuest"`
+	OwnerId     string             `bson:"ownerId,omitempty" json:"ownerId"`
 }
 
 type Location struct {
-	Country string `json:"country" db:"country"`
-	City    string `json:"city" db:"city"`
-	Street  string `json:"street" db:"street"`
-	Number  int    `json:"numberr" db:"numberr"`
+	Country string `bson:"country,omitempty" json:"country"`
+	City    string `bson:"city,omitempty" json:"city"`
+	Street  string `bson:"street,omitempty" json:"street"`
+	Number  int    `bson:"number,omitempty" json:"number"`
 }
 
 func (o *Accommodation) ToJSON(w io.Writer) error {
