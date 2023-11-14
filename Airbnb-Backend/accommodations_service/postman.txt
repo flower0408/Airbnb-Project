@@ -3,15 +3,15 @@
   "description":"opis",
   "images":"slika",
   "location": {
-    "Country":"Srbija",
-    "City":"Zlatibor",
-    "Street":"Glavna",
-    "Number": 180
+    "country":"Srbija",
+    "city":"Zlatibor",
+    "street":"Glavna",
+    "number": 180
   },
   "benefits":"bazen, klima, internet",
   "minGuest": 10,
   "maxGuest": 50,
-  "ownerId": nestoo
+  "ownerId": "nestoo"
 
 }
 
@@ -28,5 +28,5 @@
   "benefits": "Free Wi-Fi, Parking, Breakfast",
   "minGuest": 1,
   "maxGuest": 2,
-  "ownerId": nestoo
+  "ownerId": "nestoo"
 }

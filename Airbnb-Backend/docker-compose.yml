@@ -88,7 +88,7 @@ services:
       - network
 
   accommodations_db:
-    image: cassandra
+    image: mongo
     container_name: accommodations_db
     restart: on-failure
     networks:
