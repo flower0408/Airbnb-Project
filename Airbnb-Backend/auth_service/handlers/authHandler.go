@@ -38,12 +38,12 @@ func (handler *AuthHandler) Init(router *mux.Router) {
 	registerRouter.Use(MiddlewareUserValidation)
 
 	verifyRouter := router.Methods(http.MethodPost).Subrouter()
-	verifyRouter.HandleFunc("/verifyAccount", handler.VerifyAccount)
+	verifyRouter.HandleFunc("/verifyAccount", handler.AccountConfirmation)
 
 	router.HandleFunc("/", handler.GetAll).Methods("GET")
 	router.HandleFunc("/login", handler.Login).Methods("POST")
 	router.HandleFunc("/register", handler.Register).Methods("POST")
-	router.HandleFunc("/verifyAccount", handler.VerifyAccount).Methods("POST")
+	router.HandleFunc("/accountConfirmation", handler.AccountConfirmation).Methods("POST")
 	router.HandleFunc("/resendVerify", handler.ResendVerificationToken).Methods("POST")
 	router.HandleFunc("/recoverPasswordToken", handler.SendRecoveryPasswordToken).Methods("POST")
 	router.HandleFunc("/checkRecoverToken", handler.CheckRecoveryPasswordToken).Methods("POST")
@@ -179,7 +179,7 @@ func (handler *AuthHandler) Register(writer http.ResponseWriter, req *http.Reque
 	jsonResponse(token, writer)
 }
 
-func (handler *AuthHandler) VerifyAccount(writer http.ResponseWriter, req *http.Request) {
+func (handler *AuthHandler) AccountConfirmation(writer http.ResponseWriter, req *http.Request) {
 
 	var request domain.RegisterValidation
 	err := json.NewDecoder(req.Body).Decode(&request)
@@ -194,7 +194,7 @@ func (handler *AuthHandler) VerifyAccount(writer http.ResponseWriter, req *http.
 		return
 	}
 
-	err = handler.service.VerifyAccount(&request)
+	err = handler.service.AccountConfirmation(&request)
 	if err != nil {
 		if err.Error() == errors.InvalidTokenError {
 			log.Println(err.Error())

@@ -25,7 +25,7 @@ export class RecoveryEnterTokenComponent implements OnInit {
     private recoveryService: RecoveryPasswordService
   ) { }
 
-  
+
 
   ngOnInit(): void {
     this.formGroup = this.formBuilder.group({
@@ -40,20 +40,18 @@ export class RecoveryEnterTokenComponent implements OnInit {
   onSubmit(){
     this.submitted = true;
 
-    console.log(this.formGroup.invalid)
+    //console.log(this.formGroup.invalid)
 
     if (this.formGroup.invalid) {
       return;
     }
 
     let userToken = ""
-    this.recoveryService.currentToken.subscribe(tok => {userToken = tok; console.log(tok)})
+    this.recoveryService.currentToken.subscribe(tok => {userToken = tok;})
     let token = this.formGroup.get("token")?.value
     let req = new VerificationRequest()
-    console.log(userToken)
     req.user_token = userToken
     req.mail_token = token
-    console.log(req)
     this.authService.CheckRecoveryToken(req).subscribe({
       next: (v: void) => {
         this.router.navigate(['/Recovery-Password'])
@@ -62,7 +60,7 @@ export class RecoveryEnterTokenComponent implements OnInit {
         if(error.status == 404 || error.status == 406){
           this.formGroup.setErrors({invalidToken:true})
         }else{
-          alert('an error is occured.')
+          alert('an error is occurred.')
         }
       }
     })

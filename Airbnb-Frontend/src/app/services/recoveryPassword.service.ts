@@ -14,7 +14,6 @@ export class RecoveryPasswordService {
  }
 
  updateToken(message: string){
-  console.log(message)
    this.token.next(message)
  }
 

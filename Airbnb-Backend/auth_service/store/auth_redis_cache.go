@@ -18,10 +18,7 @@ func NewAuthRedisCache(client *redis.Client) domain.AuthCache {
 }
 
 func (a *AuthRedisCache) PostCacheData(key string, value string) error {
-	log.Println("redis post")
 	result := a.client.Set(key, value, 10*time.Minute)
-	log.Println(result.Err())
-	log.Println(result.Result())
 	if result.Err() != nil {
 		log.Printf("redis set error: %s", result.Err())
 		return result.Err()

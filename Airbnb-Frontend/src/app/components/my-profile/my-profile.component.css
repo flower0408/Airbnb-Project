@@ -6,7 +6,7 @@
   width: 60%;
   margin: 50px auto;
   padding: 20px;
-  background: linear-gradient(45deg, #D3DEF8, #9FBFDE);
+  background: linear-gradient(45deg, #F3CFC6, #FCEBEC);
   color: #fff;
   border-radius: 15px;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
@@ -19,13 +19,13 @@
 
 .profile {
   font-size: 36px;
-  color: #556A9A;
+  color: #F88379;
 }
 
 .profile-info .info {
   font-size: 18px;
   margin: 10px 0;
-  color: #556A9A;
+  color: #F88379;
 }
 
 .profile-options {
@@ -36,7 +36,7 @@
   padding: 15px 30px;
   font-size: 18px;
   color: #fff;
-  background-color: #556A9A;
+  background-color: #F88379;
   border: none;
   border-radius: 10px;
   cursor: pointer;

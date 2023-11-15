@@ -3,7 +3,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { LoginComponent } from './components/login/login.component';
 import { MainPageComponent } from './components/main-page/main-page.component';
 import { RegisterComponent } from './components/register/register.component';
-import {VerifyAccountComponent} from "./components/verify-account/verify-account.component";
+import {AccountConfirmationComponent} from "./components/account-confirmation/account-confirmation.component";
 import {RecoveryEnterMailComponent} from "./components/recovery-enter-mail/recovery-enter-mail.component";
 import {RecoveryEnterTokenComponent} from "./components/recovery-enter-token/recovery-enter-token.component";
 import {RecoveryNewPasswordsComponent} from "./components/recovery-new-passwords/recovery-new-passwords.component";
@@ -22,8 +22,8 @@ const routes: Routes = [
   },
 
   {
-    path: 'Verify-Account',
-    component: VerifyAccountComponent
+    path: 'Account-Confirmation',
+    component: AccountConfirmationComponent
   },
 
   {

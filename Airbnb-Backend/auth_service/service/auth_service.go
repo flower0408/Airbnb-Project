@@ -267,7 +267,7 @@ func sendValidationMail(validationToken uuid.UUID, email string) error {
 	return nil
 }
 
-func (service *AuthService) VerifyAccount(validation *domain.RegisterValidation) error {
+func (service *AuthService) AccountConfirmation(validation *domain.RegisterValidation) error {
 
 	log.Printf("Validation token for verification: %s", validation.MailToken)
 	token, err := service.cache.GetCachedValue(validation.UserToken)

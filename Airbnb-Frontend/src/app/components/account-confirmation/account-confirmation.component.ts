@@ -9,11 +9,11 @@ import {MatSnackBar} from "@angular/material/snack-bar";
 import {ResendVerificationRequest} from "../../dto/resend-verification-request";
 
 @Component({
-  selector: 'app-verify-account',
-  templateUrl: './verify-account.component.html',
-  styleUrls: ['./verify-account.component.css']
+  selector: 'app-account-confirmation',
+  templateUrl: './account-confirmation.component.html',
+  styleUrls: ['./account-confirmation.component.css']
 })
-export class VerifyAccountComponent implements OnInit {
+export class AccountConfirmationComponent implements OnInit {
 
   formGroup: FormGroup = new FormGroup({
     verificationToken: new FormControl(''),

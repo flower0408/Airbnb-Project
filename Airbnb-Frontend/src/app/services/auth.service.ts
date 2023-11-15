@@ -21,7 +21,7 @@ export class AuthService {
     }
 
   public VerifyAccount(request: VerificationRequest): Observable<void> {
-    return this.http.post<void>(`${environment.baseApiUrl}/${this.url}/verifyAccount`, request);
+    return this.http.post<void>(`${environment.baseApiUrl}/${this.url}/accountConfirmation`, request);
   }
 
   public ResendVerificationToken(request: ResendVerificationRequest): Observable<void> {

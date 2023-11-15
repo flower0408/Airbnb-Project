@@ -4,7 +4,7 @@ ul {
   margin-left: 180px;
   padding: 0;
   overflow: hidden;
-  background-color: #556A9A;
+  background-color: #F3CFC6;
   display: flex;
   padding: 10px;
   border-radius: 20px;
@@ -15,7 +15,7 @@ ul li{
 
 ul li a {
   float: left;
-  color: white;
+  color: black;
   text-align: center;
   padding: 10px 17px;
   text-decoration: none;
@@ -23,13 +23,13 @@ ul li a {
 }
 
 ul li a:hover {
-  background-color: #F3CFC6;
+  background-color: #FFF5EE;
   color: black;
   cursor: pointer;
 }
 nav{
   overflow: hidden;
-  background-color: #556A9A;
+  background-color: #F3CFC6;
   display: flex;
   justify-content: space-between;
   padding: 10px;
@@ -43,6 +43,6 @@ nav a{
   font-size: 17px;
 }
 nav a:hover {
-  background-color: #F3CFC6;
+  background-color: #EADDCA;
   color: black;
 }

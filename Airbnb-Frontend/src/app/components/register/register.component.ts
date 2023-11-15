@@ -86,7 +86,7 @@ export class RegisterComponent implements OnInit {
         next: (registrationToken: string) => {
           this.verificationService.updateUserMail(registerUser.email);
           this.verificationService.updateVerificationToken(registrationToken);
-          this.router.navigate(['/Verify-Account']);
+          this.router.navigate(['/Account-Confirmation']);
         },
         error: (error) => {
           console.log(error)

@@ -21,7 +21,7 @@ import { HeaderComponent } from './components/header/header.component';
 import { RegisterComponent } from './components/register/register.component';
 import { LoginComponent } from './components/login/login.component';
 import { AuthInterceptor } from './services/auth.interceptor';
-import {VerifyAccountComponent} from "./components/verify-account/verify-account.component";
+import {AccountConfirmationComponent} from "./components/account-confirmation/account-confirmation.component";
 import { RecoveryEnterMailComponent } from './components/recovery-enter-mail/recovery-enter-mail.component';
 import { RecoveryEnterTokenComponent } from './components/recovery-enter-token/recovery-enter-token.component';
 import { RecoveryNewPasswordsComponent } from './components/recovery-new-passwords/recovery-new-passwords.component';
@@ -35,7 +35,7 @@ import {ChangePasswordComponent} from "./components/change-password/change-passw
     HeaderComponent,
     RegisterComponent,
     LoginComponent,
-    VerifyAccountComponent,
+    AccountConfirmationComponent,
     RecoveryEnterMailComponent,
     RecoveryEnterTokenComponent,
     RecoveryNewPasswordsComponent,

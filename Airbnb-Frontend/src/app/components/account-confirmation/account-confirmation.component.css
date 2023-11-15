@@ -6,7 +6,7 @@
 
 .card-title {
   font-size: 20px;
-  color: #B7936B;
+  color: #F88379;
 }
 
 .verify-acc-card {
@@ -14,14 +14,14 @@
   margin: auto;
   margin-top: 60px;
   text-align: center;
-  background-color: #D3DEF8;
+  background-color: #F3CFC6;
   border-radius: 20px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
 }
 
 .btn {
   width: 50%;
-  background-color: #556A9A;
+  background-color: #F88379;
   color: white;
   border: none;
   padding: 10px;
