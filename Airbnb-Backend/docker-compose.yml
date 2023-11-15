@@ -60,6 +60,26 @@ services:
     networks:
       - network
 
+  reservations_service:
+    image: reservations_service
+    container_name: reservations_service
+    build:
+      context: .
+      dockerfile: ./reservations_service/Dockerfile
+    restart: always
+    ports:
+      - ${RESERVATIONS_SERVICE_PORT}:${RESERVATIONS_SERVICE_PORT}
+    environment:
+      RESERVATIONS_DB_HOST: ${RESERVATIONS_DB_HOST}
+      RESERVATIONS_DB_PORT: ${RESERVATIONS_DB_PORT}
+      RESERVATIONS_SERVICE_PORT: ${RESERVATIONS_SERVICE_PORT}
+      APPOINTMENTS_DB_HOST: ${APPOINTMENTS_DB_HOST}
+      APPOINTMENTS_DB_PORT: ${APPOINTMENTS_DB_PORT}
+    depends_on:
+      - reservations_db
+    networks:
+      - network
+
 
   api_gateway:
     build:
@@ -90,6 +110,20 @@ services:
   accommodations_db:
     image: mongo
     container_name: accommodations_db
+    restart: on-failure
+    networks:
+      - network
+
+  reservations_db:
+    image: cassandra
+    container_name: reservations_db
+    restart: on-failure
+    networks:
+      - network
+
+  appointments_db:
+    image: mongo
+    container_name: appointments_db
     restart: on-failure
     networks:
       - network
