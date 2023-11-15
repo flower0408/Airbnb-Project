@@ -1,15 +1,9 @@
-.verify-acc-title {
-  font-size: 24px;
-  padding: 15px;
-  color: #333;
-}
-
 .card-title {
   font-size: 20px;
   color: #B7936B;
 }
 
-.verify-acc-card {
+.recovery-pass-card{
   width: 50%;
   margin: auto;
   margin-top: 60px;
@@ -34,10 +28,9 @@
   color: black;
 }
 
-.invalid-token {
+.invalid-email {
   margin: 20px 0px;
   font-size: 18px;
   color: #FF5733;
   text-align: center;
 }
-

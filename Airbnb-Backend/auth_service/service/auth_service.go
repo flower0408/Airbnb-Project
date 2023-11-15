@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/gomail.v2"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -294,7 +296,7 @@ func (service *AuthService) VerifyAccount(validation *domain.RegisterValidation)
 		}
 		user.Verified = true
 
-		err = service.store.UpdateUser(user)
+		err = service.store.UpdateUserUsername(user)
 		if err != nil {
 			log.Printf("error in updating user after changing status of verify: %s", err.Error())
 			return err
@@ -323,6 +325,149 @@ func (service *AuthService) ResendVerificationToken(request *domain.ResendVerifi
 	err = sendValidationMail(tokenUUID, request.UserMail)
 	if err != nil {
 		log.Println("SEND VALIDATION MAIL PROBLEM")
+		return err
+	}
+
+	return nil
+}
+
+func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int, error) {
+
+	userServiceEndpoint := fmt.Sprintf("http://%s:%s/mailExist/%s", userServiceHost, userServicePort, email)
+	userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
+	response, _ := http.DefaultClient.Do(userServiceRequest)
+	if response.StatusCode != 200 {
+		if response.StatusCode == 404 {
+			return "", 404, fmt.Errorf(errors.NotFoundMailError)
+		}
+	}
+
+	buf := new(strings.Builder)
+	_, _ = io.Copy(buf, response.Body)
+	userID := buf.String()
+
+	userDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", userServiceHost, userServicePort, userID)
+	userDetailsRequest, _ := http.NewRequest("GET", userDetailsEndpoint, nil)
+	userDetailsResponse, _ := http.DefaultClient.Do(userDetailsRequest)
+
+	body, err := ioutil.ReadAll(userDetailsResponse.Body)
+	if err != nil {
+		return "", 500, err
+	}
+
+	responseBodyString := string(body)
+	log.Printf("User details response: %s", responseBodyString)
+
+	var userDetails UserDetails
+	err = json.Unmarshal(body, &userDetails)
+	if err != nil {
+		fmt.Println("Error unmarshaling JSON:", err)
+		return "", 0, nil
+	}
+
+	fmt.Println("Username:", userDetails.Username)
+
+	userUsernameCredentials, err := service.store.GetOneUser(userDetails.Username)
+	if err != nil {
+		return "", 500, err
+	}
+	userID = userUsernameCredentials.ID.Hex()
+
+	fmt.Println("Retrieved user ID:", userID)
+
+	recoverUUID, _ := uuid.NewUUID()
+	err = sendRecoverPasswordMail(recoverUUID, email)
+	if err != nil {
+		return "", 500, err
+	}
+
+	err = service.cache.PostCacheData(userID, recoverUUID.String())
+	if err != nil {
+		return "", 500, err
+	}
+
+	return userID, 200, nil
+}
+
+type UserDetails struct {
+	ID        string `json:"id"`
+	Username  string `json:"username"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Gender    string `json:"gender"`
+	Age       int    `json:"age"`
+	Residence string `json:"residence"`
+	Email     string `json:"email"`
+	UserType  string `json:"userType"`
+}
+
+func sendRecoverPasswordMail(validationToken uuid.UUID, email string) error {
+	message := gomail.NewMessage()
+	message.SetHeader("From", smtpEmail)
+	message.SetHeader("To", email)
+	message.SetHeader("Subject", "Recover password on your Airbnb account")
+
+	bodyString := fmt.Sprintf("Your recover password token is:\n%s", validationToken)
+	message.SetBody("text", bodyString)
+
+	client := gomail.NewDialer(smtpServer, smtpServerPort, smtpEmail, smtpPassword)
+
+	if err := client.DialAndSend(message); err != nil {
+		log.Fatalf("failed to send verification mail because of: %s", err)
+		return err
+	}
+
+	return nil
+}
+
+func (service *AuthService) CheckRecoveryPasswordToken(request *domain.RegisterValidation) error {
+
+	if len(request.UserToken) == 0 {
+		return fmt.Errorf(errors.InvalidUserTokenError)
+	}
+
+	token, err := service.cache.GetCachedValue(request.UserToken)
+	if err != nil {
+		return fmt.Errorf(errors.InvalidTokenError)
+	}
+
+	if request.MailToken != token {
+		return fmt.Errorf(errors.InvalidTokenError)
+	}
+
+	_ = service.cache.DelCachedValue(request.UserToken)
+	return nil
+}
+
+func (service *AuthService) RecoverPassword(recoverPassword *domain.RecoverPasswordRequest) error {
+	log.Println("Starting password recovery process...")
+	if recoverPassword.NewPassword != recoverPassword.RepeatedNew {
+		return fmt.Errorf(errors.NotMatchingPasswordsError)
+	}
+
+	primitiveID, err := primitive.ObjectIDFromHex(recoverPassword.UserID)
+	if err != nil {
+		log.Printf("Error converting user ID to ObjectID: %s", err)
+		return err
+	}
+	// Log the user ID
+	log.Printf("Recovering password for user ID: %s", primitiveID.Hex())
+
+	credentials := service.store.GetOneUserByID(primitiveID)
+	if credentials == nil {
+		log.Printf("User not found for ID: %s", primitiveID.Hex())
+		return fmt.Errorf("User not found")
+	}
+
+	pass := []byte(recoverPassword.NewPassword)
+	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	credentials.Password = string(hash)
+
+	err = service.store.UpdateUser(credentials)
+	if err != nil {
 		return err
 	}
 
@@ -412,7 +557,6 @@ func GenerateJWT(user *domain.Credentials) (string, error) {
 	builder := jwt.NewBuilder(signer)
 
 	claims := &domain.Claims{
-		UserID:    user.ID,
 		Username:  user.Username,
 		Role:      user.UserType,
 		ExpiresAt: time.Now().Add(time.Minute * 60),

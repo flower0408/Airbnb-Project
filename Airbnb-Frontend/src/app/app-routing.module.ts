@@ -4,6 +4,10 @@ import { LoginComponent } from './components/login/login.component';
 import { MainPageComponent } from './components/main-page/main-page.component';
 import { RegisterComponent } from './components/register/register.component';
 import {VerifyAccountComponent} from "./components/verify-account/verify-account.component";
+import {RecoveryEnterMailComponent} from "./components/recovery-enter-mail/recovery-enter-mail.component";
+import {RecoveryEnterTokenComponent} from "./components/recovery-enter-token/recovery-enter-token.component";
+import {RecoveryNewPasswordsComponent} from "./components/recovery-new-passwords/recovery-new-passwords.component";
+import {MyProfileComponent} from "./components/my-profile/my-profile.component";
 
 const routes: Routes = [
   {
@@ -19,6 +23,24 @@ const routes: Routes = [
   {
     path: 'Verify-Account',
     component: VerifyAccountComponent
+  },
+
+  {
+    path: 'Request-Recovery',
+    component: RecoveryEnterMailComponent
+  },
+  {
+    path: 'Recovery-Token',
+    component: RecoveryEnterTokenComponent
+  },
+  {
+    path: 'Recovery-Password',
+    component: RecoveryNewPasswordsComponent
+  },
+
+  {
+    path: 'My-Profile',
+    component: MyProfileComponent,
   },
 
   {

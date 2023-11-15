@@ -9,9 +9,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"io"
 	"log"
 	"net/http"
 	"regexp"
+	"strings"
 	"unicode"
 )
 
@@ -43,6 +45,9 @@ func (handler *AuthHandler) Init(router *mux.Router) {
 	router.HandleFunc("/register", handler.Register).Methods("POST")
 	router.HandleFunc("/verifyAccount", handler.VerifyAccount).Methods("POST")
 	router.HandleFunc("/resendVerify", handler.ResendVerificationToken).Methods("POST")
+	router.HandleFunc("/recoverPasswordToken", handler.SendRecoveryPasswordToken).Methods("POST")
+	router.HandleFunc("/checkRecoverToken", handler.CheckRecoveryPasswordToken).Methods("POST")
+	router.HandleFunc("/recoverPassword", handler.RecoverPassword).Methods("POST")
 	http.Handle("/", router)
 }
 
@@ -222,6 +227,66 @@ func (handler *AuthHandler) ResendVerificationToken(writer http.ResponseWriter, 
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
+	}
+
+	writer.WriteHeader(http.StatusOK)
+}
+
+func (handler *AuthHandler) SendRecoveryPasswordToken(writer http.ResponseWriter, req *http.Request) {
+
+	buf := new(strings.Builder)
+	_, err := io.Copy(buf, req.Body)
+	if err != nil {
+		http.Error(writer, errors.InvalidRequestFormatError, http.StatusBadRequest)
+		log.Fatal(err.Error())
+		return
+	}
+
+	id, statusCode, err := handler.service.SendRecoveryPasswordToken(buf.String())
+	if err != nil {
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}
+
+	jsonResponse(id, writer)
+}
+
+func (handler *AuthHandler) CheckRecoveryPasswordToken(writer http.ResponseWriter, req *http.Request) {
+
+	var request domain.RegisterValidation
+	err := json.NewDecoder(req.Body).Decode(&request)
+	if err != nil {
+		http.Error(writer, errors.InvalidRequestFormatError, http.StatusBadRequest)
+		log.Fatal(err.Error())
+		return
+	}
+
+	err = handler.service.CheckRecoveryPasswordToken(&request)
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusNotAcceptable)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
+}
+
+func (handler *AuthHandler) RecoverPassword(writer http.ResponseWriter, req *http.Request) {
+	var request domain.RecoverPasswordRequest
+	err := json.NewDecoder(req.Body).Decode(&request)
+	if err != nil {
+		http.Error(writer, errors.InvalidRequestFormatError, http.StatusBadRequest)
+		log.Fatal(err.Error())
+		return
+	}
+
+	err = handler.service.RecoverPassword(&request)
+	if err != nil {
+		if err.Error() == errors.NotMatchingPasswordsError {
+			http.Error(writer, err.Error(), http.StatusNotAcceptable)
+			return
+		}
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	writer.WriteHeader(http.StatusOK)

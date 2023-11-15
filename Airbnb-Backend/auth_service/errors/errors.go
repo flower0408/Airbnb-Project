@@ -11,4 +11,6 @@ const (
 	InvalidResendMailError    = "Invalid resend mail"
 	EmailAlreadyExist         = "Email already exists in database"
 	InvalidRequestFormatError = "Invalid request format"
+	NotFoundMailError         = "Mail not found in database"
+	NotMatchingPasswordsError = "Passwords doesn't matching"
 )

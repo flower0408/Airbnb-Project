@@ -8,4 +8,5 @@ type AuthStore interface {
 	GetAll() ([]*Credentials, error)
 	GetOneUserByID(id primitive.ObjectID) *Credentials
 	UpdateUser(user *Credentials) error
+	UpdateUserUsername(user *Credentials) error
 }

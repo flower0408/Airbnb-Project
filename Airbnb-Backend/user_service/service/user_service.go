@@ -54,6 +54,7 @@ func (service *UserService) Register(user *domain.User) (*domain.User, error) {
 		Age:       user.Age,
 		Residence: user.Residence,
 		Email:     user.Email,
+		Username:  user.Username,
 	}
 
 	return service.store.Register(&userInfo)

@@ -45,10 +45,9 @@ type Credentials struct {
 }
 
 type Claims struct {
-	UserID    primitive.ObjectID `json:"user_id"`
-	Username  string             `json:"username"`
-	Role      UserType           `json:"userType"`
-	ExpiresAt time.Time          `json:"expires_at"`
+	Username  string    `json:"username"`
+	Role      UserType  `json:"userType"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type RegisterValidation struct {
@@ -59,6 +58,18 @@ type RegisterValidation struct {
 type ResendVerificationRequest struct {
 	UserToken string `json:"user_token"`
 	UserMail  string `json:"user_mail"`
+}
+
+type ResetPasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+	RepeatedNew string `json:"repeated_new"`
+}
+
+type RecoverPasswordRequest struct {
+	UserID      string `json:"id"`
+	NewPassword string `json:"new_password"`
+	RepeatedNew string `json:"repeated_new"`
 }
 
 func (user *User) ValidateUser() error {
@@ -77,7 +88,6 @@ func (user *User) ValidateUser() error {
 	return validate.Struct(user)
 }
 
-// Allows only letters [a-z]
 func onlyCharactersField(fl validator.FieldLevel) bool {
 	re := regexp.MustCompile("[-_a-zA-Z]*")
 	matches := re.FindAllString(fl.Field().String(), -1)
@@ -89,7 +99,6 @@ func onlyCharactersField(fl validator.FieldLevel) bool {
 	return true
 }
 
-// Allows only letters [a-z] and numbers [0-9]
 func onlyCharactersAndNumbersField(fl validator.FieldLevel) bool {
 	re := regexp.MustCompile("[-_a-zA-Z0-9]*")
 	matches := re.FindAllString(fl.Field().String(), -1)

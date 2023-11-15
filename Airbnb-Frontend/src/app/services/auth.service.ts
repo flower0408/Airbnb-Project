@@ -6,6 +6,7 @@ import { LoginDTO } from "../dto/loginDTO";
 import { User } from "../models/user.model";
 import {VerificationRequest} from "../dto/verificationRequest";
 import {ResendVerificationRequest} from "../dto/resend-verification-request";
+import {RecoverPasswordDTO} from "../dto/recoverPasswordDTO";
 
 @Injectable({
 providedIn: 'root'
@@ -25,6 +26,19 @@ export class AuthService {
   public ResendVerificationToken(request: ResendVerificationRequest): Observable<void> {
     return this.http.post<void>(`${environment.baseApiUrl}/${this.url}/resendVerify`, request);
   }
+
+  public RequestRecoverPassword(email: string): Observable<string> {
+    return this.http.post<string>(`${environment.baseApiUrl}/${this.url}/recoverPasswordToken`, email);
+  }
+
+  public CheckRecoveryToken(request: VerificationRequest): Observable<void> {
+    return this.http.post<void>(`${environment.baseApiUrl}/${this.url}/checkRecoverToken`, request);
+  }
+
+  public RecoverPassword(request: RecoverPasswordDTO): Observable<void> {
+    return this.http.post<void>(`${environment.baseApiUrl}/${this.url}/recoverPassword`, request);
+  }
+
 
   public Login(loginDTO: LoginDTO): Observable<string> {
     return this.http.post(`${environment.baseApiUrl}/${this.url}/login`, loginDTO, {responseType : 'text'});

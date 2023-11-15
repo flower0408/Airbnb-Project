@@ -24,7 +24,7 @@ export class LoginComponent implements OnInit {
   ) { }
 
   submitted = false;
-  
+
   ngOnInit(): void {
     this.formGroup = this.formBuilder.group({
       username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(20)]],

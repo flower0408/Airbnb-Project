@@ -60,10 +60,21 @@ func (store *AuthMongoDBStore) GetOneUser(username string) (*domain.Credentials,
 	return user, nil
 }
 
-func (store *AuthMongoDBStore) UpdateUser(user *domain.Credentials) error {
+func (store *AuthMongoDBStore) UpdateUserUsername(user *domain.Credentials) error {
 
 	fmt.Println(user)
 	newState, err := store.credentials.UpdateOne(context.TODO(), bson.M{"username": user.Username}, bson.M{"$set": user})
+	if err != nil {
+		return err
+	}
+	fmt.Println(newState)
+	return nil
+}
+
+func (store *AuthMongoDBStore) UpdateUser(user *domain.Credentials) error {
+
+	fmt.Println(user)
+	newState, err := store.credentials.UpdateOne(context.TODO(), bson.M{"_id": user.ID}, bson.M{"$set": user})
 	if err != nil {
 		return err
 	}

@@ -12,6 +12,7 @@ type User struct {
 	Age       int                `bson:"age,omitempty" json:"age,omitempty"`
 	Residence string             `bson:"residence,omitempty" json:"residence,omitempty"`
 	Email     string             `bson:"email" json:"email"`
+	Username  string             `bson:"username" json:"username"`
 	UserType  UserType           `bson:"userType" json:"userType"`
 }
 

@@ -1,0 +1,23 @@
+<div>
+    <mat-card class="recovery-pass-card">
+        <br>
+        <div class="form-group mx-auto w-50">
+            <form [formGroup]="formGroup">
+                <div class="mb-3">
+                    <mat-card-title class="card-title">Enter recovery token</mat-card-title>
+                    <input type="text" class="form-control" formControlName="token"
+                        [ngClass]="{ 'is-invalid': submitted && f['token'].errors }">
+                    <div *ngIf="submitted && f['token'].errors" class="invalid-feedback">
+                        <div *ngIf="f['token'].errors['required']">Token is required.</div>
+                    </div>
+                    <div *ngIf="formGroup.errors?.['invalidToken']" class="invalid-email">
+                        Invalid token.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" (click)="onSubmit()">Confirm</button>
+
+            </form>
+        </div>
+    </mat-card>
+</div>
