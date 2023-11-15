@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"reservations_service/data"
@@ -30,11 +31,22 @@ func (r *AppointmentHandler) CreateAppointment(rw http.ResponseWriter, h *http.R
 
 func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.Request) {
 
-	//TODO
+	vars := mux.Vars(h)
+	id := vars["id"]
+
+	appointment := h.Context().Value(KeyProduct{}).(*data.Appointment)
+
+	r.appointmentRepo.UpdateAppointment(id, appointment)
+	rw.WriteHeader(http.StatusOK)
 }
 
 func (r *AppointmentHandler) CreatePriceForInterval(rw http.ResponseWriter, h *http.Request) {
-	//TODO
+	vars := mux.Vars(h)
+	id := vars["id"]
+	priceForInterval := h.Context().Value(KeyProduct{}).(*data.PriceForInterval)
+
+	r.appointmentRepo.AddPriceForIntervalForAppointment(id, priceForInterval)
+	rw.WriteHeader(http.StatusOK)
 }
 
 func (r *AppointmentHandler) UpdatePriceForInterval(rw http.ResponseWriter, h *http.Request) {
