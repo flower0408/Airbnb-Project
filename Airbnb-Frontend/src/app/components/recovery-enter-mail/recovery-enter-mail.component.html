@@ -4,7 +4,7 @@
         <div class="form-group mx-auto w-50">
             <form [formGroup]="formGroup">
                 <div class="mb-3">
-                    <mat-card-title class="card-title">Enter your email address </mat-card-title>
+                    <mat-card-title class="card-title">~ Enter your email address ~</mat-card-title>
                     <input type="text" class="form-control" formControlName="email"
                         [ngClass]="{ 'is-invalid': submitted && form['email'].errors }">
                     <div *ngIf="submitted && form['email'].errors" class="invalid-feedback">

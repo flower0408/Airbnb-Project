@@ -72,6 +72,12 @@ type RecoverPasswordRequest struct {
 	RepeatedNew string `json:"repeated_new"`
 }
 
+type PasswordChange struct {
+	OldPassword        string `json:"old_password"`
+	NewPassword        string `json:"new_password"`
+	NewPasswordConfirm string `json:"new_password_confirm"`
+}
+
 func (user *User) ValidateUser() error {
 	validate := validator.New()
 

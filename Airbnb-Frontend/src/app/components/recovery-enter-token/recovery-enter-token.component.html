@@ -4,7 +4,7 @@
         <div class="form-group mx-auto w-50">
             <form [formGroup]="formGroup">
                 <div class="mb-3">
-                    <mat-card-title class="card-title">Enter recovery token</mat-card-title>
+                    <mat-card-title class="card-title">~ Enter recovery token ~</mat-card-title>
                     <input type="text" class="form-control" formControlName="token"
                         [ngClass]="{ 'is-invalid': submitted && f['token'].errors }">
                     <div *ngIf="submitted && f['token'].errors" class="invalid-feedback">

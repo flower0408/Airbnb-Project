@@ -26,6 +26,7 @@ import { RecoveryEnterMailComponent } from './components/recovery-enter-mail/rec
 import { RecoveryEnterTokenComponent } from './components/recovery-enter-token/recovery-enter-token.component';
 import { RecoveryNewPasswordsComponent } from './components/recovery-new-passwords/recovery-new-passwords.component';
 import { MyProfileComponent } from './components/my-profile/my-profile.component';
+import {ChangePasswordComponent} from "./components/change-password/change-password.component";
 
 @NgModule({
   declarations: [
@@ -39,6 +40,7 @@ import { MyProfileComponent } from './components/my-profile/my-profile.component
     RecoveryEnterTokenComponent,
     RecoveryNewPasswordsComponent,
     MyProfileComponent,
+    ChangePasswordComponent,
   ],
   imports: [
     BrowserModule,

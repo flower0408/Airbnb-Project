@@ -48,6 +48,7 @@ func (handler *AuthHandler) Init(router *mux.Router) {
 	router.HandleFunc("/recoverPasswordToken", handler.SendRecoveryPasswordToken).Methods("POST")
 	router.HandleFunc("/checkRecoverToken", handler.CheckRecoveryPasswordToken).Methods("POST")
 	router.HandleFunc("/recoverPassword", handler.RecoverPassword).Methods("POST")
+	router.HandleFunc("/changePassword", handler.ChangePassword).Methods("POST")
 	http.Handle("/", router)
 }
 
@@ -290,6 +291,38 @@ func (handler *AuthHandler) RecoverPassword(writer http.ResponseWriter, req *htt
 	}
 
 	writer.WriteHeader(http.StatusOK)
+}
+
+func (handler *AuthHandler) ChangePassword(writer http.ResponseWriter, request *http.Request) {
+
+	var token string = request.Header.Get("Authorization")
+	bearerToken := strings.Split(token, "Bearer ")
+	tokenString := bearerToken[1]
+
+	fmt.Println(request.Body)
+
+	var password domain.PasswordChange
+	err := json.NewDecoder(request.Body).Decode(&password)
+	if err != nil {
+		log.Println(err)
+		http.Error(writer, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	status := handler.service.ChangePassword(password, tokenString)
+
+	if status == "oldPassErr" {
+		http.Error(writer, "Wrong old password", http.StatusConflict) //409
+		return
+	} else if status == "newPassErr" {
+		http.Error(writer, "Wrong new password", http.StatusNotAcceptable) //406
+		return
+	} else if status == "baseErr" {
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	writer.WriteHeader(http.StatusOK)
+
 }
 
 func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request) {

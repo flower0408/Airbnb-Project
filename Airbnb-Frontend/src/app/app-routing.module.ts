@@ -8,6 +8,7 @@ import {RecoveryEnterMailComponent} from "./components/recovery-enter-mail/recov
 import {RecoveryEnterTokenComponent} from "./components/recovery-enter-token/recovery-enter-token.component";
 import {RecoveryNewPasswordsComponent} from "./components/recovery-new-passwords/recovery-new-passwords.component";
 import {MyProfileComponent} from "./components/my-profile/my-profile.component";
+import {ChangePasswordComponent} from "./components/change-password/change-password.component";
 
 const routes: Routes = [
   {
@@ -41,6 +42,11 @@ const routes: Routes = [
   {
     path: 'My-Profile',
     component: MyProfileComponent,
+  },
+
+  {
+    path: 'Change-Password',
+    component: ChangePasswordComponent,
   },
 
   {

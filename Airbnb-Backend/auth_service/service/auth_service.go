@@ -1,6 +1,7 @@
 package application
 
 import (
+	"auth_service/authorization"
 	"auth_service/domain"
 	"auth_service/errors"
 	"bytes"
@@ -472,6 +473,51 @@ func (service *AuthService) RecoverPassword(recoverPassword *domain.RecoverPassw
 	}
 
 	return nil
+}
+
+func (service *AuthService) ChangePassword(password domain.PasswordChange, token string) string {
+
+	parsedToken := authorization.GetToken(token)
+	claims := authorization.GetMapClaims(parsedToken.Bytes())
+
+	username := claims["username"]
+
+	user, err := service.store.GetOneUser(username)
+	if err != nil {
+		log.Println(err)
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password.OldPassword))
+	if err != nil {
+		return "oldPassErr"
+	}
+
+	var validNew bool = false
+	fmt.Println(password)
+	if password.NewPassword == password.NewPasswordConfirm {
+		validNew = true
+	}
+
+	if validNew {
+		newEncryptedPassword, err := bcrypt.GenerateFromPassword([]byte(password.NewPassword), bcrypt.DefaultCost)
+		if err != nil {
+			log.Println(err)
+			return "hashErr"
+		}
+
+		user.Password = string(newEncryptedPassword)
+
+		err = service.store.UpdateUser(user)
+		if err != nil {
+			return "baseErr"
+		}
+
+	} else {
+		return "newPassErr"
+
+	}
+
+	return "ok"
 }
 
 func (service *AuthService) Login(credentials *domain.Credentials) (string, error) {
