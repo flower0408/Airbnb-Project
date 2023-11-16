@@ -157,7 +157,32 @@ func (rr *AppointmentRepo) AddPriceForIntervalForAppointment(id string, priceFor
 
 func (rr *AppointmentRepo) EditPriceForIntervalForAppointment(id string, intervalId string, priceForInterval *PriceForInterval) error {
 
-	//TODO
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	appointmentsCollection := rr.getCollection()
+
+	objectID, err := primitive.ObjectIDFromHex(id)
+	objectIDForPriceInterval, err := primitive.ObjectIDFromHex(intervalId)
+
+	if err != nil {
+		rr.logger.Println("Error converting ID to ObjectID:", err)
+		return err
+	}
+
+	filter := bson.M{"_id": objectID, "priceForInterval._id": objectIDForPriceInterval}
+	update := bson.M{"$set": bson.M{
+		"priceForInterval.$.pricePerGuest":         priceForInterval.PricePerGuest,
+		"priceForInterval.$.pricePerAccommodation": priceForInterval.PricePerAccommodation,
+	}}
+
+	result, err := appointmentsCollection.UpdateOne(ctx, filter, update)
+	rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
+	rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
+
+	if err != nil {
+		rr.logger.Println(err)
+		return err
+	}
 	return nil
 }
 
