@@ -27,6 +27,7 @@ import { RecoveryEnterTokenComponent } from './components/recovery-enter-token/r
 import { RecoveryNewPasswordsComponent } from './components/recovery-new-passwords/recovery-new-passwords.component';
 import { MyProfileComponent } from './components/my-profile/my-profile.component';
 import {ChangePasswordComponent} from "./components/change-password/change-password.component";
+import { NgxCaptchaModule } from 'ngx-captcha';
 
 @NgModule({
   declarations: [
@@ -58,6 +59,8 @@ import {ChangePasswordComponent} from "./components/change-password/change-passw
     MatSelectModule,
     MatDividerModule,
     MatSnackBarModule,
+    ReactiveFormsModule,
+    NgxCaptchaModule
   ],
   providers: [{
     provide: HTTP_INTERCEPTORS,
