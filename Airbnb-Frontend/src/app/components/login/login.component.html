@@ -44,6 +44,8 @@
             <span>Remember me</span>
           </div>
 
+          <a routerLink="/Request-Recovery">Forgot password?</a>
+
           <form [formGroup]="aFormGroup" style="margin:15px 0">
             <ngx-recaptcha2 #captchaElem
                             [siteKey]="siteKey"
@@ -52,12 +54,12 @@
             </ngx-recaptcha2>
           </form>
 
-          <a [routerLink]="['/Register']">Create your account</a>
-
           <button type="submit" (click)="onSubmit()" class="btn btn-primary" [disabled]="!captchaPassed">Login</button>
           <div *ngIf="formGroup.errors?.['unauthenticated']" class="incorrect-credentials">
             Username or Password Incorrect!
           </div>
+
+          <a [routerLink]="['/Register']">Create your account</a>
         </form>
       </div>
     </div>
