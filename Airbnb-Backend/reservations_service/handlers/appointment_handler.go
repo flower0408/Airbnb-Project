@@ -50,7 +50,13 @@ func (r *AppointmentHandler) CreatePriceForInterval(rw http.ResponseWriter, h *h
 }
 
 func (r *AppointmentHandler) UpdatePriceForInterval(rw http.ResponseWriter, h *http.Request) {
-	//TODO
+	vars := mux.Vars(h)
+	id := vars["id"]
+	intervalId := vars["intervalId"]
+	priceForInterval := h.Context().Value(KeyProduct{}).(*data.PriceForInterval)
+
+	r.appointmentRepo.EditPriceForIntervalForAppointment(id, intervalId, priceForInterval)
+	rw.WriteHeader(http.StatusOK)
 }
 
 func (s *AppointmentHandler) MiddlewareAppointmentDeserialization(next http.Handler) http.Handler {
