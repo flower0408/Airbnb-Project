@@ -2,14 +2,21 @@ package handlers
 
 import (
 	"encoding/json"
+	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"user_service/domain"
 	"user_service/errors"
 	"user_service/service"
+)
+
+var (
+	jwtKey      = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _ = jwt.NewVerifierHS(jwt.HS256, jwtKey)
 )
 
 type UserHandler struct {
@@ -26,6 +33,8 @@ func (handler *UserHandler) Init(router *mux.Router) {
 	router.HandleFunc("/{id}", handler.Get).Methods("GET")
 	router.HandleFunc("/", handler.GetAll).Methods("GET")
 	router.HandleFunc("/", handler.Register).Methods("POST")
+	router.HandleFunc("/getOne/{username}", handler.GetOne).Methods("GET")
+	router.HandleFunc("/mailExist/{mail}", handler.MailExist).Methods("GET")
 	http.Handle("/", router)
 }
 
@@ -146,4 +155,38 @@ func (handler *UserHandler) Get(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 	jsonResponse(user, writer)
+}
+
+func (handler *UserHandler) GetOne(writer http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	username := vars["username"]
+
+	user, err := handler.service.GetOneUser(username)
+	if err != nil {
+		log.Println(err)
+		writer.WriteHeader(http.StatusNotFound)
+	}
+	jsonResponse(user, writer)
+}
+
+func (handler *UserHandler) MailExist(writer http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	mail, ok := vars["mail"]
+	if !ok {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	id, err := handler.service.DoesEmailExist(mail)
+	if err != nil {
+		writer.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	_, err = writer.Write([]byte(id))
+	if err != nil {
+		log.Println("error in response user service")
+		log.Println(err.Error())
+		return
+	}
 }

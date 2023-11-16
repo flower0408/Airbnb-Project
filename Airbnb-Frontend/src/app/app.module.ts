@@ -11,6 +11,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatSelectModule} from '@angular/material/select';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -20,6 +21,13 @@ import { HeaderComponent } from './components/header/header.component';
 import { RegisterComponent } from './components/register/register.component';
 import { LoginComponent } from './components/login/login.component';
 import { AuthInterceptor } from './services/auth.interceptor';
+import {AccountConfirmationComponent} from "./components/account-confirmation/account-confirmation.component";
+import { RecoveryEnterMailComponent } from './components/recovery-enter-mail/recovery-enter-mail.component';
+import { RecoveryEnterTokenComponent } from './components/recovery-enter-token/recovery-enter-token.component';
+import { RecoveryNewPasswordsComponent } from './components/recovery-new-passwords/recovery-new-passwords.component';
+import { MyProfileComponent } from './components/my-profile/my-profile.component';
+import {ChangePasswordComponent} from "./components/change-password/change-password.component";
+import { NgxCaptchaModule } from 'ngx-captcha';
 
 @NgModule({
   declarations: [
@@ -27,7 +35,13 @@ import { AuthInterceptor } from './services/auth.interceptor';
     MainPageComponent,
     HeaderComponent,
     RegisterComponent,
-    LoginComponent
+    LoginComponent,
+    AccountConfirmationComponent,
+    RecoveryEnterMailComponent,
+    RecoveryEnterTokenComponent,
+    RecoveryNewPasswordsComponent,
+    MyProfileComponent,
+    ChangePasswordComponent,
   ],
   imports: [
     BrowserModule,
@@ -43,7 +57,10 @@ import { AuthInterceptor } from './services/auth.interceptor';
     MatCardModule,
     MatFormFieldModule,
     MatSelectModule,
-    MatDividerModule
+    MatDividerModule,
+    MatSnackBarModule,
+    ReactiveFormsModule,
+    NgxCaptchaModule
   ],
   providers: [{
     provide: HTTP_INTERCEPTORS,

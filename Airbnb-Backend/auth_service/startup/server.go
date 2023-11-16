@@ -8,6 +8,7 @@ import (
 	store2 "auth_service/store"
 	"context"
 	"fmt"
+	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
@@ -37,8 +38,10 @@ func (server *Server) Start() {
 		}
 	}(mongoClient, context.Background())
 
+	redisClient := server.initRedisClient()
+	authCache := server.initAuthCache(redisClient)
 	authStore := server.initAuthStore(mongoClient)
-	authService := server.initAuthService(authStore)
+	authService := server.initAuthService(authStore, authCache)
 	authHandler := server.initAuthHandler(authService)
 
 	server.start(authHandler)
@@ -52,13 +55,26 @@ func (server *Server) initMongoClient() *mongo.Client {
 	return client
 }
 
+func (server *Server) initRedisClient() *redis.Client {
+	client, err := store2.GetRedisClient(server.config.AuthCacheHost, server.config.AuthCachePort)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
+}
+
 func (server *Server) initAuthStore(client *mongo.Client) domain.AuthStore {
 	store := store2.NewAuthMongoDBStore(client)
 	return store
 }
 
-func (server *Server) initAuthService(store domain.AuthStore) *application.AuthService {
-	return application.NewAuthService(store)
+func (server *Server) initAuthCache(client *redis.Client) domain.AuthCache {
+	cache := store2.NewAuthRedisCache(client)
+	return cache
+}
+
+func (server *Server) initAuthService(store domain.AuthStore, cache domain.AuthCache) *application.AuthService {
+	return application.NewAuthService(store, cache)
 }
 
 func (server *Server) initAuthHandler(service *application.AuthService) *handlers.AuthHandler {
