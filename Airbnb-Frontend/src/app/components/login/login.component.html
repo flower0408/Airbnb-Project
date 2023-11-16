@@ -28,7 +28,7 @@
           </div>
           <label for="password"><b>Password:</b></label>
           <div>
-            <input type="password" id="password" name="password" placeholder="********" maxlength="30" class="form-control" formControlName="password"
+            <input type="password" id="password" name="password" maxlength="30" class="form-control" formControlName="password"
                    [ngClass]="{ 'is-invalid': submitted && loginGroup['password'].errors}">
             <div *ngIf="submitted && loginGroup['password'].errors" class="invalid-feedback">
               <div *ngIf="loginGroup['password'].errors['required']">Password is required.</div>
@@ -43,29 +43,22 @@
             <input type="checkbox">
             <span>Remember me</span>
           </div>
-          <a routerLink="/Request-Recovery">Forgot password?</a>
 
+          <form [formGroup]="aFormGroup" style="margin:15px 0">
+            <ngx-recaptcha2 #captchaElem
+                            [siteKey]="siteKey"
+                            formControlName="recaptcha"
+                            (success)="handleCaptchaResolved($event)">
+            </ngx-recaptcha2>
+          </form>
 
-          <button type="submit" (click)="onSubmit()" class="btn btn-primary" >Login</button>
+          <a [routerLink]="['/Register']">Create your account</a>
+
+          <button type="submit" (click)="onSubmit()" class="btn btn-primary" [disabled]="!captchaPassed">Login</button>
           <div *ngIf="formGroup.errors?.['unauthenticated']" class="incorrect-credentials">
             Username or Password Incorrect!
           </div>
         </form>
-
-        <form [formGroup]="aFormGroup" style="margin:15px 0">
-          <ngx-recaptcha2 #captchaElem
-                          [siteKey]="siteKey"
-                          formControlName="recaptcha"
-                          (success)="handleCaptchaResolved($event)">
-          </ngx-recaptcha2>
-        </form>
-
-        <div>
-          <a [routerLink]="['/Register']">Do not have an account? Create one here!</a>
-        </div>
-        <br>
-        <br>
-        <br>
       </div>
     </div>
   </div>

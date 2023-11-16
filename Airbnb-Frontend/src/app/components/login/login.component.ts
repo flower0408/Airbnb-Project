@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { LoginDTO } from 'src/app/dto/loginDTO';
 import { AuthService } from 'src/app/services/auth.service';
 
+
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
@@ -13,6 +14,7 @@ import { AuthService } from 'src/app/services/auth.service';
 export class LoginComponent implements OnInit {
   title = 'Login to Airbnb';
   protected aFormGroup!: FormGroup;
+
   formGroup: FormGroup = new FormGroup({
     username: new FormControl(''),
     password: new FormControl('')
@@ -34,21 +36,22 @@ export class LoginComponent implements OnInit {
     });
     this.formGroup.setErrors({ unauthenticated: true})
     this.aFormGroup = this.formBuilder.group({
-             recaptcha: ['', Validators.required]
+         recaptcha: ['', Validators.required]
+       });
+     this.grecaptcha.ready(() => {
+           this.grecaptcha.execute('6LdysQwpAAAAAI8olDs0nZDphSeaQhPaxwUWXiBY', { action: 'submit' }).then((token: string) => {
+             // token sadrži vrednost reCAPTCHA tokena koju možete poslati na server
            });
-    this.grecaptcha.ready(() => {
-               this.grecaptcha.execute('6LdysQwpAAAAAI8olDs0nZDphSeaQhPaxwUWXiBY', { action: 'submit' }).then((token: string) => {
-                 // token sadrži vrednost reCAPTCHA tokena koju možete poslati na server
-               });
-             });
+         });
   }
 
   captchaPassed: boolean = false;
-    siteKey:string = "6LdysQwpAAAAAI8olDs0nZDphSeaQhPaxwUWXiBY";
+  siteKey:string = "6LdysQwpAAAAAI8olDs0nZDphSeaQhPaxwUWXiBY";
 
-    handleCaptchaResolved(event: any) {
-      this.captchaPassed = event;
-    }
+  handleCaptchaResolved(event: any) {
+    this.captchaPassed = event;
+  }
+
 
   get loginGroup(): { [key: string]: AbstractControl } {
     return this.formGroup.controls;
@@ -57,7 +60,7 @@ export class LoginComponent implements OnInit {
   onSubmit() {
     this.submitted = true;
 
-    if (this.formGroup.invalid) {
+    if (!this.captchaPassed || this.formGroup.invalid) {
       return;
     }
 
