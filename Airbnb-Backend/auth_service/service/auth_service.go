@@ -8,11 +8,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/cristalhq/jwt/v4"
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
-	"gopkg.in/gomail.v2"
 	"io"
 	"io/ioutil"
 	"log"
@@ -152,6 +150,13 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 
 	if err := validateUser(user); err != nil {
 		return "", 400, err
+	}
+	checkUser, err := blackListChecking(user.Password)
+	log.Println(checkUser)
+
+	if checkUser {
+		log.Println("Password is in blacklist")
+		return "", 55, fmt.Errorf("Password is in black list, try with another one!")
 	}
 
 	/* PAZI OVDE OVO JE TRENUTNO ZAKOMENTARISANO - PROVERA DA NE POSTOJI USER SA ISTIM MAILOM
@@ -614,4 +619,25 @@ func GenerateJWT(user *domain.Credentials) (string, error) {
 	}
 
 	return token.String(), nil
+}
+func blackListChecking(username string) (bool, error) {
+
+	file, err := os.Open("blacklist.txt")
+
+	if err != nil {
+		log.Printf("Error in checking blacklist: %s", err.Error())
+		return false, err
+	}
+	defer file.Close()
+
+	blacklist := make(map[string]bool)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		blacklist[scanner.Text()] = true
+	}
+	if blacklist[username] {
+		return true, nil
+	} else {
+		return false, nil
+	}
 }
