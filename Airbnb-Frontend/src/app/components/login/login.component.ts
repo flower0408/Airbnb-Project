@@ -40,12 +40,23 @@ export class LoginComponent implements OnInit {
     this.aFormGroup = this.formBuilder.group({
          recaptcha: ['', Validators.required]
        });
-     this.grecaptcha.ready(() => {
-           this.grecaptcha.execute('6LdysQwpAAAAAI8olDs0nZDphSeaQhPaxwUWXiBY', { action: 'submit' }).then((token: string) => {
-             // token sadrži vrednost reCAPTCHA tokena koju možete poslati na server
-           });
-         });
   }
+
+  ngAfterViewInit(): void {
+      const checkGrecaptcha = () => {
+        if (this.grecaptcha) {
+          this.grecaptcha.ready(() => {
+            this.grecaptcha.execute('6LdysQwpAAAAAI8olDs0nZDphSeaQhPaxwUWXiBY', { action: 'submit' }).then((token: string) => {
+              // token contains the reCAPTCHA token to send to the server
+            });
+          });
+        } else {
+          setTimeout(checkGrecaptcha, 100);
+        }
+      };
+
+      checkGrecaptcha();
+    }
 
   captchaPassed: boolean = false;
   siteKey:string = "6LdysQwpAAAAAI8olDs0nZDphSeaQhPaxwUWXiBY";
