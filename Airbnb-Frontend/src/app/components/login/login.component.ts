@@ -3,7 +3,9 @@ import { Component, OnInit } from '@angular/core';
 import { AbstractControl, FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { LoginDTO } from 'src/app/dto/loginDTO';
+import { User } from 'src/app/models/user.model';
 import { AuthService } from 'src/app/services/auth.service';
+import { UserService } from 'src/app/services/user.service';
 
 
 @Component({
@@ -23,7 +25,7 @@ export class LoginComponent implements OnInit {
   constructor(
     private authService: AuthService,
     private router: Router,
-    private formBuilder: FormBuilder,
+    private formBuilder: FormBuilder
   ) { }
 
   submitted = false;
@@ -81,6 +83,7 @@ export class LoginComponent implements OnInit {
           console.log(error);
         }
       });
+
 
   }
 

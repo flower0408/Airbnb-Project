@@ -39,7 +39,7 @@ func main() {
 	router.Use(accommodationHandler.MiddlewareContentTypeSet)
 
 	postAccommodation := router.Methods(http.MethodPost).Subrouter()
-	postAccommodation.HandleFunc("/accommodations/", accommodationHandler.CreateAccommodation)
+	postAccommodation.HandleFunc("/", accommodationHandler.CreateAccommodation)
 	postAccommodation.Use(accommodationHandler.MiddlewareAccommodationDeserialization)
 
 	cors := gorillaHandlers.CORS(gorillaHandlers.AllowedOrigins([]string{"*"}))

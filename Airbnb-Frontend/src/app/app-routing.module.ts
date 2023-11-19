@@ -9,6 +9,7 @@ import {RecoveryEnterTokenComponent} from "./components/recovery-enter-token/rec
 import {RecoveryNewPasswordsComponent} from "./components/recovery-new-passwords/recovery-new-passwords.component";
 import {MyProfileComponent} from "./components/my-profile/my-profile.component";
 import {ChangePasswordComponent} from "./components/change-password/change-password.component";
+import { CreateAccommodationComponent } from './components/create-accommodation/create-accommodation.component';
 
 const routes: Routes = [
   {
@@ -50,8 +51,12 @@ const routes: Routes = [
   },
 
   {
-    path: 'Login',
+    path: '',
     component: LoginComponent
+  },
+  {
+    path: 'createAccommodation',
+    component: CreateAccommodationComponent
   }
 ];
 

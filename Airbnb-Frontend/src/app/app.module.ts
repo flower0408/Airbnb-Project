@@ -28,6 +28,7 @@ import { RecoveryNewPasswordsComponent } from './components/recovery-new-passwor
 import { MyProfileComponent } from './components/my-profile/my-profile.component';
 import {ChangePasswordComponent} from "./components/change-password/change-password.component";
 import { NgxCaptchaModule } from 'ngx-captcha';
+import { CreateAccommodationComponent } from './components/create-accommodation/create-accommodation.component';
 
 @NgModule({
   declarations: [
@@ -42,6 +43,7 @@ import { NgxCaptchaModule } from 'ngx-captcha';
     RecoveryNewPasswordsComponent,
     MyProfileComponent,
     ChangePasswordComponent,
+    CreateAccommodationComponent,
   ],
   imports: [
     BrowserModule,

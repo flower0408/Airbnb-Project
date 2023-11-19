@@ -1,0 +1,147 @@
+<app-header></app-header>
+<div class="formbold-main-wrapper">
+    <!-- Author: FormBold Team -->
+    <!-- Learn More: https://formbold.com -->
+    <div class="formbold-form-wrapper">
+      <form [formGroup]="accommodationForm" (ngSubmit)="onSubmit()">
+        <div class="formbold-mb-5">
+          <label for="name" class="formbold-form-label"> Name </label>
+          <input
+            type="text"
+            name="name"
+            id="name"
+            class="formbold-form-input"
+            formControlName="name"
+            required
+          />
+        </div>
+        <div class="formbold-mb-5">
+          <label for="description" class="formbold-form-label"> Description </label>
+          <input
+            type="text"
+            name="description"
+            id="description"
+            class="formbold-form-input"
+            formControlName="description"
+            required
+          />
+        </div>
+        <div class="formbold-mb-5">
+          <label for="images" class="formbold-form-label"> Image </label>
+          <input
+            type="text"
+            name="images"
+            id="images"
+            class="formbold-form-input"
+            formControlName="images"
+            required
+          />
+        </div>
+        <div class="formbold-mb-5">
+            <label for="benefits" class="formbold-form-label"> Benefits </label>
+            <input
+              type="text"
+              name="benefits"
+              id="benefits"
+              class="formbold-form-input"
+              formControlName="benefits"
+              required
+            />
+        </div>
+
+        <div class="flex flex-wrap formbold--mx-3">
+          <div class="w-full sm:w-half formbold-px-3">
+            <div class="formbold-mb-5 w-full">
+              <label for="Minguest" class="formbold-form-label"> Min guest </label>
+              <input
+                type="number"
+                name="Minguest"
+                id="Minguest"
+                class="formbold-form-input"
+                formControlName="Minguest"
+                required
+              />
+            </div>
+          </div>
+          <div class="w-full sm:w-half formbold-px-3">
+            <div class="formbold-mb-5">
+              <label for="Maxguest" class="formbold-form-label"> Max guest </label>
+              <input
+                type="number"
+                name="Maxguest"
+                id="Maxguest"
+                class="formbold-form-input"
+                formControlName="Maxguest"
+                required
+              />
+            </div>
+          </div>
+        </div>
+  
+        <div class="formbold-mb-5 formbold-pt-3">
+          <label class="formbold-form-label formbold-form-label-2">
+            Address Details
+          </label>
+          <div class="flex flex-wrap formbold--mx-3">
+            <div class="w-full sm:w-half formbold-px-3">
+              <div class="formbold-mb-5">
+                <input
+                  type="text"
+                  name="country"
+                  id="country"
+                  placeholder="Enter country"
+                  class="formbold-form-input"
+                  formControlName="country"
+                  required
+                />
+              </div>
+            </div>
+            <div class="w-full sm:w-half formbold-px-3">
+              <div class="formbold-mb-5">
+                <input
+                  type="text"
+                  name="city"
+                  id="city"
+                  placeholder="Enter city"
+                  class="formbold-form-input"
+                  formControlName="city"
+                  required
+                />
+              </div>
+            </div>
+            <div class="w-full sm:w-half formbold-px-3">
+              <div class="formbold-mb-5">
+                <input
+                  type="text"
+                  name="street"
+                  id="street"
+                  placeholder="Enter street"
+                  class="formbold-form-input"
+                  formControlName="street"
+                  required
+                />
+              </div>
+            </div>
+            <div class="w-full sm:w-half formbold-px-3">
+              <div class="formbold-mb-5">
+                <input
+                  type="number"
+                  name="number"
+                  id="number"
+                  placeholder="Enter number"
+                  class="formbold-form-input"
+                  formControlName="number"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+  
+        <div>
+          <button type="submit" class="formbold-btn">Create accommodation</button>
+        </div>
+      </form>
+    </div>
+</div>
+  
