@@ -67,7 +67,7 @@ export class RecoveryNewPasswordsComponent implements OnInit {
       .subscribe({
         next: () => {
           this.openSnackBar("Successfully recovered password.", "OK")
-          this.router.navigate(['/Login']);
+          this.router.navigate(['']);
         },
         error: (error: HttpErrorResponse) => {
           console.log(error.status);

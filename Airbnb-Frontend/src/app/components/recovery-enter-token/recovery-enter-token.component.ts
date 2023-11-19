@@ -29,7 +29,7 @@ export class RecoveryEnterTokenComponent implements OnInit {
 
   ngOnInit(): void {
     this.formGroup = this.formBuilder.group({
-      token: ['', [Validators.required, Validators.maxLength(50)]],
+      token: ['', [Validators.required, Validators.minLength(36), Validators.maxLength(36)]],
     })
   }
 

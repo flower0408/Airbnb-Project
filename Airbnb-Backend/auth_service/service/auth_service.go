@@ -483,7 +483,7 @@ func (service *AuthService) RecoverPassword(recoverPassword *domain.RecoverPassw
 	return nil
 }
 
-func (service *AuthService) ChangePassword(password domain.PasswordChange, token string) string {
+func (service *AuthService) ChangePassword(password domain.PasswordChange, token string) (string, int, error) {
 
 	parsedToken := authorization.GetToken(token)
 	claims := authorization.GetMapClaims(parsedToken.Bytes())
@@ -497,35 +497,53 @@ func (service *AuthService) ChangePassword(password domain.PasswordChange, token
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password.OldPassword))
 	if err != nil {
-		return "oldPassErr"
+		return "oldPassErr", http.StatusConflict, fmt.Errorf("Old password is incorrect")
 	}
 
-	var validNew bool = false
+	if password.NewPassword == "" {
+		return "Password cannot be empty", http.StatusBadRequest, fmt.Errorf("New password is empty")
+	}
+	if !verifyPassword(password.NewPassword) {
+		return "Invalid password format. It should be at least 11 characters, with at least one uppercase letter, one lowercase letter, one digit, and one special character", http.StatusBadRequest, fmt.Errorf("Invalid password format")
+	}
+
+	checkPassword, err := blackListChecking(password.NewPassword)
+	if err != nil {
+		log.Println(err)
+		return "Error checking password against blacklist", http.StatusInternalServerError, err
+	}
+
+	if checkPassword {
+		log.Println("Password is in the blacklist")
+		return "Password is in the blacklist", http.StatusBadRequest, fmt.Errorf(errors.BlackList)
+	}
+
+	var isNewPasswordValid bool = false
 	fmt.Println(password)
 	if password.NewPassword == password.NewPasswordConfirm {
-		validNew = true
+		isNewPasswordValid = true
 	}
 
-	if validNew {
+	if isNewPasswordValid {
 		newEncryptedPassword, err := bcrypt.GenerateFromPassword([]byte(password.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
 			log.Println(err)
-			return "hashErr"
+			return "Error trying to hash password.", http.StatusInternalServerError, err
 		}
 
 		user.Password = string(newEncryptedPassword)
 
 		err = service.store.UpdateUser(user)
 		if err != nil {
-			return "baseErr"
+			return "baseErr", http.StatusInternalServerError, err
 		}
 
 	} else {
-		return "newPassErr"
+		return "newPassErr", http.StatusNotAcceptable, fmt.Errorf("New password does not match confirmation")
 
 	}
 
-	return "ok"
+	return "OK", http.StatusOK, nil
 }
 
 func (service *AuthService) Login(credentials *domain.Credentials) (string, error) {

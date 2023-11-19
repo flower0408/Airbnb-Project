@@ -13,4 +13,5 @@ const (
 	InvalidRequestFormatError = "Invalid request format"
 	NotFoundMailError         = "Mail not found in database"
 	NotMatchingPasswordsError = "Passwords doesn't matching"
+	BlackList                 = "Password is in the blacklist"
 )

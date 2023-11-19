@@ -309,18 +309,26 @@ func (handler *AuthHandler) ChangePassword(writer http.ResponseWriter, request *
 		return
 	}
 
-	status := handler.service.ChangePassword(password, tokenString)
+	status, statusCode, err := handler.service.ChangePassword(password, tokenString)
 
-	if status == "oldPassErr" {
-		http.Error(writer, "Wrong old password", http.StatusConflict) //409
-		return
-	} else if status == "newPassErr" {
-		http.Error(writer, "Wrong new password", http.StatusNotAcceptable) //406
-		return
-	} else if status == "baseErr" {
-		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+	if err != nil {
+		var errorMessage string
+
+		switch status {
+		case "oldPassErr":
+			errorMessage = "Wrong old password"
+		case "newPassErr":
+			errorMessage = "Wrong new password"
+		case "baseErr":
+			errorMessage = "Internal server error"
+		default:
+			errorMessage = "An error occurred"
+		}
+
+		http.Error(writer, errorMessage, statusCode)
 		return
 	}
+
 	writer.WriteHeader(http.StatusOK)
 
 }

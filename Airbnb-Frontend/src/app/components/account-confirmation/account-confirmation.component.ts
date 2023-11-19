@@ -30,7 +30,7 @@ export class AccountConfirmationComponent implements OnInit {
 
   ngOnInit(): void {
     this.formGroup = this.formBuilder.group({
-      verificationToken: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(36)]],
+      verificationToken: ['', [Validators.required, Validators.minLength(36), Validators.maxLength(36)]],
     })
   }
 
@@ -59,7 +59,7 @@ export class AccountConfirmationComponent implements OnInit {
       .subscribe({
         next: (response: void) => {
           this.openSnackBar("You have been successfully registered to Airbnb", "OK")
-          this.router.navigate(['/Login'])
+          this.router.navigate([''])
         },
         error: (error: HttpErrorResponse) => {
           if (error.status == 406 || error.status == 400) {
@@ -104,6 +104,7 @@ export class AccountConfirmationComponent implements OnInit {
       duration: 5000
     });
   }
+
 
 
 }
