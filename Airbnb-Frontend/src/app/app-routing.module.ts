@@ -10,11 +10,15 @@ import {RecoveryNewPasswordsComponent} from "./components/recovery-new-passwords
 import {MyProfileComponent} from "./components/my-profile/my-profile.component";
 import {ChangePasswordComponent} from "./components/change-password/change-password.component";
 import { CreateAccommodationComponent } from './components/create-accommodation/create-accommodation.component';
+import {LoginGuardService} from "./guards/login-guard.service";
+import {RoleGuardService} from "./guards/role-guard.service";
 
 const routes: Routes = [
   {
     path: 'Main-Page',
-    component: MainPageComponent
+    component: MainPageComponent,
+    canActivate: [RoleGuardService],
+    data: {expectedRoles: 'Host|Guest'}
   },
 
   {
@@ -43,20 +47,29 @@ const routes: Routes = [
   {
     path: 'My-Profile',
     component: MyProfileComponent,
+    canActivate: [RoleGuardService],
+    data: {expectedRoles: 'Host|Guest'}
+
   },
 
   {
     path: 'Change-Password',
     component: ChangePasswordComponent,
+    canActivate: [RoleGuardService],
+    data: {expectedRoles: 'Host|Guest'}
   },
 
   {
     path: '',
-    component: LoginComponent
+    component: LoginComponent,
+    canActivate: [LoginGuardService]
   },
   {
     path: 'createAccommodation',
-    component: CreateAccommodationComponent
+    component: CreateAccommodationComponent,
+    canActivate: [RoleGuardService],
+    data: {expectedRoles: 'Host'}
+
   }
 ];
 

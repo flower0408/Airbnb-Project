@@ -55,5 +55,12 @@ export class AuthService {
     return this.http.post(`${environment.baseApiUrl}/${this.url}/login`, loginDTO, {responseType : 'text'});
   }
 
+  isLoggedIn(): boolean {
+    if (!localStorage.getItem('authToken')) {
+      return false;
+    }
+    return true;
+  }
+
 
 }
