@@ -29,7 +29,7 @@
     display: block;
     font-weight: 500;
     font-size: 16px;
-    color: #07074d;
+    color: #F88379;
     margin-bottom: 12px;
   }
   .formbold-form-label-2 {
@@ -62,13 +62,14 @@
     padding: 14px 32px;
     border: none;
     font-weight: 600;
-    background-color: #6a64f1;
+    background-color: #F88379;
     color: white;
     width: 100%;
     cursor: pointer;
   }
   .formbold-btn:hover {
-    box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.05);
+    background-color: #F3CFC6;
+    color: black;
   }
 
   .formbold--mx-3 {
@@ -93,3 +94,16 @@
       width: 50%;
     }
   }
+.accommodation-box {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  background-color: white;
+  box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.1);
+}
+
+.formbold-main-wrapper {
+  padding: 16px;
+}
+
+

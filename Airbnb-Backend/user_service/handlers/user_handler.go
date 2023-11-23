@@ -2,13 +2,17 @@ package handlers
 
 import (
 	"encoding/json"
+	"github.com/casbin/casbin"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"log"
 	"net/http"
 	"os"
 	"regexp"
+	"user_service/casbinAuthorization"
 	"user_service/domain"
 	"user_service/errors"
 	"user_service/service"
@@ -30,12 +34,22 @@ func NewUserHandler(service *application.UserService) *UserHandler {
 }
 
 func (handler *UserHandler) Init(router *mux.Router) {
+
+	CasbinMiddleware1, err := casbin.NewEnforcerSafe("./rbac_model.conf", "./policy.csv")
+
+	log.Println("auth service successful init of enforcer")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	router.Use(ExtractTraceInfoMiddleware)
 	router.HandleFunc("/{id}", handler.Get).Methods("GET")
 	router.HandleFunc("/", handler.GetAll).Methods("GET")
 	router.HandleFunc("/", handler.Register).Methods("POST")
 	router.HandleFunc("/getOne/{username}", handler.GetOne).Methods("GET")
 	router.HandleFunc("/mailExist/{mail}", handler.MailExist).Methods("GET")
 	http.Handle("/", router)
+	log.Fatal(http.ListenAndServe(":8002", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
 }
 
 type ValidationError struct {
@@ -189,4 +203,10 @@ func (handler *UserHandler) MailExist(writer http.ResponseWriter, req *http.Requ
 		log.Println(err.Error())
 		return
 	}
+}
+func ExtractTraceInfoMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

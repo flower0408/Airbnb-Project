@@ -3,6 +3,7 @@ package handlers
 import (
 	"accommodations_service/data"
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"regexp"
@@ -38,6 +39,22 @@ func (s *AccommodationHandler) CreateAccommodation(rw http.ResponseWriter, h *ht
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
+	// No need to extract accommodation from context in GetAll
+
+	accommodations, err := s.repo.GetAll()
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Serialize accommodations to JSON and send the response
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(accommodations)
 	rw.WriteHeader(http.StatusOK)
 }
 

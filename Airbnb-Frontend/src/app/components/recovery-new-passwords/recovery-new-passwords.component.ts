@@ -33,8 +33,8 @@ export class RecoveryNewPasswordsComponent implements OnInit {
 
   ngOnInit(): void {
     this.formGroup = this.formBuilder.group({
-      newPassword: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(30), PasswordStrengthValidator(), ]],
-      repeatPassword: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(30), PasswordStrengthValidator(), ]],
+      newPassword: ['', [Validators.required, Validators.minLength(11), Validators.maxLength(30), PasswordStrengthValidator(), ]],
+      repeatPassword: ['', [Validators.required, Validators.minLength(11), Validators.maxLength(30), PasswordStrengthValidator(), ]],
     })
   }
 
@@ -69,9 +69,23 @@ export class RecoveryNewPasswordsComponent implements OnInit {
           this.openSnackBar("Successfully recovered password.", "OK")
           this.router.navigate(['']);
         },
-        error: (error: HttpErrorResponse) => {
+        /*error: (error: HttpErrorResponse) => {
           console.log(error.status);
           console.log(error.message);
+        }*/
+        error: (err: HttpErrorResponse) => {
+          if (err.status === 400) {
+            alert('Password is in the blacklist!');
+          }
+          else if (err.status == 406){
+            alert("New password not match!")
+          }
+          else if (err.status === 500) {
+            alert('Internal server error!');
+          }
+          else if (err.status == 200){
+            alert("Password recovered successfully!")
+          }
         }
       });
   }

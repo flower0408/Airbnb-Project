@@ -6,6 +6,8 @@ import { AccommodationService } from 'src/app/services/accommodation.service';
 import { UserService } from 'src/app/services/user.service';
 import { UpperLetterValidator } from 'src/app/services/customValidators';
 import { MaxGuestValidator } from 'src/app/services/customValidators';
+import {MatSnackBar} from "@angular/material/snack-bar";
+import {Router} from "@angular/router";
 
 @Component({
   selector: 'app-create-accommodation',
@@ -16,7 +18,7 @@ export class CreateAccommodationComponent implements OnInit {
 
   accommodationForm!: FormGroup;
 
-  constructor(private fb: FormBuilder,private accommodationService: AccommodationService,private userService:UserService) {
+  constructor(private fb: FormBuilder,private accommodationService: AccommodationService,private userService:UserService, private _snackBar: MatSnackBar, private router: Router,) {
   }
 
   get f(): { [key: string]: AbstractControl } {
@@ -73,11 +75,14 @@ export class CreateAccommodationComponent implements OnInit {
 
           this.accommodationService.createAccommodation(newAccommodation).subscribe(
             () => {
+              this.openSnackBar("Accommodation created successfully!", "")
               console.log('Accommodation created successfully!');
+              this.router.navigate(['/Main-Page'])
               //this.toastr.success('Accommodation created successfully!');
 
             },
             (error) => {
+              this.openSnackBar("Error creating accommodation!", "")
               console.error('Error creating accommodation:', error);
               //this.toastr.error('Error creating accommodation!');
             }
@@ -90,6 +95,11 @@ export class CreateAccommodationComponent implements OnInit {
       );
 
     }
+  }
+  openSnackBar(message: string, action: string) {
+    this._snackBar.open(message, action,  {
+      duration: 3500
+    });
   }
 
 }

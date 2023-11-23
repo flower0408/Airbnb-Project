@@ -15,6 +15,7 @@ services:
       USER_DB_HOST: ${USER_DB_HOST}
       USER_DB_PORT: ${USER_DB_PORT}
       USER_SERVICE_PORT: ${USER_SERVICE_PORT}
+      SECRET_KEY: ${SECRET_KEY}
     depends_on:
       - user_db
     networks:
@@ -61,6 +62,7 @@ services:
       ACCOMMODATIONS_DB_HOST: ${ACCOMMODATIONS_DB_HOST}
       ACCOMMODATIONS_DB_PORT: ${ACCOMMODATIONS_DB_PORT}
       ACCOMMODATIONS_SERVICE_PORT: ${ACCOMMODATIONS_SERVICE_PORT}
+      SECRET_KEY: ${SECRET_KEY}
     depends_on:
       - accommodations_db
     networks:

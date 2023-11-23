@@ -8,5 +8,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 FROM alpine:latest
 WORKDIR /root/
 COPY --from=builder /app/main .
+COPY /rbac_model/rbac_model.conf/ .
+COPY /user_service/policy.csv .
 EXPOSE 8000
 CMD ["./main"]

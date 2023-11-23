@@ -15,13 +15,18 @@ export class AccommodationService {
   createAccommodation(accommodation: Accommodation): Observable<any> {
 
     const token = localStorage.getItem('authToken');
-    
+
     const headers = new HttpHeaders({
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
-      
+
     });
 
     return this.http.post<any>(`${environment.baseApiUrl}/${this.url}/`, accommodation , {headers});
+  }
+
+  getAllAccommodations(): Observable<any> {
+    const url = `${environment.baseApiUrl}/${this.url}/`;
+    return this.http.get(url);
   }
 }

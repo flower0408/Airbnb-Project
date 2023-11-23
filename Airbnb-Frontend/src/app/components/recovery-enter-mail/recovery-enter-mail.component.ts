@@ -48,7 +48,7 @@ export class RecoveryEnterMailComponent implements OnInit {
     this.authService.RequestRecoverPassword(email).subscribe({
       next: (token: string) => {
         this.recoveryService.updateToken(token)
-        this.openSnackBar("Recovery token has sended to your e-mail. Please type token from e-mail", "")
+        this.openSnackBar("Recovery token has been sent to your e-mail. Please enter token from the e-mail", "")
         this.router.navigate(['/Recovery-Token'])
       },
       error: (error: HttpErrorResponse) => {
