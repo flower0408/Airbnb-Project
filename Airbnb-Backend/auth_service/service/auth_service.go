@@ -257,17 +257,17 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 }
 
 func sendValidationMail(validationToken uuid.UUID, email string) error {
-	message := gomail.NewMessage()
-	message.SetHeader("From", smtpEmail)
-	message.SetHeader("To", email)
-	message.SetHeader("Subject", "Verify your for airbnb account")
+	m := gomail.NewMessage()
+	m.SetHeader("From", smtpEmail)
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Verify your for airbnb account")
 
 	bodyString := fmt.Sprintf("Your validation token for airbnb account is:\n%s", validationToken)
-	message.SetBody("text", bodyString)
+	m.SetBody("text", bodyString)
 
 	client := gomail.NewDialer(smtpServer, smtpServerPort, smtpEmail, smtpPassword)
 
-	if err := client.DialAndSend(message); err != nil {
+	if err := client.DialAndSend(m); err != nil {
 		log.Fatalf("Failed to send verification mail because of: %s", err)
 		return err
 	}
@@ -411,17 +411,17 @@ type UserDetails struct {
 }
 
 func sendRecoverPasswordMail(validationToken uuid.UUID, email string) error {
-	message := gomail.NewMessage()
-	message.SetHeader("From", smtpEmail)
-	message.SetHeader("To", email)
-	message.SetHeader("Subject", "Recover password on your Airbnb account")
+	m := gomail.NewMessage()
+	m.SetHeader("From", smtpEmail)
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Recover password on your Airbnb account")
 
 	bodyString := fmt.Sprintf("Your recover password token is:\n%s", validationToken)
-	message.SetBody("text", bodyString)
+	m.SetBody("text", bodyString)
 
 	client := gomail.NewDialer(smtpServer, smtpServerPort, smtpEmail, smtpPassword)
 
-	if err := client.DialAndSend(message); err != nil {
+	if err := client.DialAndSend(m); err != nil {
 		log.Fatalf("failed to send verification mail because of: %s", err)
 		return err
 	}
