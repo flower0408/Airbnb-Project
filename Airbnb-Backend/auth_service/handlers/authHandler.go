@@ -84,15 +84,15 @@ func verifyPassword(s string) (valid bool) {
 		}
 	}
 
-	valid = len(s) >= 11 && hasUpperCase && hasLowerCase && hasDigit && hasSpecial
+	valid = len(s) >= 11 && len(s) <= 30 && hasUpperCase && hasLowerCase && hasDigit && hasSpecial
 	return
 }
 
 func validateUser(user *domain.User) *ValidationError {
-	emailRegex := regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
+	emailRegex := regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{3,35}`)
 	usernameRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]{4,30}$`)
-	residenceRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,35}$`)
-
+	residenceRegex := regexp.MustCompile(`^[a-zA-Z]{3,35}$`)
+	nameRegex := regexp.MustCompile(`^[a-zA-Z]{3,20}$`)
 	// Validate Email
 	if user.Email == "" {
 		return &ValidationError{Message: "Email cannot be empty"}
@@ -118,7 +118,7 @@ func validateUser(user *domain.User) *ValidationError {
 	}
 
 	// Validate Age
-	if user.Age <= 0 || user.Age >= 100 {
+	if user.Age <= 0 || user.Age > 100 {
 		return &ValidationError{Message: "Age should be a number over 0 and less than 100"}
 	}
 
@@ -126,7 +126,7 @@ func validateUser(user *domain.User) *ValidationError {
 	if user.FirstName == "" {
 		return &ValidationError{Message: "FirstName cannot be empty"}
 	}
-	nameRegex := regexp.MustCompile(`^[a-zA-Z]{3,20}$`)
+
 	if !nameRegex.MatchString(user.FirstName) {
 		return &ValidationError{Message: "Invalid firstname format. It must contain only letters and be 3-20 characters long"}
 	}
@@ -341,6 +341,11 @@ func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request)
 		return
 	}
 
+	if err := validateLogin(&request); err != nil {
+		http.Error(writer, errors.InvalidCredentials, http.StatusBadRequest)
+		return
+	}
+
 	token, err := handler.service.Login(&request)
 	if err != nil {
 		if err.Error() == errors.NotVerificatedUser {
@@ -379,4 +384,15 @@ func MiddlewareUserValidation(next http.Handler) http.Handler {
 
 		next.ServeHTTP(responseWriter, request)
 	})
+
+}
+
+func validateLogin(cred *domain.Credentials) *ValidationError {
+	usernameRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]{4,30}$`)
+
+	if !usernameRegex.MatchString(cred.Username) {
+		return &ValidationError{Message: "Invalid 'Username' format."}
+	}
+
+	return nil
 }

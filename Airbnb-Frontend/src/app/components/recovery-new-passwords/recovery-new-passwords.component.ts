@@ -33,8 +33,8 @@ export class RecoveryNewPasswordsComponent implements OnInit {
 
   ngOnInit(): void {
     this.formGroup = this.formBuilder.group({
-      newPassword: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(30), PasswordStrengthValidator(), ]],
-      repeatPassword: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(30), PasswordStrengthValidator(), ]],
+      newPassword: ['', [Validators.required, Validators.minLength(11), Validators.maxLength(30), PasswordStrengthValidator(), ]],
+      repeatPassword: ['', [Validators.required, Validators.minLength(11), Validators.maxLength(30), PasswordStrengthValidator(), ]],
     })
   }
 

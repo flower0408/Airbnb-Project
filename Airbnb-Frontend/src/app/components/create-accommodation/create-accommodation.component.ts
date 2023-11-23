@@ -28,13 +28,13 @@ export class CreateAccommodationComponent implements OnInit {
    this.accommodationForm = this.fb.group({
      name: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(35), Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,35}$/)]],
      description: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(200), Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,200}$/)]],
-     images: ['', Validators.required],
+     images: ['', [Validators.required,Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,200}$/)]],
      benefits: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100), Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,100}$/)]],
      Minguest: ['', [Validators.required, Validators.min(1)]],
-     Maxguest: ['', [Validators.required, MaxGuestValidator(/*this.accommodationForm.get('Minguest')*/)]],
-     country: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(35),UpperLetterValidator(), Validators.pattern(/^[A-Z][a-zA-Z\s-]{2,34}$/)]],
-     city: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(35),UpperLetterValidator(), Validators.pattern(/^[A-Z][a-zA-Z\s-]{2,34}$/)]],
-     street: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(35),UpperLetterValidator(), Validators.pattern(/^[A-Z][a-zA-Z0-9\s,'-]{1,34}$/)]],
+     Maxguest: ['', [Validators.required,Validators.min(1), MaxGuestValidator(/*this.accommodationForm.get('Minguest')*/)]],
+     country: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(35),UpperLetterValidator(), Validators.pattern(/^[A-Z][a-zA-Z\s-]{2,35}$/)]],
+     city: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(35),UpperLetterValidator(), Validators.pattern(/^[A-Z][a-zA-Z\s-]{2,35}$/)]],
+     street: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(35),UpperLetterValidator(), Validators.pattern(/^[A-Z][a-zA-Z0-9\s,'-]{2,35}$/)]],
      number: ['', [Validators.required, Validators.min(1)]]
    });
 

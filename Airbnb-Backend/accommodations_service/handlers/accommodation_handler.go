@@ -44,9 +44,10 @@ func (s *AccommodationHandler) CreateAccommodation(rw http.ResponseWriter, h *ht
 func validateAccommodation(accommodation *data.Accommodation) *ValidationError {
 	nameRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,35}$`)
 	descriptionRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,200}$`)
-	countryRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,34}$`)
-	cityRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,34}$`)
-	streetRegex := regexp.MustCompile(`^[A-Z][a-zA-Z0-9\s,'-]{1,34}$`)
+	imagesRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,200}$`)
+	countryRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,35}$`)
+	cityRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,35}$`)
+	streetRegex := regexp.MustCompile(`^[A-Z][a-zA-Z0-9\s,'-]{2,35}$`)
 	benefitsRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,100}$`)
 
 	if accommodation.Name == "" {
@@ -65,6 +66,9 @@ func validateAccommodation(accommodation *data.Accommodation) *ValidationError {
 
 	if accommodation.Images == "" {
 		return &ValidationError{Message: "Images cannot be empty"}
+	}
+	if !imagesRegex.MatchString(accommodation.Images) {
+		return &ValidationError{Message: "Invalid 'Images' format. It must be 3-200 characters long and contain only letters, numbers, spaces, commas, apostrophes, and hyphens"}
 	}
 
 	if accommodation.Benefits == "" {
@@ -124,16 +128,6 @@ func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.
 		}
 		ctx := context.WithValue(h.Context(), KeyProduct{}, accommodations)
 		h = h.WithContext(ctx)
-		next.ServeHTTP(rw, h)
-	})
-}
-
-func (s *AccommodationHandler) MiddlewareContentTypeSet(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
-		s.logger.Println("Method [", h.Method, "] - Hit path :", h.URL.Path)
-
-		rw.Header().Add("Content-Type", "application/json")
-
 		next.ServeHTTP(rw, h)
 	})
 }

@@ -13,7 +13,7 @@ export function PasswordStrengthValidator(): ValidatorFn {
     const hasNumeric = /[0-9]+/.test(value);
     const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value);
 
-    const passwordValid = value.length >= 11 && hasUpperCase && hasLowerCase && hasNumeric && hasSpecialChar;
+    const passwordValid = value.length >= 11 && value.length <= 30 && hasUpperCase && hasLowerCase && hasNumeric && hasSpecialChar;
 
     return !passwordValid ? { passwordStrength: true } : null;
   };

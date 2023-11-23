@@ -36,13 +36,16 @@ func main() {
 
 	//Initialize the router and add a middleware for all the requests
 	router := mux.NewRouter()
-	router.Use(accommodationHandler.MiddlewareContentTypeSet)
+	router.Use(MiddlewareContentTypeSet)
 
 	postAccommodation := router.Methods(http.MethodPost).Subrouter()
 	postAccommodation.HandleFunc("/", accommodationHandler.CreateAccommodation)
 	postAccommodation.Use(accommodationHandler.MiddlewareAccommodationDeserialization)
 
-	cors := gorillaHandlers.CORS(gorillaHandlers.AllowedOrigins([]string{"*"}))
+	cors := gorillaHandlers.CORS(
+		gorillaHandlers.AllowedOrigins([]string{"https://localhost:4200"}),
+		gorillaHandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PATCH", "OPTIONS"}),
+		gorillaHandlers.AllowedHeaders([]string{"Authorization, Origin, X-Requested-With, Content-Type, Accept"}))
 
 	//Initialize the server
 	server := http.Server{
@@ -73,4 +76,19 @@ func main() {
 		logger.Fatal("Cannot gracefully shutdown...")
 	}
 	logger.Println("Server stopped")
+
+}
+
+func MiddlewareContentTypeSet(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
+		//s.logger.Println("Method [", h.Method, "] - Hit path :", h.URL.Path)
+
+		rw.Header().Add("Content-Type", "application/json")
+		rw.Header().Set("X-Content-Type-Options", "nosniff")
+		rw.Header().Set("X-Frame-Options", "DENY")
+
+		rw.Header().Set("Content-Security-Policy", "default-src 'self' script-src 'self' 'unsafe-inline' trusted-scripts.com; style-src 'self' 'unsafe-inline' trusted-styles.com; img-src 'self' data:")
+
+		next.ServeHTTP(rw, h)
+	})
 }

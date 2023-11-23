@@ -21,8 +21,8 @@
                    [ngClass]="{ 'is-invalid': submitted && loginGroup['username'].errors}">
             <div *ngIf="submitted && loginGroup['username'].errors" class="invalid-feedback">
               <div *ngIf="loginGroup['username'].errors['required']">Username is required.</div>
-              <div *ngIf="loginGroup['username'].errors['minlength']">Username must be at least 3 characters long.</div>
-              <div *ngIf="loginGroup['username'].errors['maxlength']">Username must not exceed 20 characters.
+              <div *ngIf="loginGroup['username'].errors['minlength']">Username must be at least 4 characters long.</div>
+              <div *ngIf="loginGroup['username'].errors['maxlength']">Username must not exceed 30 characters.
               </div>
             </div>
           </div>
@@ -32,9 +32,9 @@
                    [ngClass]="{ 'is-invalid': submitted && loginGroup['password'].errors}">
             <div *ngIf="submitted && loginGroup['password'].errors" class="invalid-feedback">
               <div *ngIf="loginGroup['password'].errors['required']">Password is required.</div>
-              <div *ngIf="loginGroup['password'].errors['minlength']">Password must be at least 3
+              <div *ngIf="loginGroup['password'].errors['minlength']">Password must be at least 11
                 characters long.</div>
-              <div *ngIf="loginGroup['password'].errors['maxlength']">Password must not exceed 20
+              <div *ngIf="loginGroup['password'].errors['maxlength']">Password must not exceed 30
                 characters.</div>
             </div>
           </div>

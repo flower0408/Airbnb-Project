@@ -3,6 +3,7 @@ package startup
 import (
 	"context"
 	"fmt"
+	gorillaHandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
@@ -68,11 +69,17 @@ func (server *Server) initUserHandler(service *application.UserService) *handler
 
 func (server *Server) start(tweetHandler *handlers.UserHandler) {
 	router := mux.NewRouter()
+	router.Use(MiddlewareContentTypeSet)
 	tweetHandler.Init(router)
+
+	cors := gorillaHandlers.CORS(
+		gorillaHandlers.AllowedOrigins([]string{"https://localhost:4200"}),
+		gorillaHandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PATCH", "OPTIONS"}),
+		gorillaHandlers.AllowedHeaders([]string{"Authorization, Origin, X-Requested-With, Content-Type, Accept"}))
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", server.config.Port),
-		Handler: router,
+		Handler: cors(router),
 	}
 
 	wait := time.Second * 15
@@ -96,4 +103,18 @@ func (server *Server) start(tweetHandler *handlers.UserHandler) {
 		log.Fatalf("Error Shutting Down Server %s", err)
 	}
 	log.Println("Server Gracefully Stopped")
+}
+
+func MiddlewareContentTypeSet(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
+		//s.logger.Println("Method [", h.Method, "] - Hit path :", h.URL.Path)
+
+		rw.Header().Add("Content-Type", "application/json")
+		rw.Header().Set("X-Content-Type-Options", "nosniff")
+		rw.Header().Set("X-Frame-Options", "DENY")
+
+		rw.Header().Set("Content-Security-Policy", "default-src 'self' script-src 'self' 'unsafe-inline' trusted-scripts.com; style-src 'self' 'unsafe-inline' trusted-styles.com; img-src 'self' data:")
+
+		next.ServeHTTP(rw, h)
+	})
 }

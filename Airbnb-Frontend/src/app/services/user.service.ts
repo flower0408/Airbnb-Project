@@ -40,16 +40,9 @@ export class UserService {
 
   getUser(): Observable<any> {
 
-    const token = localStorage.getItem('authToken');
-
-    const headers = new HttpHeaders({
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    });
-
     const username = this.getUsernameFromToken();
 
-    return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/getOne/` + username, {headers});
+    return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/getOne/` + username);
   }
 
 }
