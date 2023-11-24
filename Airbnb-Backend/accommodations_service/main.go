@@ -7,7 +7,6 @@ import (
 	"errors"
 	"github.com/casbin/casbin"
 	"github.com/cristalhq/jwt/v4"
-	gorillaHandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -47,7 +46,6 @@ func main() {
 		log.Fatal(err)
 	}
 	router.Use(casbinMiddleware)
-	router.Use(accommodationHandler.MiddlewareContentTypeSet)
 
 	getAccommodation := router.Methods(http.MethodGet).Subrouter()
 	getAccommodation.HandleFunc("/", accommodationHandler.GetAll)
