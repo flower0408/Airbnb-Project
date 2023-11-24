@@ -341,11 +341,6 @@ func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	if err := validateLogin(&request); err != nil {
-		http.Error(writer, errors.InvalidCredentials, http.StatusBadRequest)
-		return
-	}
-
 	token, err := handler.service.Login(&request)
 	if err != nil {
 		if err.Error() == errors.NotVerificatedUser {
@@ -385,14 +380,4 @@ func MiddlewareUserValidation(next http.Handler) http.Handler {
 		next.ServeHTTP(responseWriter, request)
 	})
 
-}
-
-func validateLogin(cred *domain.Credentials) *ValidationError {
-	usernameRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]{4,30}$`)
-
-	if !usernameRegex.MatchString(cred.Username) {
-		return &ValidationError{Message: "Invalid 'Username' format."}
-	}
-
-	return nil
 }

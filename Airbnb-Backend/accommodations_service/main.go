@@ -4,7 +4,6 @@ import (
 	"accommodations_service/data"
 	"accommodations_service/handlers"
 	"context"
-	gorillaHandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -42,15 +41,10 @@ func main() {
 	postAccommodation.HandleFunc("/", accommodationHandler.CreateAccommodation)
 	postAccommodation.Use(accommodationHandler.MiddlewareAccommodationDeserialization)
 
-	cors := gorillaHandlers.CORS(
-		gorillaHandlers.AllowedOrigins([]string{"https://localhost:4200"}),
-		gorillaHandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PATCH", "OPTIONS"}),
-		gorillaHandlers.AllowedHeaders([]string{"Authorization, Origin, X-Requested-With, Content-Type, Accept"}))
-
 	//Initialize the server
 	server := http.Server{
 		Addr:         ":" + port,
-		Handler:      cors(router),
+		Handler:      router,
 		IdleTimeout:  120 * time.Second,
 		ReadTimeout:  1 * time.Second,
 		WriteTimeout: 1 * time.Second,

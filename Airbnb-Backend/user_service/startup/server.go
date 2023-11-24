@@ -3,7 +3,6 @@ package startup
 import (
 	"context"
 	"fmt"
-	gorillaHandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
@@ -72,14 +71,9 @@ func (server *Server) start(tweetHandler *handlers.UserHandler) {
 	router.Use(MiddlewareContentTypeSet)
 	tweetHandler.Init(router)
 
-	cors := gorillaHandlers.CORS(
-		gorillaHandlers.AllowedOrigins([]string{"https://localhost:4200"}),
-		gorillaHandlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PATCH", "OPTIONS"}),
-		gorillaHandlers.AllowedHeaders([]string{"Authorization, Origin, X-Requested-With, Content-Type, Accept"}))
-
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", server.config.Port),
-		Handler: cors(router),
+		Handler: router,
 	}
 
 	wait := time.Second * 15

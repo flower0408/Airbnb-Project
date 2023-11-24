@@ -70,10 +70,6 @@ import { XSSInterceptor } from './services/xss.interceptor';
     provide: HTTP_INTERCEPTORS,
     useClass: AuthInterceptor,
     multi: true,
-  },{
-    provide: HTTP_INTERCEPTORS,
-    useClass: XSSInterceptor,
-    multi: true,
   }],
   bootstrap: [AppComponent]
 })
