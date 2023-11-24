@@ -16,4 +16,9 @@ export class AccommodationService {
 
     return this.http.post<any>(`${environment.baseApiUrl}/${this.url}/`, accommodation);
   }
+
+  getAllAccommodations(): Observable<any> {
+    const url = `${environment.baseApiUrl}/${this.url}/`;
+    return this.http.get(url);
+  }
 }

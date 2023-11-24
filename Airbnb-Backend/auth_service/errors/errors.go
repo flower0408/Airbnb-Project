@@ -14,4 +14,6 @@ const (
 	NotFoundMailError         = "Mail not found in database"
 	NotMatchingPasswordsError = "Passwords doesn't matching"
 	BlackList                 = "Password is in the blacklist"
+	InvalidPasswordFormat     = "Invalid password format"
+	EmptyPassword             = "New password is empty"
 )

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"auth_service/casbinAuthorization"
 	"auth_service/domain"
 	"auth_service/errors"
 	"auth_service/service"
@@ -8,12 +9,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/casbin/casbin"
 	"github.com/gorilla/mux"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -30,6 +35,14 @@ func NewAuthHandler(service *application.AuthService) *AuthHandler {
 
 func (handler *AuthHandler) Init(router *mux.Router) {
 
+	CasbinMiddleware1, err := casbin.NewEnforcerSafe("./rbac_model.conf", "./policy.csv")
+
+	log.Println("auth service successful init of enforcer")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	router.Use(ExtractTraceInfoMiddleware)
 	loginRouter := router.Methods(http.MethodPost).Subrouter()
 	loginRouter.HandleFunc("/login", handler.Login)
 
@@ -49,9 +62,50 @@ func (handler *AuthHandler) Init(router *mux.Router) {
 	router.HandleFunc("/checkRecoverToken", handler.CheckRecoveryPasswordToken).Methods("POST")
 	router.HandleFunc("/recoverPassword", handler.RecoverPassword).Methods("POST")
 	router.HandleFunc("/changePassword", handler.ChangePassword).Methods("POST")
+	router.HandleFunc("/logout", handler.logoutHandler).Methods("POST")
 	http.Handle("/", router)
+	log.Fatal(http.ListenAndServe(":8003", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
 }
 
+func (handler *AuthHandler) logoutHandler(w http.ResponseWriter, r *http.Request) {
+	tokenString, err := extractTokenFromHeader(r)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("No token found"))
+		return
+	}
+
+	cookie := &http.Cookie{
+		Name:     "jwt",
+		Value:    tokenString,
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	}
+
+	http.SetCookie(w, cookie)
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Logout successful"))
+}
+
+func extractTokenFromHeader(request *http.Request) (string, error) {
+	authHeader := request.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", fmt.Errorf("No Authorization header found")
+	}
+
+	// Check if the header starts with "Bearer "
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return "", fmt.Errorf("Invalid Authorization header format")
+	}
+
+	// Extract the token
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	return tokenString, nil
+}
 func (handler *AuthHandler) GetAll(writer http.ResponseWriter, req *http.Request) {
 	users, err := handler.service.GetAll()
 	if err != nil {
@@ -280,13 +334,25 @@ func (handler *AuthHandler) RecoverPassword(writer http.ResponseWriter, req *htt
 		return
 	}
 
-	err = handler.service.RecoverPassword(&request)
+	status, statusCode, err := handler.service.RecoverPassword(&request)
 	if err != nil {
-		if err.Error() == errors.NotMatchingPasswordsError {
+		/*if err.Error() == errors.NotMatchingPasswordsError {
 			http.Error(writer, err.Error(), http.StatusNotAcceptable)
 			return
 		}
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		http.Error(writer, err.Error(), http.StatusInternalServerError)*/
+		var errorMessage string
+
+		switch status {
+		case "newPassErr":
+			errorMessage = "Wrong new password"
+		case "baseErr":
+			errorMessage = "Internal server error"
+		default:
+			errorMessage = "An error occurred"
+		}
+
+		http.Error(writer, errorMessage, statusCode)
 		return
 	}
 
@@ -380,4 +446,10 @@ func MiddlewareUserValidation(next http.Handler) http.Handler {
 		next.ServeHTTP(responseWriter, request)
 	})
 
+}
+func ExtractTraceInfoMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

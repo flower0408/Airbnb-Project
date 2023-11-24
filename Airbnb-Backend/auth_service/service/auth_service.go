@@ -257,18 +257,18 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 }
 
 func sendValidationMail(validationToken uuid.UUID, email string) error {
-	message := gomail.NewMessage()
-	message.SetHeader("From", smtpEmail)
-	message.SetHeader("To", email)
-	message.SetHeader("Subject", "Verify your for airbnb account")
+	m := gomail.NewMessage()
+	m.SetHeader("From", smtpEmail)
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Verify your for airbnb account")
 
 	bodyString := fmt.Sprintf("Your validation token for airbnb account is:\n%s", validationToken)
-	message.SetBody("text", bodyString)
+	m.SetBody("text", bodyString)
 
 	client := gomail.NewDialer(smtpServer, smtpServerPort, smtpEmail, smtpPassword)
 
-	if err := client.DialAndSend(message); err != nil {
-		log.Fatalf("failed to send verification mail because of: %s", err)
+	if err := client.DialAndSend(m); err != nil {
+		log.Fatalf("Failed to send verification mail because of: %s", err)
 		return err
 	}
 
@@ -288,7 +288,7 @@ func (service *AuthService) AccountConfirmation(validation *domain.RegisterValid
 	if validation.MailToken == token {
 		err = service.cache.DelCachedValue(validation.UserToken)
 		if err != nil {
-			log.Printf("error in deleting cached value: %s", err)
+			log.Printf("Error in deleting cached value: %s", err)
 			return err
 		}
 
@@ -300,14 +300,14 @@ func (service *AuthService) AccountConfirmation(validation *domain.RegisterValid
 		user.Verified = true*/
 		user, err := service.store.GetOneUser(validation.UserToken)
 		if user == nil {
-			log.Println("user not found")
-			return fmt.Errorf("user not found")
+			log.Println("User is not found")
+			return fmt.Errorf("User is not found")
 		}
 		user.Verified = true
 
 		err = service.store.UpdateUserUsername(user)
 		if err != nil {
-			log.Printf("error in updating user after changing status of verify: %s", err.Error())
+			log.Printf("Error in updating user after changing status of verify: %s", err.Error())
 			return err
 		}
 
@@ -327,13 +327,13 @@ func (service *AuthService) ResendVerificationToken(request *domain.ResendVerifi
 
 	err := service.cache.PostCacheData(request.UserToken, tokenUUID.String())
 	if err != nil {
-		log.Println("POST CACHE DATA PROBLEM")
+		log.Println("Post cache problem")
 		return err
 	}
 
 	err = sendValidationMail(tokenUUID, request.UserMail)
 	if err != nil {
-		log.Println("SEND VALIDATION MAIL PROBLEM")
+		log.Println("Send verification mail problem")
 		return err
 	}
 
@@ -411,17 +411,17 @@ type UserDetails struct {
 }
 
 func sendRecoverPasswordMail(validationToken uuid.UUID, email string) error {
-	message := gomail.NewMessage()
-	message.SetHeader("From", smtpEmail)
-	message.SetHeader("To", email)
-	message.SetHeader("Subject", "Recover password on your Airbnb account")
+	m := gomail.NewMessage()
+	m.SetHeader("From", smtpEmail)
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Recover password on your Airbnb account")
 
 	bodyString := fmt.Sprintf("Your recover password token is:\n%s", validationToken)
-	message.SetBody("text", bodyString)
+	m.SetBody("text", bodyString)
 
 	client := gomail.NewDialer(smtpServer, smtpServerPort, smtpEmail, smtpPassword)
 
-	if err := client.DialAndSend(message); err != nil {
+	if err := client.DialAndSend(m); err != nil {
 		log.Fatalf("failed to send verification mail because of: %s", err)
 		return err
 	}
@@ -448,39 +448,58 @@ func (service *AuthService) CheckRecoveryPasswordToken(request *domain.RegisterV
 	return nil
 }
 
-func (service *AuthService) RecoverPassword(recoverPassword *domain.RecoverPasswordRequest) error {
+func (service *AuthService) RecoverPassword(recoverPassword *domain.RecoverPasswordRequest) (string, int, error) {
 	log.Println("Starting password recovery process...")
+
+	if recoverPassword.NewPassword == "" {
+		return "Password cannot be empty", http.StatusBadRequest, fmt.Errorf(errors.EmptyPassword)
+	}
+	if !verifyPassword(recoverPassword.NewPassword) {
+		return "Invalid password format. It should be at least 11 characters, with at least one uppercase letter, one lowercase letter, one digit, and one special character", http.StatusBadRequest, fmt.Errorf(errors.InvalidPasswordFormat)
+	}
+
+	checkPassword, err := blackListChecking(recoverPassword.NewPassword)
+	if err != nil {
+		log.Println(err)
+		return "Error checking password against blacklist", http.StatusInternalServerError, err
+	}
+
+	if checkPassword {
+		log.Println("Password is in the blacklist")
+		return "Password is in the blacklist", http.StatusBadRequest, fmt.Errorf(errors.BlackList)
+	}
+
 	if recoverPassword.NewPassword != recoverPassword.RepeatedNew {
-		return fmt.Errorf(errors.NotMatchingPasswordsError)
+		return "newPassErr", http.StatusNotAcceptable, fmt.Errorf(errors.NotMatchingPasswordsError)
 	}
 
 	primitiveID, err := primitive.ObjectIDFromHex(recoverPassword.UserID)
 	if err != nil {
 		log.Printf("Error converting user ID to ObjectID: %s", err)
-		return err
+		return "", http.StatusNotFound, err
 	}
-	// Log the user ID
+
 	log.Printf("Recovering password for user ID: %s", primitiveID.Hex())
 
 	credentials := service.store.GetOneUserByID(primitiveID)
 	if credentials == nil {
 		log.Printf("User not found for ID: %s", primitiveID.Hex())
-		return fmt.Errorf("User not found")
+		return "", http.StatusNotFound, fmt.Errorf("User not found")
 	}
 
 	pass := []byte(recoverPassword.NewPassword)
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return "Error trying to hash password.", http.StatusInternalServerError, err
 	}
 	credentials.Password = string(hash)
 
 	err = service.store.UpdateUser(credentials)
 	if err != nil {
-		return err
+		return "baseErr", http.StatusInternalServerError, err
 	}
 
-	return nil
+	return "OK", http.StatusOK, nil
 }
 
 func (service *AuthService) ChangePassword(password domain.PasswordChange, token string) (string, int, error) {

@@ -85,3 +85,33 @@ func (rr *AccommodationRepo) getCollection() *mongo.Collection {
 	appointmentsCollection := appointmentDatabase.Collection("accommodations")
 	return appointmentsCollection
 }
+
+func (rr *AccommodationRepo) GetAll() ([]*Accommodation, error) {
+	filter := bson.D{{}}
+	return rr.filter(filter)
+}
+
+func (rr *AccommodationRepo) filter(filter interface{}) ([]*Accommodation, error) {
+	ctx := context.TODO()
+	accommodationCollection := rr.getCollection()
+	cursor, err := accommodationCollection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	return decode(cursor)
+}
+
+func decode(cursor *mongo.Cursor) (users []*Accommodation, err error) {
+	for cursor.Next(context.TODO()) {
+		var user Accommodation
+		err = cursor.Decode(&user)
+		if err != nil {
+			return
+		}
+		users = append(users, &user)
+	}
+	err = cursor.Err()
+	return
+}

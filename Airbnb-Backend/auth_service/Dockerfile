@@ -9,5 +9,7 @@ FROM alpine:latest
 WORKDIR /root/
 COPY --from=builder /app/main .
 COPY /auth_service/blacklist.txt .
+COPY /rbac_model/rbac_model.conf/ .
+COPY /auth_service/policy.csv .
 EXPOSE 8000
 CMD ["./main"]
