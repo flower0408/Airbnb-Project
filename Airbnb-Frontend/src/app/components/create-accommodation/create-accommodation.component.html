@@ -17,8 +17,9 @@
           />
           <div *ngIf="submitted && f['name'].errors" class="invalid-feedback">
             <div *ngIf="f['name'].errors['required']">Name is required.</div>
-            <div *ngIf="f['name'].errors['minlength']">First Name must be at least 3 characters long.</div>
-            <div *ngIf="f['name'].errors['maxlength']">First Name must not exceed 35 characters.</div>
+            <div *ngIf="f['name'].errors['minlength']">Name must be at least 3 characters long.</div>
+            <div *ngIf="f['name'].errors['maxlength']">Name must not exceed 35 characters.</div>
+            <div *ngIf="f['name'].errors['pattern']">Name can only contain letters, numbers, spaces, commas, quotes, and hyphens.</div>
           </div>
         </div>
         <div class="formbold-mb-5">
@@ -36,6 +37,7 @@
             <div *ngIf="f['description'].errors['required']">Description is required.</div>
             <div *ngIf="f['description'].errors['minlength']">Description must be at least 3 characters long.</div>
             <div *ngIf="f['description'].errors['maxlength']">Description must not exceed 200 characters.</div>
+            <div *ngIf="f['description'].errors['pattern']">Description can only contain letters, numbers, spaces, commas, quotes, and hyphens.</div>
           </div>
         </div>
         <div class="formbold-mb-5">
@@ -51,6 +53,7 @@
           />
           <div *ngIf="submitted && f['images'].errors" class="invalid-feedback">
             <div *ngIf="f['images'].errors['required']">Image is required.</div>
+            <div *ngIf="f['images'].errors['pattern']">Image can only contain letters, numbers, spaces, commas, quotes, and hyphens.</div>
           </div>
         </div>
         <div class="formbold-mb-5">
@@ -68,6 +71,7 @@
             <div *ngIf="f['benefits'].errors['required']">Benefits are required.</div>
             <div *ngIf="f['benefits'].errors['minlength']">Benefits must be at least 3 characters long.</div>
             <div *ngIf="f['benefits'].errors['maxlength']">Benefits must not exceed 100 characters.</div>
+            <div *ngIf="f['benefits'].errors['pattern']">Benefits can only contain letters, numbers, spaces, commas, quotes, and hyphens.</div>
           </div>
         </div>
 
@@ -132,6 +136,7 @@
                   <div *ngIf="f['country'].errors['minlength']">Country must be at least 3 characters long.</div>
                   <div *ngIf="f['country'].errors['maxlength']">Country must not exceed 35 characters.</div>
                   <div *ngIf="f['country'].errors['upperLetter']">Country must start with upper letter.</div>
+                  <div *ngIf="f['country'].errors['pattern']">Country can only contain letters, numbers, spaces, commas, quotes, and hyphens.</div>
                 </div>
               </div>
             </div>
@@ -152,6 +157,7 @@
                   <div *ngIf="f['city'].errors['minlength']">City must be at least 3 characters long.</div>
                   <div *ngIf="f['city'].errors['maxlength']">City must not exceed 35 characters.</div>
                   <div *ngIf="f['city'].errors['upperLetter']">City must start with upper letter.</div>
+                  <div *ngIf="f['city'].errors['pattern']">City can only contain letters, numbers, spaces, commas, quotes, and hyphens.</div>
                 </div>
               </div>
             </div>
@@ -164,6 +170,7 @@
                   placeholder="Enter street"
                   class="formbold-form-input"
                   formControlName="street"
+                  required
                   [ngClass]="{ 'is-invalid': submitted && f['street'].errors}"
                 />
                 <div *ngIf="submitted && f['street'].errors" class="invalid-feedback">
@@ -171,6 +178,7 @@
                   <div *ngIf="f['street'].errors['minlength']">Street must be at least 2 characters long.</div>
                   <div *ngIf="f['street'].errors['maxlength']">Street must not exceed 35 characters.</div>
                   <div *ngIf="f['street'].errors['upperLetter']">Street must start with upper letter.</div>
+                  <div *ngIf="f['street'].errors['pattern']">Street can only contain letters, numbers, spaces, commas, quotes, and hyphens.</div>
                 </div>
               </div>
             </div>
@@ -183,6 +191,7 @@
                   placeholder="Enter number"
                   class="formbold-form-input"
                   formControlName="number"
+                  required
                   [ngClass]="{ 'is-invalid': submitted && f['number'].errors}"
                 />
                 <div *ngIf="submitted && f['number'].errors" class="invalid-feedback">

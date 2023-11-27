@@ -71,29 +71,49 @@ export class LoginComponent implements OnInit {
   }
 
   onSubmit() {
-    this.submitted = true;
+      this.submitted = true;
 
-    if (!this.captchaPassed || this.formGroup.invalid) {
-      return;
-    }
+      if (!this.captchaPassed || this.formGroup.invalid) {
+        return;
+      }
 
-    let login: LoginDTO = new LoginDTO();
+      let login: LoginDTO = new LoginDTO();
 
-    login.username = this.formGroup.get('username')?.value;
-    login.password = this.formGroup.get('password')?.value;
+      login.username = this.formGroup.get('username')?.value;
+      login.password = this.formGroup.get('password')?.value;
 
-    this.authService.Login(login)
-      .subscribe({
-        next: (token: string) => {
-          localStorage.setItem('authToken', token);
-          this.router.navigate(['/Main-Page']);
-        },
-        error: (error) => {
-          this.formGroup.setErrors({ unauthenticated: true });
-          window.alert('Username or password are incorrect!');
-          console.log(error);
-        }
-      });
+      const recaptchaControl = this.aFormGroup.get('recaptcha');
+      if (recaptchaControl) {
+        const recaptchaToken = recaptchaControl.value;
+        this.authService.verifyCaptcha(recaptchaToken).subscribe({
+          next: (response: any) => {
+            // Provera odgovora sa servera
+            if (response.success) {
+              // Ako je reCAPTCHA prošla, izvrši login
+              this.authService.Login(login).subscribe({
+                next: (token: string) => {
+                  localStorage.setItem('authToken', token);
+                  this.router.navigate(['/Main-Page']);
+                },
+                error: (error) => {
+                  this.formGroup.setErrors({ unauthenticated: true });
+                  window.alert('Username or password are incorrect!');
+                  console.log(error);
+                }
+              });
+            } else {
+              // Ako reCAPTCHA nije uspešno prošla
+              window.alert('reCAPTCHA verification failed.');
+            }
+          },
+          error: (error) => {
+            console.error('Error verifying reCAPTCHA:', error);
+            window.alert('Error verifying reCAPTCHA. Please try again.');
+          }
+        });
+      } else {
+        console.log("Recaptcha control is not found");
+      }
 
 
   }

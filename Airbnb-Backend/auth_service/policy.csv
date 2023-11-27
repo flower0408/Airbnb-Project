@@ -5,6 +5,7 @@ p, Unauthenticated, /resendVerify, POST
 p, Unauthenticated, /recoverPasswordToken, POST
 p, Unauthenticated, /checkRecoverToken, POST
 p, Unauthenticated, /recoverPassword, POST
+p, Unauthenticated, /verify-recaptcha, POST
 p, Guest, /changePassword, POST
 p, Host, /changePassword, POST
 p, Guest, /changeUsername, POST

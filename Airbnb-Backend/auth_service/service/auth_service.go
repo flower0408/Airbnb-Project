@@ -26,12 +26,13 @@ import (
 )
 
 var (
-	userServiceHost = os.Getenv("USER_SERVICE_HOST")
-	userServicePort = os.Getenv("USER_SERVICE_PORT")
-	smtpServer      = "smtp.office365.com"
-	smtpServerPort  = 587
-	smtpEmail       = os.Getenv("SMTP_AUTH_MAIL")
-	smtpPassword    = os.Getenv("SMTP_AUTH_PASSWORD")
+	userServiceHost    = os.Getenv("USER_SERVICE_HOST")
+	userServicePort    = os.Getenv("USER_SERVICE_PORT")
+	smtpServer         = "smtp.office365.com"
+	smtpServerPort     = 587
+	smtpEmail          = os.Getenv("SMTP_AUTH_MAIL")
+	smtpPassword       = os.Getenv("SMTP_AUTH_PASSWORD")
+	recaptchaSecretKey = os.Getenv("SECRET_CAPTCHA_KEY")
 )
 
 type AuthService struct {
@@ -52,6 +53,50 @@ func (service *AuthService) GetAll() ([]*domain.Credentials, error) {
 
 type ValidationError struct {
 	Message string `json:"message"`
+}
+
+type RecaptchaResponse struct {
+	Success     bool     `json:"success"`
+	Score       float64  `json:"score"`
+	Action      string   `json:"action"`
+	ChallengeTS string   `json:"challenge_ts"`
+	Hostname    string   `json:"hostname"`
+	ErrorCodes  []string `json:"error-codes"`
+}
+
+func (service *AuthService) VerifyRecaptcha(recaptchaToken string) (bool, error) {
+	recaptchaEndpoint := "https://www.google.com/recaptcha/api/siteverify"
+	recaptchaSecret := recaptchaSecretKey
+
+	// Pravimo zahtev ka reCAPTCHA API-ju
+	response, err := http.Post(recaptchaEndpoint, "application/x-www-form-urlencoded",
+		bytes.NewBuffer([]byte(fmt.Sprintf("secret=%s&response=%s", recaptchaSecret, recaptchaToken))))
+	if err != nil {
+		return false, err
+	}
+	defer response.Body.Close()
+
+	// Čitamo odgovor od reCAPTCHA API-ja
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return false, err
+	}
+
+	// Parsiramo JSON odgovor
+	var recaptchaResponse RecaptchaResponse
+	if err := json.Unmarshal(body, &recaptchaResponse); err != nil {
+		return false, err
+	}
+
+	// Proveravamo da li je reCAPTCHA uspešno proverena i da li je postignut dobar rezultat
+	if recaptchaResponse.Success /* && recaptchaResponse.Score >= 0.5*/ {
+		return true, nil
+	}
+
+	log.Printf("ReCAPTCHA response: %v\n", recaptchaResponse)
+
+	// Ako nije uspešna provera ili nije postignut dobar rezultat, vraćamo grešku
+	return false, fmt.Errorf("Invalid reCAPTCHA token or low score")
 }
 
 func (v *ValidationError) Error() string {

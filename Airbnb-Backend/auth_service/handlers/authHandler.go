@@ -53,9 +53,13 @@ func (handler *AuthHandler) Init(router *mux.Router) {
 	verifyRouter := router.Methods(http.MethodPost).Subrouter()
 	verifyRouter.HandleFunc("/verifyAccount", handler.AccountConfirmation)
 
+	verifyRecaptchaRouter := router.Methods(http.MethodPost).Subrouter()
+	verifyRecaptchaRouter.HandleFunc("/verify-recaptcha", handler.VerifyRecaptcha)
+
 	router.HandleFunc("/", handler.GetAll).Methods("GET")
 	router.HandleFunc("/login", handler.Login).Methods("POST")
 	router.HandleFunc("/register", handler.Register).Methods("POST")
+	router.HandleFunc("/verify-recaptcha", handler.VerifyRecaptcha).Methods("POST")
 	router.HandleFunc("/accountConfirmation", handler.AccountConfirmation).Methods("POST")
 	router.HandleFunc("/resendVerify", handler.ResendVerificationToken).Methods("POST")
 	router.HandleFunc("/recoverPasswordToken", handler.SendRecoveryPasswordToken).Methods("POST")
@@ -209,6 +213,35 @@ func validateUser(user *domain.User) *ValidationError {
 	}
 
 	return nil
+}
+
+func (handler *AuthHandler) VerifyRecaptcha(writer http.ResponseWriter, req *http.Request) {
+	var recaptchaToken struct {
+		Token string `json:"token"`
+	}
+
+	err := json.NewDecoder(req.Body).Decode(&recaptchaToken)
+	if err != nil {
+		log.Println(err)
+		http.Error(writer, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Pozivamo funkciju za proveru reCAPTCHA tokena iz servisa
+	isCaptchaValid, err := handler.service.VerifyRecaptcha(recaptchaToken.Token)
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Vraćamo rezultat provere kao JSON odgovor
+	response := struct {
+		Success bool `json:"success"`
+	}{
+		Success: isCaptchaValid,
+	}
+
+	json.NewEncoder(writer).Encode(response)
 }
 
 func (handler *AuthHandler) Register(writer http.ResponseWriter, req *http.Request) {

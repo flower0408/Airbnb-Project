@@ -20,6 +20,11 @@ export class AuthService {
       return this.http.post<string>(`${environment.baseApiUrl}/${this.url}/register`, user);
     }
 
+  public verifyCaptcha(token: string): Observable<any> {
+    const verifyUrl = `${environment.baseApiUrl}/${this.url}/verify-recaptcha`;
+    return this.http.post(verifyUrl, { token });
+  }
+
   public VerifyAccount(request: VerificationRequest): Observable<void> {
     return this.http.post<void>(`${environment.baseApiUrl}/${this.url}/accountConfirmation`, request);
   }
