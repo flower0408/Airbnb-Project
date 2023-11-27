@@ -51,7 +51,7 @@ export class RegisterComponent implements OnInit {
       lastName: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(20), Validators.pattern('[-_a-zA-Z]*')]],
       gender: ['', [Validators.required]],
       age: ['', [Validators.required, Validators.min(1), Validators.max(100)]],
-      residence: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(35), Validators.pattern('^[a-zA-Z0-9\s,\'-]*')]],
+      residence: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(35), Validators.pattern("^[a-zA-Z0-9\\s,'-]*")]],
       email: ['', [Validators.required, Validators.email, Validators.minLength(3), Validators.maxLength(35)]],
       username: ['', [Validators.required, Validators.minLength(4), Validators.maxLength(30), Validators.pattern('[-_a-zA-Z0-9]*')]],
       password: ['', [Validators.required, Validators.minLength(11), Validators.maxLength(30), PasswordStrengthValidator()]],
@@ -92,6 +92,9 @@ export class RegisterComponent implements OnInit {
         error: (error: HttpErrorResponse) => {
           if (error.status === 409) {
             alert('User with that username already exists!');
+          }
+          else if (error.status === 406) {
+            alert('Password is in blacklist!');
           }
           //console.log(error)
         }

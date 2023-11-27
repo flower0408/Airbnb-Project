@@ -150,7 +150,7 @@ func verifyPassword(s string) (valid bool) {
 func validateUser(user *domain.User) *ValidationError {
 	emailRegex := regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{3,35}`)
 	usernameRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]{4,30}$`)
-	residenceRegex := regexp.MustCompile(`^[a-zA-Z]{3,35}$`)
+	residenceRegex := regexp.MustCompile(`^[a-zA-Z\s,'-]{3,35}$`)
 	nameRegex := regexp.MustCompile(`^[a-zA-Z]{3,20}$`)
 	// Validate Email
 	if user.Email == "" {

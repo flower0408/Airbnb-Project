@@ -57,7 +57,10 @@ export class MyProfileComponent implements OnInit {
             this.router.navigate([""])
           },
           (error) => {
-            console.error('Error updating username', error);
+            if (error.status === 409) {
+              alert('User with that username already exists!');
+            }
+            //console.error('Error updating username', error);
           }
         );
     }

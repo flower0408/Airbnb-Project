@@ -129,7 +129,7 @@ func verifyPassword(s string) (valid bool) {
 func validateUser(user *domain.User) *ValidationError {
 	emailRegex := regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{3,35}`)
 	usernameRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]{4,30}$`)
-	residenceRegex := regexp.MustCompile(`^[a-zA-Z]{3,35}$`)
+	residenceRegex := regexp.MustCompile(`^[a-zA-Z\s,'-]{3,35}$`)
 	nameRegex := regexp.MustCompile(`^[a-zA-Z]{3,20}$`)
 	// Validate Email
 	if user.Email == "" {
@@ -204,7 +204,7 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 
 	if checkUser {
 		log.Println("Password is in blacklist")
-		return "", 55, fmt.Errorf("Password is in black list, try with another one!")
+		return "", 406, fmt.Errorf("Password is in black list, try with another one!")
 	}
 
 	existingUser, err := service.store.GetOneUser(user.Username)
@@ -618,6 +618,15 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 
 	currentUsername := claims["username"]
 	fmt.Println("Current Username:", currentUsername)
+
+	existingUser, err := service.store.GetOneUser(username.NewUsername)
+	if err != nil {
+		return "GetUserErr", http.StatusInternalServerError, err
+	}
+
+	if existingUser != nil {
+		return "UsernameExist", http.StatusConflict, fmt.Errorf(errors.UsernameExist)
+	}
 
 	requestBody := map[string]interface{}{
 		"old_username": currentUsername,
