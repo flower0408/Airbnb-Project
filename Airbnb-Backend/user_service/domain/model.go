@@ -29,3 +29,8 @@ const (
 	Guest = "Guest"
 	Host  = "Host"
 )
+
+type UsernameChange struct {
+	OldUsername string `json:"old_username"`
+	NewUsername string `json:"new_username"`
+}

@@ -7,6 +7,8 @@ p, Unauthenticated, /checkRecoverToken, POST
 p, Unauthenticated, /recoverPassword, POST
 p, Guest, /changePassword, POST
 p, Host, /changePassword, POST
+p, Guest, /changeUsername, POST
+p, Host, /changeUsername, POST
 p, Guest, /, GET
 p, Guest, /logout, POST
 p, Host, /logout, POST

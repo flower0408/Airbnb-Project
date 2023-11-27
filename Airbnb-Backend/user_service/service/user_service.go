@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
+	"net/http"
 	"user_service/domain"
 )
 
@@ -59,4 +60,27 @@ func (service *UserService) Register(user *domain.User) (*domain.User, error) {
 
 	return service.store.Register(&userInfo)
 
+}
+
+func (service *UserService) ChangeUsername(username domain.UsernameChange) (string, int, error) {
+
+	currentUsername := username.OldUsername
+
+	user, err := service.store.GetOneUser(currentUsername)
+	if err != nil {
+		log.Println(err)
+		return "GetUserErr", http.StatusInternalServerError, err
+	}
+
+	user.Username = username.NewUsername
+
+	err = service.store.UpdateUser(user)
+	if err != nil {
+		return "baseErr", http.StatusInternalServerError, err
+	}
+
+	fmt.Println("Username Updated Successfully")
+
+	// Return the updated token
+	return "OK", http.StatusOK, nil
 }

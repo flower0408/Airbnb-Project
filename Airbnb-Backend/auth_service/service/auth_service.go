@@ -162,7 +162,6 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 		return "", 55, fmt.Errorf("Password is in black list, try with another one!")
 	}
 
-	/* PAZI OVDE OVO JE TRENUTNO ZAKOMENTARISANO - PROVERA DA NE POSTOJI USER SA ISTIM MAILOM
 	existingUser, err := service.store.GetOneUser(user.Username)
 	if err != nil {
 		return "", 500, err
@@ -172,13 +171,15 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 		return "", 409, fmt.Errorf(errors.UsernameExist)
 	}
 
+	/*// PAZI OVDE OVO JE TRENUTNO ZAKOMENTARISANO - PROVERA DA NE POSTOJI USER SA ISTIM MAILOM
+
 	userServiceEndpointMail := fmt.Sprintf("http://%s:%s/mailExist/%s", userServiceHost, userServicePort, user.Email)
 	userServiceRequestMail, _ := http.NewRequest("GET", userServiceEndpointMail, nil)
 	response, _ := http.DefaultClient.Do(userServiceRequestMail)
 	if response.StatusCode != 404 {
 		return "", 406, fmt.Errorf(errors.EmailAlreadyExist)
-	}
-	*/
+	}*/
+
 	pass := []byte(user.Password)
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
 	if err != nil {
@@ -561,6 +562,58 @@ func (service *AuthService) ChangePassword(password domain.PasswordChange, token
 		return "newPassErr", http.StatusNotAcceptable, fmt.Errorf("New password does not match confirmation")
 
 	}
+
+	return "OK", http.StatusOK, nil
+}
+
+func (service *AuthService) ChangeUsername(username domain.UsernameChange, token string) (string, int, error) {
+
+	parsedToken := authorization.GetToken(token)
+	claims := authorization.GetMapClaims(parsedToken.Bytes())
+
+	currentUsername := claims["username"]
+	fmt.Println("Current Username:", currentUsername)
+
+	requestBody := map[string]interface{}{
+		"old_username": currentUsername,
+		"new_username": username.NewUsername,
+	}
+
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		return "MarshalError", http.StatusInternalServerError, err
+	}
+
+	userServiceEndpoint := fmt.Sprintf("http://%s:%s/changeUsername", userServiceHost, userServicePort)
+	userServiceRequest, _ := http.NewRequest("POST", userServiceEndpoint, bytes.NewReader(body))
+	responseUser, err := http.DefaultClient.Do(userServiceRequest)
+
+	if err != nil {
+		log.Println(err)
+		return "UserServiceError", http.StatusInternalServerError, err
+	}
+	defer responseUser.Body.Close()
+
+	if responseUser.StatusCode != http.StatusOK {
+		buf := new(strings.Builder)
+		_, _ = io.Copy(buf, responseUser.Body)
+		return "UserServiceError", responseUser.StatusCode, fmt.Errorf(buf.String())
+	}
+
+	user, err := service.store.GetOneUser(currentUsername)
+	if err != nil {
+		log.Println(err)
+		return "GetUserErr", http.StatusInternalServerError, err
+	}
+	fmt.Println("Retrieved User:", user)
+
+	user.Username = username.NewUsername
+
+	err = service.store.UpdateUser(user)
+	if err != nil {
+		return "baseErr", http.StatusInternalServerError, err
+	}
+	fmt.Println("Username Updated Successfully")
 
 	return "OK", http.StatusOK, nil
 }

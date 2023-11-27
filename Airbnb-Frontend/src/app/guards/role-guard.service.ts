@@ -22,7 +22,7 @@ export class RoleGuardService implements CanActivate {
     const jwt: JwtHelperService = new JwtHelperService();
 
     // Moze i ne mora da se prikazuje
-    console.log('Expected Roles:', expectedRoles);
+    //console.log('Expected Roles:', expectedRoles);
 
     if (!token) {
       console.error('Access forbidden. Invalid token or missing user type.');
@@ -38,7 +38,7 @@ export class RoleGuardService implements CanActivate {
 
       if (roles.indexOf(info.userType) === -1) {
         console.error('Access forbidden. User does not have the required role.');
-        this.router.navigate(['/Main-Page']);
+        this.router.navigate(['']);
         return of(false);
       }
     } else {

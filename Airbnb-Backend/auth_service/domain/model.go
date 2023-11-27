@@ -78,6 +78,11 @@ type PasswordChange struct {
 	NewPasswordConfirm string `json:"new_password_confirm"`
 }
 
+type UsernameChange struct {
+	OldUsername string `json:"old_username"`
+	NewUsername string `json:"new_username"`
+}
+
 func (user *User) ValidateUser() error {
 	validate := validator.New()
 

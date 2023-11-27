@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { ChangePasswordDTO } from 'src/app/dto/changePasswordDTO';
 import { AuthService } from 'src/app/services/auth.service';
 import { PasswordStrengthValidator } from 'src/app/services/customValidators';
+import {MatSnackBar} from "@angular/material/snack-bar";
 
 @Component({
   selector: 'app-change-password',
@@ -21,7 +22,8 @@ export class ChangePasswordComponent implements OnInit {
 
   constructor(private router: Router,
               private formBuilder: FormBuilder,
-              private authService: AuthService
+              private authService: AuthService,
+              private _snackBar: MatSnackBar
   ) { }
 
   submitted = false;
@@ -55,6 +57,7 @@ export class ChangePasswordComponent implements OnInit {
     this.authService.ChangePassword(changePassword)
       .subscribe({
         next: () => {
+          this.openSnackBar("Password changed successfully!", "")
             localStorage.clear()
             this.router.navigate([""])
         },
@@ -77,6 +80,12 @@ export class ChangePasswordComponent implements OnInit {
         }
       }
       );
+  }
+
+  openSnackBar(message: string, action: string) {
+    this._snackBar.open(message, action,  {
+      duration: 3500
+    });
   }
 
 }

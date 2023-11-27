@@ -62,6 +62,7 @@ func (handler *AuthHandler) Init(router *mux.Router) {
 	router.HandleFunc("/checkRecoverToken", handler.CheckRecoveryPasswordToken).Methods("POST")
 	router.HandleFunc("/recoverPassword", handler.RecoverPassword).Methods("POST")
 	router.HandleFunc("/changePassword", handler.ChangePassword).Methods("POST")
+	router.HandleFunc("/changeUsername", handler.ChangeUsername).Methods("POST")
 	router.HandleFunc("/logout", handler.logoutHandler).Methods("POST")
 	http.Handle("/", router)
 	log.Fatal(http.ListenAndServe(":8003", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
@@ -336,11 +337,6 @@ func (handler *AuthHandler) RecoverPassword(writer http.ResponseWriter, req *htt
 
 	status, statusCode, err := handler.service.RecoverPassword(&request)
 	if err != nil {
-		/*if err.Error() == errors.NotMatchingPasswordsError {
-			http.Error(writer, err.Error(), http.StatusNotAcceptable)
-			return
-		}
-		http.Error(writer, err.Error(), http.StatusInternalServerError)*/
 		var errorMessage string
 
 		switch status {
@@ -397,6 +393,45 @@ func (handler *AuthHandler) ChangePassword(writer http.ResponseWriter, request *
 
 	writer.WriteHeader(http.StatusOK)
 
+}
+
+func (handler *AuthHandler) ChangeUsername(writer http.ResponseWriter, request *http.Request) {
+
+	var token string = request.Header.Get("Authorization")
+	bearerToken := strings.Split(token, "Bearer ")
+	tokenString := bearerToken[1]
+
+	fmt.Println(request.Body)
+
+	var username domain.UsernameChange
+	err := json.NewDecoder(request.Body).Decode(&username)
+	if err != nil {
+		log.Println(err)
+		http.Error(writer, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	status, statusCode, err := handler.service.ChangeUsername(username, tokenString)
+
+	if err != nil {
+		var errorMessage string
+
+		switch status {
+		case "oldUsername":
+			errorMessage = "Wrong old username"
+		case "newUsername":
+			errorMessage = "Wrong new username"
+		case "baseErr":
+			errorMessage = "Internal server error"
+		default:
+			errorMessage = "An error occurred"
+		}
+
+		http.Error(writer, errorMessage, statusCode)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
 }
 
 func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request) {

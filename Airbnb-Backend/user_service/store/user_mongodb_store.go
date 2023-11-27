@@ -7,7 +7,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
 	"user_service/domain"
 )
 
@@ -66,12 +65,19 @@ func (store *UserMongoDBStore) GetByEmail(email string) (*domain.User, error) {
 }
 
 func (store *UserMongoDBStore) UpdateUser(user *domain.User) error {
-	_, err := store.users.UpdateOne(context.TODO(), bson.M{"_id": user.ID}, bson.M{"$set": user})
+	/*_, err := store.users.UpdateOne(context.TODO(), bson.M{"_id": user.ID}, bson.M{"$set": user})
 	if err != nil {
 		log.Printf("Updating user error mongodb: %s", err.Error())
 		return err
 	}
 
+	return nil*/
+	fmt.Println(user)
+	newState, err := store.users.UpdateOne(context.TODO(), bson.M{"_id": user.ID}, bson.M{"$set": user})
+	if err != nil {
+		return err
+	}
+	fmt.Println(newState)
 	return nil
 }
 

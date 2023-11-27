@@ -14,13 +14,13 @@ export class UserService {
 
   getUsernameFromToken(): any {
     const token = localStorage.getItem('authToken');
-  
+
     if (token) {
       try {
         const payload = token.split('.')[1];
         const decodedPayload = atob(payload);
         const user = JSON.parse(decodedPayload);
-  
+
         if (user && user.username) {
           const username = user.username;
           return username;
@@ -33,16 +33,20 @@ export class UserService {
     } else {
       console.error('Token not found.');
     }
-  
+
     return null;
   }
-  
+
 
   getUser(): Observable<any> {
 
     const username = this.getUsernameFromToken();
 
     return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/getOne/` + username);
+  }
+
+  public Profile(): Observable<User> {
+    return this.http.get<User>(`${environment.baseApiUrl}/${this.url}/profile/`)
   }
 
 }

@@ -4,14 +4,27 @@
     <h1 class="profile">Profile info</h1>
   </div>
   <div class="profile-info">
-    <p class="info"><b>First Name:</b> Name</p>
-    <p class="info"><b>Last Name:</b> LastName</p>
-    <p class="info"><b>Username:</b> Username</p>
-    <p class="info"><b>Email:</b> example@gmail.com</p>
+    <p class="info"><b>First Name:</b> {{user.firstName}}</p>
+    <p class="info"><b>Last Name:</b> {{user.lastName}}</p>
+    <p class="info"><b>Username:</b> {{user.username}}</p>
+    <p class="info"><b>Age:</b> {{user.age}}</p>
+    <p class="info"><b>Residence:</b> {{user.residence}}</p>
+    <p class="info"><b>Email:</b> {{user.email}}</p>
   </div>
   <div class="profile-options">
     <button class="btn btn-danger" (click)="updatePassword()">Change Password</button>
   </div>
+  <br>
+  <div class="profile-info">
+    <form [formGroup]="usernameForm">
+      <p for="newUsername" class="info"><b>New Username:</b></p>
+      <input type="text" id="newUsername" formControlName="newUsername" />
+      <br>
+      <br>
+      <button class="btn btn-danger" (click)="updateUsername()">Change Username</button>
+    </form>
+  </div>
+
 </div>
 
 

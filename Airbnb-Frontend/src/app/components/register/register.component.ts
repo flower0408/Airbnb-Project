@@ -5,6 +5,7 @@ import { AuthService } from 'src/app/services/auth.service';
 import { PasswordStrengthValidator } from 'src/app/services/customValidators';
 import {Router} from "@angular/router";
 import {VerificationService} from "../../services/verify.service";
+import {HttpErrorResponse} from "@angular/common/http";
 
 @Component({
   selector: 'app-register',
@@ -88,8 +89,11 @@ export class RegisterComponent implements OnInit {
           this.verificationService.updateVerificationToken(registrationToken);
           this.router.navigate(['/Account-Confirmation']);
         },
-        error: (error) => {
-          console.log(error)
+        error: (error: HttpErrorResponse) => {
+          if (error.status === 409) {
+            alert('User with that username already exists!');
+          }
+          //console.log(error)
         }
       });
   }

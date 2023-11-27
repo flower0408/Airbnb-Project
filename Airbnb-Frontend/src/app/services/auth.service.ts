@@ -50,6 +50,22 @@ export class AuthService {
     return this.http.post<any>(`${environment.baseApiUrl}/${this.url}/changePassword`, changePasswordDTO, options)
   }
 
+  changeUsername(oldUsername: string, newUsername: string): Observable<any> {
+    const endpoint = `${environment.baseApiUrl}/${this.url}/changeUsername`;
+
+    const headers = {
+      "Content-Type" : "application/json",
+      "Authorization" : "Bearer " + localStorage.getItem("authToken"),
+    };
+
+    const body = {
+      old_username: oldUsername,
+      new_username: newUsername
+    };
+
+    return this.http.post(endpoint, body, { headers });
+  }
+
 
   public Login(loginDTO: LoginDTO): Observable<string> {
     return this.http.post(`${environment.baseApiUrl}/${this.url}/login`, loginDTO, {responseType : 'text'});
