@@ -96,6 +96,9 @@ export class RegisterComponent implements OnInit {
           else if (error.status === 406) {
             alert('Password is in blacklist!');
           }
+          else if (error.status === 405) {
+            alert('User with that email already exists!');
+          }
           //console.log(error)
         }
       });

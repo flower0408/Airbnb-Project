@@ -222,7 +222,7 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 	userServiceRequestMail, _ := http.NewRequest("GET", userServiceEndpointMail, nil)
 	response, _ := http.DefaultClient.Do(userServiceRequestMail)
 	if response.StatusCode != 404 {
-		return "", 406, fmt.Errorf(errors.EmailAlreadyExist)
+		return "", 405, fmt.Errorf(errors.EmailAlreadyExist)
 	}*/
 
 	pass := []byte(user.Password)
@@ -283,6 +283,7 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 	}
 
 	return newUser.ID.Hex(), 200, nil*/
+
 	validationToken := uuid.New()
 	log.Printf("Username: %s", user.Username)
 	log.Printf("Generated validation token: %s", validationToken.String())
@@ -618,6 +619,11 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 
 	currentUsername := claims["username"]
 	fmt.Println("Current Username:", currentUsername)
+
+	usernameRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]{4,30}$`)
+	if !usernameRegex.MatchString(username.NewUsername) {
+		return "InvalidUsername", http.StatusBadRequest, fmt.Errorf("Invalid username format. It must be 4-30 characters long and contain only letters, numbers, underscores, and hyphens")
+	}
 
 	existingUser, err := service.store.GetOneUser(username.NewUsername)
 	if err != nil {

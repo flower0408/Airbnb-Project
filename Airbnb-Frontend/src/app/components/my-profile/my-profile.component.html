@@ -19,6 +19,18 @@
     <form [formGroup]="usernameForm">
       <p for="newUsername" class="info"><b>New Username:</b></p>
       <input type="text" id="newUsername" formControlName="newUsername" />
+      <div class="color" *ngIf="usernameForm.get('newUsername')?.hasError('required')">
+        Username is required.
+      </div>
+      <div class="color" *ngIf="usernameForm.get('newUsername')?.hasError('minlength')">
+        Username must be at least 4 characters long.
+      </div>
+      <div class="color" *ngIf="usernameForm.get('newUsername')?.hasError('maxlength')">
+        Username must not exceed 30 characters.
+      </div>
+      <div class="color" *ngIf="usernameForm.get('newUsername')?.hasError('pattern')">
+        Special Characters are not allowed.
+      </div>
       <br>
       <br>
       <button class="btn btn-danger" (click)="updateUsername()">Change Username</button>

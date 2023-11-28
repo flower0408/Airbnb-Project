@@ -19,7 +19,7 @@ export class MyProfileComponent implements OnInit {
               private fb: FormBuilder,
               private _snackBar: MatSnackBar,){
     this.usernameForm = this.fb.group({
-      newUsername: ['', Validators.required]
+      newUsername: ['', [Validators.required, Validators.minLength(4), Validators.maxLength(30), Validators.pattern('[-_a-zA-Z0-9]*')]],
     });
   }
 
@@ -38,6 +38,7 @@ export class MyProfileComponent implements OnInit {
         },
       });
   }
+
 
   updatePassword() {
     this.router.navigateByUrl("Change-Password")
