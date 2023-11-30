@@ -2,14 +2,27 @@ package handlers
 
 import (
 	"encoding/json"
+	"github.com/casbin/casbin"
+	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
+	"strings"
+	"user_service/authorization"
+	"user_service/casbinAuthorization"
 	"user_service/domain"
 	"user_service/errors"
 	"user_service/service"
+)
+
+var (
+	jwtKey      = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _ = jwt.NewVerifierHS(jwt.HS256, jwtKey)
 )
 
 type UserHandler struct {
@@ -23,10 +36,25 @@ func NewUserHandler(service *application.UserService) *UserHandler {
 }
 
 func (handler *UserHandler) Init(router *mux.Router) {
+
+	CasbinMiddleware1, err := casbin.NewEnforcerSafe("./rbac_model.conf", "./policy.csv")
+
+	log.Println("auth service successful init of enforcer")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	router.Use(ExtractTraceInfoMiddleware)
 	router.HandleFunc("/{id}", handler.Get).Methods("GET")
 	router.HandleFunc("/", handler.GetAll).Methods("GET")
 	router.HandleFunc("/", handler.Register).Methods("POST")
+	router.HandleFunc("/getOne/{username}", handler.GetOne).Methods("GET")
+	router.HandleFunc("/profile/", handler.Profile).Methods("GET")
+	router.HandleFunc("/mailExist/{mail}", handler.MailExist).Methods("GET")
+	router.HandleFunc("/changeUsername", handler.ChangeUsername).Methods("POST")
+
 	http.Handle("/", router)
+	log.Fatal(http.ListenAndServe(":8002", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
 }
 
 type ValidationError struct {
@@ -117,6 +145,37 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 
 }
 
+func (handler *UserHandler) ChangeUsername(writer http.ResponseWriter, request *http.Request) {
+	var username domain.UsernameChange
+	err := json.NewDecoder(request.Body).Decode(&username)
+	if err != nil {
+		log.Println(err)
+		http.Error(writer, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	status, statusCode, err := handler.service.ChangeUsername(username)
+
+	if err != nil {
+		log.Println("Error in ChangeUsername:", err)
+		var errorMessage string
+
+		switch status {
+		case "GetUserErr":
+			errorMessage = "Error getting user"
+		case "baseErr":
+			errorMessage = "Internal server error"
+		default:
+			errorMessage = "An error occurred: " + err.Error()
+		}
+
+		http.Error(writer, errorMessage, statusCode)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
+}
+
 func (handler *UserHandler) GetAll(writer http.ResponseWriter, req *http.Request) {
 	users, err := handler.service.GetAll()
 	if err != nil {
@@ -146,4 +205,84 @@ func (handler *UserHandler) Get(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 	jsonResponse(user, writer)
+}
+
+func (handler *UserHandler) GetOne(writer http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	username := vars["username"]
+
+	user, err := handler.service.GetOneUser(username)
+	if err != nil {
+		log.Println(err)
+		writer.WriteHeader(http.StatusNotFound)
+	}
+	jsonResponse(user, writer)
+}
+
+func (handler *UserHandler) Profile(writer http.ResponseWriter, req *http.Request) {
+
+	bearer := req.Header.Get("Authorization")
+	if bearer == "" {
+		log.Println("Authorization header missing")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	bearerToken := strings.Split(bearer, "Bearer ")
+	if len(bearerToken) != 2 {
+		log.Println("Malformed Authorization header")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tokenString := bearerToken[1]
+	log.Printf("Token: %s\n", tokenString)
+
+	token, err := jwt.Parse([]byte(tokenString), verifier)
+	if err != nil {
+		log.Println("Token parsing error:", err)
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	claims := authorization.GetMapClaims(token.Bytes())
+	log.Printf("Token Claims: %+v\n", claims)
+	username := claims["username"]
+
+	user, err := handler.service.GetOneUser(username)
+	if err != nil {
+		log.Println("GetOneUser error:", err)
+		http.Error(writer, "User not found", http.StatusNotFound)
+		return
+	}
+	log.Printf("Retrieved User: %+v\n", user)
+	jsonResponse(user, writer)
+}
+
+func (handler *UserHandler) MailExist(writer http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	mail, ok := vars["mail"]
+	if !ok {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	id, err := handler.service.DoesEmailExist(mail)
+	if err != nil {
+		writer.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	_, err = writer.Write([]byte(id))
+	if err != nil {
+		log.Println("error in response user service")
+		log.Println(err.Error())
+		return
+	}
+}
+func ExtractTraceInfoMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

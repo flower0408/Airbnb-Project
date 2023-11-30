@@ -1,1 +1,175 @@
-<p>Login works</p>
+<app-header></app-header>
+
+<!--<div *ngFor="let accommodation of accommodations">
+  <div class="accommodation-box">
+  <div class="formbold-main-wrapper">
+    <div class="formbold-form-wrapper">
+      <div class="formbold-mb-5">
+        <label for="name" class="formbold-form-label"> Name </label>
+        <input
+          type="text"
+          name="name"
+          id="name"
+          class="formbold-form-input"
+          [value]="accommodation?.name"
+          readonly
+        />
+      </div>
+      <div class="formbold-mb-5">
+        <label for="description" class="formbold-form-label"> Description </label>
+        <input
+          type="text"
+          name="description"
+          id="description"
+          class="formbold-form-input"
+          [value]="accommodation?.description"
+          readonly
+        />
+      </div>
+
+
+      <div class="formbold-mb-5">
+        <label for="images" class="formbold-form-label"> Image </label>
+        <input
+          type="text"
+          name="images"
+          id="images"
+          class="formbold-form-input"
+          [value]="accommodation?.images"
+          readonly
+        />
+      </div>
+      <div class="formbold-mb-5">
+        <label for="benefits" class="formbold-form-label"> Benefits </label>
+        <input
+          type="text"
+          name="benefits"
+          id="benefits"
+          class="formbold-form-input"
+          [value]="accommodation?.benefits"
+          readonly
+        />
+      </div>
+      <div class="flex flex-wrap formbold--mx-3">
+        <div class="w-full sm:w-half formbold-px-3">
+          <div class="formbold-mb-5 w-full">
+            <label for="Minguest" class="formbold-form-label"> Min guest </label>
+            <input
+              type="number"
+              name="Minguest"
+              id="Minguest"
+              class="formbold-form-input"
+              [value]="accommodation?.minGuest"
+              readonly
+            />
+          </div>
+        </div>
+        <div class="w-full sm:w-half formbold-px-3">
+          <div class="formbold-mb-5">
+            <label for="Maxguest" class="formbold-form-label"> Max guest </label>
+            <input
+              type="number"
+              name="Maxguest"
+              id="Maxguest"
+              class="formbold-form-input"
+              [value]="accommodation?.maxGuest"
+              readonly
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="formbold-mb-5 formbold-pt-3">
+        <label class="formbold-form-label formbold-form-label-2"> Address Details </label>
+        <div class="flex flex-wrap formbold--mx-3">
+          <div class="w-full sm:w-half formbold-px-3">
+            <div class="formbold-mb-5">
+              <input
+                type="text"
+                name="country"
+                id="country"
+                placeholder="Enter country"
+                class="formbold-form-input"
+                [value]="accommodation?.location?.country"
+                readonly
+              />
+            </div>
+          </div>
+          <div class="w-full sm:w-half formbold-px-3">
+            <div class="formbold-mb-5">
+              <input
+                type="text"
+                name="city"
+                id="city"
+                placeholder="Enter city"
+                class="formbold-form-input"
+                [value]="accommodation?.location?.city"
+                readonly
+              />
+            </div>
+          </div>
+          <div class="w-full sm:w-half formbold-px-3">
+            <div class="formbold-mb-5">
+              <input
+                type="text"
+                name="street"
+                id="street"
+                placeholder="Enter street"
+                class="formbold-form-input"
+                [value]="accommodation?.location?.street"
+                readonly
+              />
+            </div>
+          </div>
+          <div class="w-full sm:w-half formbold-px-3">
+            <div class="formbold-mb-5">
+              <input
+                type="number"
+                name="number"
+                id="number"
+                placeholder="Enter number"
+                class="formbold-form-input"
+                [value]="accommodation?.location?.number"
+                readonly
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+-->
+
+<div *ngFor="let accommodation of accommodations" class="accommodation-card">
+  <h2 class="accommodation-title">{{ accommodation?.name }}</h2>
+  <p class="accommodation-description"> {{ accommodation?.description }}</p>
+  <div class="accommodation-details">
+    <div class="detail">
+      <!--<span class="detail-label">Image:</span>
+      <span class="detail-value">{{ accommodation?.images }}</span>
+    </div>-->
+    <div class="detail">
+      <span class="detail-label">Benefits:</span>
+      <span class="detail-value"> {{ accommodation?.benefits }}</span>
+    </div>
+    <div class="detail">
+      <span class="detail-label">Guests:</span>
+      <span class="detail-value"> {{ accommodation?.minGuest }} - {{ accommodation?.maxGuest }}</span>
+    </div>
+    <div class="detail">
+      <span class="detail-label">Location:</span>
+      <span class="detail-value">
+        {{ accommodation?.location?.country }},
+        {{ accommodation?.location?.city }},
+        {{ accommodation?.location?.street }}
+        {{ accommodation?.location?.number }}
+      </span>
+    </div>
+  </div>
+</div>
+  <div>
+    <button type="submit"class="btn btn-danger">Check availability</button>
+  </div>
+</div>

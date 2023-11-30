@@ -68,6 +68,7 @@ func (server *Server) initUserHandler(service *application.UserService) *handler
 
 func (server *Server) start(tweetHandler *handlers.UserHandler) {
 	router := mux.NewRouter()
+	router.Use(MiddlewareContentTypeSet)
 	tweetHandler.Init(router)
 
 	srv := &http.Server{
@@ -96,4 +97,18 @@ func (server *Server) start(tweetHandler *handlers.UserHandler) {
 		log.Fatalf("Error Shutting Down Server %s", err)
 	}
 	log.Println("Server Gracefully Stopped")
+}
+
+func MiddlewareContentTypeSet(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
+		//s.logger.Println("Method [", h.Method, "] - Hit path :", h.URL.Path)
+
+		rw.Header().Add("Content-Type", "application/json")
+		rw.Header().Set("X-Content-Type-Options", "nosniff")
+		rw.Header().Set("X-Frame-Options", "DENY")
+
+		rw.Header().Set("Content-Security-Policy", "script-src 'self' https://cdn.jsdelivr.net https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com 'unsafe-inline'; font-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: https://i.ibb.co;")
+
+		next.ServeHTTP(rw, h)
+	})
 }

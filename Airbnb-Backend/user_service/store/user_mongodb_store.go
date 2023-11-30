@@ -43,8 +43,42 @@ func (store *UserMongoDBStore) GetAll() ([]*domain.User, error) {
 }
 
 func (store *UserMongoDBStore) Get(id primitive.ObjectID) (*domain.User, error) {
-	filter := bson.M{"id": id}
+	filter := bson.M{"_id": id}
 	return store.filterOne(filter)
+}
+
+func (store *UserMongoDBStore) GetOneUser(username string) (*domain.User, error) {
+
+	filter := bson.M{"username": username}
+
+	user, err := store.filterOne(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (store *UserMongoDBStore) GetByEmail(email string) (*domain.User, error) {
+	filter := bson.M{"email": email}
+	return store.filterOne(filter)
+}
+
+func (store *UserMongoDBStore) UpdateUser(user *domain.User) error {
+	/*_, err := store.users.UpdateOne(context.TODO(), bson.M{"_id": user.ID}, bson.M{"$set": user})
+	if err != nil {
+		log.Printf("Updating user error mongodb: %s", err.Error())
+		return err
+	}
+
+	return nil*/
+	fmt.Println(user)
+	newState, err := store.users.UpdateOne(context.TODO(), bson.M{"_id": user.ID}, bson.M{"$set": user})
+	if err != nil {
+		return err
+	}
+	fmt.Println(newState)
+	return nil
 }
 
 func (store *UserMongoDBStore) filter(filter interface{}) ([]*domain.User, error) {

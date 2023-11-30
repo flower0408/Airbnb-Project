@@ -21,20 +21,20 @@
                    [ngClass]="{ 'is-invalid': submitted && loginGroup['username'].errors}">
             <div *ngIf="submitted && loginGroup['username'].errors" class="invalid-feedback">
               <div *ngIf="loginGroup['username'].errors['required']">Username is required.</div>
-              <div *ngIf="loginGroup['username'].errors['minlength']">Username must be at least 3 characters long.</div>
-              <div *ngIf="loginGroup['username'].errors['maxlength']">Username must not exceed 20 characters.
+              <div *ngIf="loginGroup['username'].errors['minlength']">Username must be at least 4 characters long.</div>
+              <div *ngIf="loginGroup['username'].errors['maxlength']">Username must not exceed 30 characters.
               </div>
             </div>
           </div>
           <label for="password"><b>Password:</b></label>
           <div>
-            <input type="password" id="password" name="password" maxlength="30" class="form-control" formControlName="password"
+            <input type="password" id="password" name="password" placeholder="Password" maxlength="30" class="form-control" formControlName="password"
                    [ngClass]="{ 'is-invalid': submitted && loginGroup['password'].errors}">
             <div *ngIf="submitted && loginGroup['password'].errors" class="invalid-feedback">
               <div *ngIf="loginGroup['password'].errors['required']">Password is required.</div>
-              <div *ngIf="loginGroup['password'].errors['minlength']">Password must be at least 3
+              <div *ngIf="loginGroup['password'].errors['minlength']">Password must be at least 11
                 characters long.</div>
-              <div *ngIf="loginGroup['password'].errors['maxlength']">Password must not exceed 20
+              <div *ngIf="loginGroup['password'].errors['maxlength']">Password must not exceed 30
                 characters.</div>
             </div>
           </div>
@@ -43,13 +43,27 @@
             <input type="checkbox">
             <span>Remember me</span>
           </div>
-          <a [routerLink]="['/Register']">Create your account</a>
 
-          <button type="submit" (click)="onSubmit()" class="btn btn-primary" >Login</button>
+          <a routerLink="/Request-Recovery">Forgot password?</a>
+
+          <form [formGroup]="aFormGroup" style="margin:15px 0">
+            <ngx-recaptcha2 #captchaElem
+                            [siteKey]="siteKey"
+                            formControlName="recaptcha"
+                            (success)="handleCaptchaResolved($event)">
+            </ngx-recaptcha2>
+          </form>
+
+          <button type="submit" (click)="onSubmit()" class="btn btn-primary" [disabled]="!captchaPassed">Login</button>
           <div *ngIf="formGroup.errors?.['unauthenticated']" class="incorrect-credentials">
             Username or Password Incorrect!
           </div>
+
+          <a [routerLink]="['/Register']">Create your account</a>
+
         </form>
+        <br>
+        <br>
       </div>
     </div>
   </div>

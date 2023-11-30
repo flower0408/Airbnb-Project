@@ -4,6 +4,8 @@ import { User } from 'src/app/models/user.model';
 import { AuthService } from 'src/app/services/auth.service';
 import { PasswordStrengthValidator } from 'src/app/services/customValidators';
 import {Router} from "@angular/router";
+import {VerificationService} from "../../services/verify.service";
+import {HttpErrorResponse} from "@angular/common/http";
 
 @Component({
   selector: 'app-register',
@@ -36,7 +38,8 @@ export class RegisterComponent implements OnInit {
 
   constructor(private authService: AuthService,
               private formBuilder: FormBuilder,
-              private router: Router) { }
+              private router: Router,
+              private verificationService: VerificationService) { }
 
   // @ts-ignore
   formGroup: FormGroup;
@@ -48,7 +51,7 @@ export class RegisterComponent implements OnInit {
       lastName: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(20), Validators.pattern('[-_a-zA-Z]*')]],
       gender: ['', [Validators.required]],
       age: ['', [Validators.required, Validators.min(1), Validators.max(100)]],
-      residence: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(35), Validators.pattern('[a-zA-Z ]*')]],
+      residence: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(35), Validators.pattern("^[a-zA-Z0-9\\s,'-]*")]],
       email: ['', [Validators.required, Validators.email, Validators.minLength(3), Validators.maxLength(35)]],
       username: ['', [Validators.required, Validators.minLength(4), Validators.maxLength(30), Validators.pattern('[-_a-zA-Z0-9]*')]],
       password: ['', [Validators.required, Validators.minLength(11), Validators.maxLength(30), PasswordStrengthValidator()]],
@@ -81,13 +84,22 @@ export class RegisterComponent implements OnInit {
 
     this.authService.Register(registerUser)
       .subscribe({
-        next: (data: User) => {
-          console.log(data);
-          alert("You have been successfully registered to Airbnb!");
-          this.router.navigate(['/Login']);
+        next: (registrationToken: string) => {
+          this.verificationService.updateUserMail(registerUser.email);
+          this.verificationService.updateVerificationToken(registrationToken);
+          this.router.navigate(['/Account-Confirmation']);
         },
-        error: (error) => {
-          console.log(error)
+        error: (error: HttpErrorResponse) => {
+          if (error.status === 409) {
+            alert('User with that username already exists!');
+          }
+          else if (error.status === 406) {
+            alert('Password is in blacklist!');
+          }
+          else if (error.status === 405) {
+            alert('User with that email already exists!');
+          }
+          //console.log(error)
         }
       });
   }

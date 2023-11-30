@@ -1,14 +1,24 @@
 package handlers
 
 import (
+	"auth_service/casbinAuthorization"
 	"auth_service/domain"
+	"auth_service/errors"
 	"auth_service/service"
 	"auth_service/store"
+	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/casbin/casbin"
 	"github.com/gorilla/mux"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"io"
 	"log"
 	"net/http"
 	"regexp"
+	"strings"
+	"time"
 	"unicode"
 )
 
@@ -24,9 +34,90 @@ func NewAuthHandler(service *application.AuthService) *AuthHandler {
 }
 
 func (handler *AuthHandler) Init(router *mux.Router) {
+
+	CasbinMiddleware1, err := casbin.NewEnforcerSafe("./rbac_model.conf", "./policy.csv")
+
+	log.Println("auth service successful init of enforcer")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	router.Use(ExtractTraceInfoMiddleware)
+	loginRouter := router.Methods(http.MethodPost).Subrouter()
+	loginRouter.HandleFunc("/login", handler.Login)
+
+	registerRouter := router.Methods(http.MethodPost).Subrouter()
+	registerRouter.HandleFunc("/register", handler.Register)
+	registerRouter.Use(MiddlewareUserValidation)
+
+	verifyRouter := router.Methods(http.MethodPost).Subrouter()
+	verifyRouter.HandleFunc("/verifyAccount", handler.AccountConfirmation)
+
+	verifyRecaptchaRouter := router.Methods(http.MethodPost).Subrouter()
+	verifyRecaptchaRouter.HandleFunc("/verify-recaptcha", handler.VerifyRecaptcha)
+
+	router.HandleFunc("/", handler.GetAll).Methods("GET")
 	router.HandleFunc("/login", handler.Login).Methods("POST")
 	router.HandleFunc("/register", handler.Register).Methods("POST")
+	router.HandleFunc("/verify-recaptcha", handler.VerifyRecaptcha).Methods("POST")
+	router.HandleFunc("/accountConfirmation", handler.AccountConfirmation).Methods("POST")
+	router.HandleFunc("/resendVerify", handler.ResendVerificationToken).Methods("POST")
+	router.HandleFunc("/recoverPasswordToken", handler.SendRecoveryPasswordToken).Methods("POST")
+	router.HandleFunc("/checkRecoverToken", handler.CheckRecoveryPasswordToken).Methods("POST")
+	router.HandleFunc("/recoverPassword", handler.RecoverPassword).Methods("POST")
+	router.HandleFunc("/changePassword", handler.ChangePassword).Methods("POST")
+	router.HandleFunc("/changeUsername", handler.ChangeUsername).Methods("POST")
+	router.HandleFunc("/logout", handler.logoutHandler).Methods("POST")
 	http.Handle("/", router)
+	log.Fatal(http.ListenAndServe(":8003", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
+}
+
+func (handler *AuthHandler) logoutHandler(w http.ResponseWriter, r *http.Request) {
+	tokenString, err := extractTokenFromHeader(r)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("No token found"))
+		return
+	}
+
+	cookie := &http.Cookie{
+		Name:     "jwt",
+		Value:    tokenString,
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	}
+
+	http.SetCookie(w, cookie)
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Logout successful"))
+}
+
+func extractTokenFromHeader(request *http.Request) (string, error) {
+	authHeader := request.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", fmt.Errorf("No Authorization header found")
+	}
+
+	// Check if the header starts with "Bearer "
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return "", fmt.Errorf("Invalid Authorization header format")
+	}
+
+	// Extract the token
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	return tokenString, nil
+}
+func (handler *AuthHandler) GetAll(writer http.ResponseWriter, req *http.Request) {
+	users, err := handler.service.GetAll()
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(users, writer)
 }
 
 type ValidationError struct {
@@ -52,15 +143,15 @@ func verifyPassword(s string) (valid bool) {
 		}
 	}
 
-	valid = len(s) >= 11 && hasUpperCase && hasLowerCase && hasDigit && hasSpecial
+	valid = len(s) >= 11 && len(s) <= 30 && hasUpperCase && hasLowerCase && hasDigit && hasSpecial
 	return
 }
 
 func validateUser(user *domain.User) *ValidationError {
-	emailRegex := regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
+	emailRegex := regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{3,35}`)
 	usernameRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]{4,30}$`)
-	residenceRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,35}$`)
-
+	residenceRegex := regexp.MustCompile(`^[a-zA-Z\s,'-]{3,35}$`)
+	nameRegex := regexp.MustCompile(`^[a-zA-Z]{3,20}$`)
 	// Validate Email
 	if user.Email == "" {
 		return &ValidationError{Message: "Email cannot be empty"}
@@ -86,7 +177,7 @@ func validateUser(user *domain.User) *ValidationError {
 	}
 
 	// Validate Age
-	if user.Age <= 0 || user.Age >= 100 {
+	if user.Age <= 0 || user.Age > 100 {
 		return &ValidationError{Message: "Age should be a number over 0 and less than 100"}
 	}
 
@@ -94,7 +185,7 @@ func validateUser(user *domain.User) *ValidationError {
 	if user.FirstName == "" {
 		return &ValidationError{Message: "FirstName cannot be empty"}
 	}
-	nameRegex := regexp.MustCompile(`^[a-zA-Z]{3,20}$`)
+
 	if !nameRegex.MatchString(user.FirstName) {
 		return &ValidationError{Message: "Invalid firstname format. It must contain only letters and be 3-20 characters long"}
 	}
@@ -124,25 +215,252 @@ func validateUser(user *domain.User) *ValidationError {
 	return nil
 }
 
-func (handler *AuthHandler) Register(writer http.ResponseWriter, req *http.Request) {
+func (handler *AuthHandler) VerifyRecaptcha(writer http.ResponseWriter, req *http.Request) {
+	var recaptchaToken struct {
+		Token string `json:"token"`
+	}
 
-	var request domain.User
-	err := json.NewDecoder(req.Body).Decode(&request)
-
+	err := json.NewDecoder(req.Body).Decode(&recaptchaToken)
 	if err != nil {
 		log.Println(err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := validateUser(&request); err != nil {
+	// Pozivamo funkciju za proveru reCAPTCHA tokena iz servisa
+	isCaptchaValid, err := handler.service.VerifyRecaptcha(recaptchaToken.Token)
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Vraćamo rezultat provere kao JSON odgovor
+	response := struct {
+		Success bool `json:"success"`
+	}{
+		Success: isCaptchaValid,
+	}
+
+	json.NewEncoder(writer).Encode(response)
+}
+
+func (handler *AuthHandler) Register(writer http.ResponseWriter, req *http.Request) {
+
+	myUser := req.Context().Value(domain.User{}).(domain.User)
+
+	if err := validateUser(&myUser); err != nil {
 		http.Error(writer, err.Message, http.StatusBadRequest)
 		return
 	}
 
-	code, err := handler.service.Register(&request)
+	token, statusCode, err := handler.service.Register(&myUser)
+	if statusCode == 55 {
+		writer.WriteHeader(http.StatusFound)
+		http.Error(writer, err.Error(), 302)
+		return
+	}
 	if err != nil {
-		http.Error(writer, err.Error(), code)
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}
+
+	jsonResponse(token, writer)
+}
+
+func (handler *AuthHandler) AccountConfirmation(writer http.ResponseWriter, req *http.Request) {
+
+	var request domain.RegisterValidation
+	err := json.NewDecoder(req.Body).Decode(&request)
+	if err != nil {
+		log.Println(err)
+		http.Error(writer, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if len(request.UserToken) == 0 {
+		http.Error(writer, errors.InvalidUserTokenError, http.StatusBadRequest)
+		return
+	}
+
+	err = handler.service.AccountConfirmation(&request)
+	if err != nil {
+		if err.Error() == errors.InvalidTokenError {
+			log.Println(err.Error())
+			http.Error(writer, errors.InvalidTokenError, http.StatusNotAcceptable)
+		} else if err.Error() == errors.ExpiredTokenError {
+			log.Println(err.Error())
+			http.Error(writer, errors.ExpiredTokenError, http.StatusNotFound)
+		}
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
+}
+
+func (handler *AuthHandler) ResendVerificationToken(writer http.ResponseWriter, req *http.Request) {
+
+	var request domain.ResendVerificationRequest
+	err := json.NewDecoder(req.Body).Decode(&request)
+	if err != nil {
+		http.Error(writer, errors.InvalidRequestFormatError, http.StatusBadRequest)
+		log.Fatal(err.Error())
+		return
+	}
+
+	err = handler.service.ResendVerificationToken(&request)
+	if err != nil {
+		if err.Error() == errors.InvalidResendMailError {
+			http.Error(writer, err.Error(), http.StatusNotAcceptable)
+			return
+		} else {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	writer.WriteHeader(http.StatusOK)
+}
+
+func (handler *AuthHandler) SendRecoveryPasswordToken(writer http.ResponseWriter, req *http.Request) {
+
+	buf := new(strings.Builder)
+	_, err := io.Copy(buf, req.Body)
+	if err != nil {
+		http.Error(writer, errors.InvalidRequestFormatError, http.StatusBadRequest)
+		log.Fatal(err.Error())
+		return
+	}
+
+	id, statusCode, err := handler.service.SendRecoveryPasswordToken(buf.String())
+	if err != nil {
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}
+
+	jsonResponse(id, writer)
+}
+
+func (handler *AuthHandler) CheckRecoveryPasswordToken(writer http.ResponseWriter, req *http.Request) {
+
+	var request domain.RegisterValidation
+	err := json.NewDecoder(req.Body).Decode(&request)
+	if err != nil {
+		http.Error(writer, errors.InvalidRequestFormatError, http.StatusBadRequest)
+		log.Fatal(err.Error())
+		return
+	}
+
+	err = handler.service.CheckRecoveryPasswordToken(&request)
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusNotAcceptable)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
+}
+
+func (handler *AuthHandler) RecoverPassword(writer http.ResponseWriter, req *http.Request) {
+	var request domain.RecoverPasswordRequest
+	err := json.NewDecoder(req.Body).Decode(&request)
+	if err != nil {
+		http.Error(writer, errors.InvalidRequestFormatError, http.StatusBadRequest)
+		log.Fatal(err.Error())
+		return
+	}
+
+	status, statusCode, err := handler.service.RecoverPassword(&request)
+	if err != nil {
+		var errorMessage string
+
+		switch status {
+		case "newPassErr":
+			errorMessage = "Wrong new password"
+		case "baseErr":
+			errorMessage = "Internal server error"
+		default:
+			errorMessage = "An error occurred"
+		}
+
+		http.Error(writer, errorMessage, statusCode)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
+}
+
+func (handler *AuthHandler) ChangePassword(writer http.ResponseWriter, request *http.Request) {
+
+	var token string = request.Header.Get("Authorization")
+	bearerToken := strings.Split(token, "Bearer ")
+	tokenString := bearerToken[1]
+
+	fmt.Println(request.Body)
+
+	var password domain.PasswordChange
+	err := json.NewDecoder(request.Body).Decode(&password)
+	if err != nil {
+		log.Println(err)
+		http.Error(writer, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	status, statusCode, err := handler.service.ChangePassword(password, tokenString)
+
+	if err != nil {
+		var errorMessage string
+
+		switch status {
+		case "oldPassErr":
+			errorMessage = "Wrong old password"
+		case "newPassErr":
+			errorMessage = "Wrong new password"
+		case "baseErr":
+			errorMessage = "Internal server error"
+		default:
+			errorMessage = "An error occurred"
+		}
+
+		http.Error(writer, errorMessage, statusCode)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
+
+}
+
+func (handler *AuthHandler) ChangeUsername(writer http.ResponseWriter, request *http.Request) {
+
+	var token string = request.Header.Get("Authorization")
+	bearerToken := strings.Split(token, "Bearer ")
+	tokenString := bearerToken[1]
+
+	fmt.Println(request.Body)
+
+	var username domain.UsernameChange
+	err := json.NewDecoder(request.Body).Decode(&username)
+	if err != nil {
+		log.Println(err)
+		http.Error(writer, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	status, statusCode, err := handler.service.ChangeUsername(username, tokenString)
+
+	if err != nil {
+		var errorMessage string
+
+		switch status {
+		case "oldUsername":
+			errorMessage = "Wrong old username"
+		case "newUsername":
+			errorMessage = "Wrong new username"
+		case "baseErr":
+			errorMessage = "Internal server error"
+		default:
+			errorMessage = "An error occurred"
+		}
+
+		http.Error(writer, errorMessage, statusCode)
 		return
 	}
 
@@ -150,20 +468,56 @@ func (handler *AuthHandler) Register(writer http.ResponseWriter, req *http.Reque
 }
 
 func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request) {
-
 	var request domain.Credentials
 	err := json.NewDecoder(req.Body).Decode(&request)
-
 	if err != nil {
-		log.Println(err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	token, err := handler.service.Login(&request)
 	if err != nil {
-		http.Error(writer, err.Error(), http.StatusNotFound)
+		if err.Error() == errors.NotVerificatedUser {
+			http.Error(writer, token, http.StatusLocked)
+			return
+		}
+		http.Error(writer, "Username not exist!", http.StatusBadRequest)
 		return
 	}
+
+	if token == "not_same" {
+		http.Error(writer, "Wrong password", http.StatusUnauthorized)
+		return
+	}
+
 	writer.Write([]byte(token))
+}
+
+func MiddlewareUserValidation(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+		user := &domain.User{}
+		err := user.FromJSON(request.Body)
+		if err != nil {
+			http.Error(responseWriter, "Unable to Decode JSON", http.StatusBadRequest)
+			return
+		}
+
+		err = user.ValidateUser()
+		if err != nil {
+			http.Error(responseWriter, fmt.Sprintf("Validation Error:\n %s.", err), http.StatusBadRequest)
+			return
+		}
+
+		ctx := context.WithValue(request.Context(), domain.User{}, *user)
+		request = request.WithContext(ctx)
+
+		next.ServeHTTP(responseWriter, request)
+	})
+
+}
+func ExtractTraceInfoMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

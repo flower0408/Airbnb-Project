@@ -3,8 +3,10 @@ package handlers
 import (
 	"accommodations_service/data"
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
+	"regexp"
 )
 
 type KeyProduct struct{}
@@ -14,12 +16,23 @@ type AccommodationHandler struct {
 	repo   *data.AccommodationRepo
 }
 
+type ValidationError struct {
+	Message string `json:"message"`
+}
+
 func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo) *AccommodationHandler {
 	return &AccommodationHandler{l, r}
 }
 
 func (s *AccommodationHandler) CreateAccommodation(rw http.ResponseWriter, h *http.Request) {
+
 	accommodation := h.Context().Value(KeyProduct{}).(*data.Accommodation)
+
+	if err := validateAccommodation(accommodation); err != nil {
+		http.Error(rw, err.Message, http.StatusUnprocessableEntity)
+		return
+	}
+
 	err := s.repo.InsertAccommodation(accommodation)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
@@ -27,6 +40,98 @@ func (s *AccommodationHandler) CreateAccommodation(rw http.ResponseWriter, h *ht
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
+	// No need to extract accommodation from context in GetAll
+
+	accommodations, err := s.repo.GetAll()
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Serialize accommodations to JSON and send the response
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(accommodations)
+	rw.WriteHeader(http.StatusOK)
+}
+
+func validateAccommodation(accommodation *data.Accommodation) *ValidationError {
+	nameRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,35}$`)
+	descriptionRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,200}$`)
+	imagesRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,200}$`)
+	countryRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,35}$`)
+	cityRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,35}$`)
+	streetRegex := regexp.MustCompile(`^[A-Z][a-zA-Z0-9\s,'-]{2,35}$`)
+	benefitsRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,100}$`)
+
+	if accommodation.Name == "" {
+		return &ValidationError{Message: "Name cannot be empty"}
+	}
+	if !nameRegex.MatchString(accommodation.Name) {
+		return &ValidationError{Message: "Invalid 'Name' format. It must be 3-35 characters long and contain only letters, numbers, spaces, commas, apostrophes, and hyphens"}
+	}
+
+	if accommodation.Description == "" {
+		return &ValidationError{Message: "Description cannot be empty"}
+	}
+	if !descriptionRegex.MatchString(accommodation.Description) {
+		return &ValidationError{Message: "Invalid 'Description' format. It must be 3-200 characters long and contain only letters, numbers, spaces, commas, apostrophes, and hyphens"}
+	}
+
+	if accommodation.Images == "" {
+		return &ValidationError{Message: "Images cannot be empty"}
+	}
+	if !imagesRegex.MatchString(accommodation.Images) {
+		return &ValidationError{Message: "Invalid 'Images' format. It must be 3-200 characters long and contain only letters, numbers, spaces, commas, apostrophes, and hyphens"}
+	}
+
+	if accommodation.Benefits == "" {
+		return &ValidationError{Message: "Benefits cannot be empty"}
+	}
+	if !benefitsRegex.MatchString(accommodation.Benefits) {
+		return &ValidationError{Message: "Invalid 'Benefits' format. It must be 3-100 characters long and contain only letters, numbers, spaces, commas, apostrophes, and hyphens"}
+	}
+
+	if accommodation.Location.Country == "" {
+		return &ValidationError{Message: "Country cannot be empty"}
+	}
+	if !countryRegex.MatchString(accommodation.Location.Country) {
+		return &ValidationError{Message: "Invalid 'Country' format. It must start with an uppercase letter, followed by letters, spaces, or hyphens, and be 2-35 characters long"}
+	}
+
+	if accommodation.Location.City == "" {
+		return &ValidationError{Message: "City cannot be empty"}
+	}
+	if !cityRegex.MatchString(accommodation.Location.City) {
+		return &ValidationError{Message: "Invalid 'City' format. It must start with an uppercase letter, followed by letters, spaces, or hyphens, and be 2-35 characters long"}
+	}
+
+	if accommodation.Location.Street == "" {
+		return &ValidationError{Message: "Street cannot be empty"}
+	}
+	if !streetRegex.MatchString(accommodation.Location.Street) {
+		return &ValidationError{Message: "Invalid 'Street' format. It must start with an uppercase letter, followed by letters, numbers, spaces, commas, apostrophes, or hyphens, and be 2-50 characters long"}
+	}
+
+	if accommodation.Location.Number <= 0 {
+		return &ValidationError{Message: "Number in Location should be a positive integer"}
+	}
+
+	if accommodation.MinGuest <= 0 {
+		return &ValidationError{Message: "MinGuest should be a non-negative integer"}
+	}
+	if accommodation.MaxGuest < accommodation.MinGuest {
+		return &ValidationError{Message: "MaxGuest should be greater than or equal to MinGuest"}
+	}
+
+	if accommodation.OwnerId == "" {
+		return &ValidationError{Message: "OwnerId cannot be empty"}
+	}
+
+	return nil
 }
 
 func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.Handler) http.Handler {
@@ -40,16 +145,6 @@ func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.
 		}
 		ctx := context.WithValue(h.Context(), KeyProduct{}, accommodations)
 		h = h.WithContext(ctx)
-		next.ServeHTTP(rw, h)
-	})
-}
-
-func (s *AccommodationHandler) MiddlewareContentTypeSet(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
-		s.logger.Println("Method [", h.Method, "] - Hit path :", h.URL.Path)
-
-		rw.Header().Add("Content-Type", "application/json")
-
 		next.ServeHTTP(rw, h)
 	})
 }

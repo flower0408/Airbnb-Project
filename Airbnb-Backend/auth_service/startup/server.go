@@ -8,6 +8,7 @@ import (
 	store2 "auth_service/store"
 	"context"
 	"fmt"
+	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
@@ -37,8 +38,10 @@ func (server *Server) Start() {
 		}
 	}(mongoClient, context.Background())
 
+	redisClient := server.initRedisClient()
+	authCache := server.initAuthCache(redisClient)
 	authStore := server.initAuthStore(mongoClient)
-	authService := server.initAuthService(authStore)
+	authService := server.initAuthService(authStore, authCache)
 	authHandler := server.initAuthHandler(authService)
 
 	server.start(authHandler)
@@ -52,13 +55,26 @@ func (server *Server) initMongoClient() *mongo.Client {
 	return client
 }
 
+func (server *Server) initRedisClient() *redis.Client {
+	client, err := store2.GetRedisClient(server.config.AuthCacheHost, server.config.AuthCachePort)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
+}
+
 func (server *Server) initAuthStore(client *mongo.Client) domain.AuthStore {
 	store := store2.NewAuthMongoDBStore(client)
 	return store
 }
 
-func (server *Server) initAuthService(store domain.AuthStore) *application.AuthService {
-	return application.NewAuthService(store)
+func (server *Server) initAuthCache(client *redis.Client) domain.AuthCache {
+	cache := store2.NewAuthRedisCache(client)
+	return cache
+}
+
+func (server *Server) initAuthService(store domain.AuthStore, cache domain.AuthCache) *application.AuthService {
+	return application.NewAuthService(store, cache)
 }
 
 func (server *Server) initAuthHandler(service *application.AuthService) *handlers.AuthHandler {
@@ -67,6 +83,7 @@ func (server *Server) initAuthHandler(service *application.AuthService) *handler
 
 func (server *Server) start(authHandler *handlers.AuthHandler) {
 	router := mux.NewRouter()
+	router.Use(MiddlewareContentTypeSet)
 	authHandler.Init(router)
 
 	srv := &http.Server{
@@ -95,4 +112,18 @@ func (server *Server) start(authHandler *handlers.AuthHandler) {
 		log.Fatalf("Error Shutting Down Server %s", err)
 	}
 	log.Println("Server Gracefully Stopped")
+}
+
+func MiddlewareContentTypeSet(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
+		//s.logger.Println("Method [", h.Method, "] - Hit path :", h.URL.Path)
+
+		rw.Header().Add("Content-Type", "application/json")
+		rw.Header().Set("X-Content-Type-Options", "nosniff")
+		rw.Header().Set("X-Frame-Options", "DENY")
+
+		rw.Header().Set("Content-Security-Policy", "script-src 'self' https://cdn.jsdelivr.net https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com 'unsafe-inline'; font-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: https://i.ibb.co;")
+
+		next.ServeHTTP(rw, h)
+	})
 }
