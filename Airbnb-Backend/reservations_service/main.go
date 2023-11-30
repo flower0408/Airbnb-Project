@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	gorillaHandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -54,28 +53,38 @@ func main() {
 	createReservation.HandleFunc("/reservations", reservationHandler.CreateReservation)
 	createReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
 
+	getReservationByUser := router.Methods(http.MethodGet).Subrouter()
+	getReservationByUser.HandleFunc("/reservationsByUser/{id}", reservationHandler.GetReservationByUser)
+	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
+	getReservationByAccommodation := router.Methods(http.MethodGet).Subrouter()
+	getReservationByAccommodation.HandleFunc("/reservationsByAccommodation/{id}", reservationHandler.GetReservationByAccommodation)
+	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
 	createAppointment := router.Methods(http.MethodPost).Subrouter()
 	createAppointment.HandleFunc("/appointments", appointmentHandler.CreateAppointment)
 	createAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
+
+	getAllAppointment := router.Methods(http.MethodGet).Subrouter()
+	getAllAppointment.HandleFunc("/appointments", appointmentHandler.GetAllAppointment)
+	//getAllAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
+
+	getAppointmentByAccommodation := router.Methods(http.MethodGet).Subrouter()
+	getAppointmentByAccommodation.HandleFunc("/appointmentsByAccommodation/{id}", appointmentHandler.GetAppointmentsByAccommodation)
+	//getAllAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
 	updateAppointment := router.Methods(http.MethodPatch).Subrouter()
 	updateAppointment.HandleFunc("/appointments/{id}", appointmentHandler.UpdateAppointment)
 	updateAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
-	createPriceForInterval := router.Methods(http.MethodPatch).Subrouter()
-	createPriceForInterval.HandleFunc("/appointments/addPrice/{id}", appointmentHandler.CreatePriceForInterval)
-	createPriceForInterval.Use(appointmentHandler.MiddlewarePriceForIntervalDeserialization)
-
-	updatePriceForInterval := router.Methods(http.MethodPatch).Subrouter()
-	updatePriceForInterval.HandleFunc("/appointments/editPrice/{id}/{intervalId}", appointmentHandler.UpdatePriceForInterval)
-	updatePriceForInterval.Use(appointmentHandler.MiddlewarePriceForIntervalDeserialization)
-
-	cors := gorillaHandlers.CORS(gorillaHandlers.AllowedOrigins([]string{"*"}))
+	updatePrice := router.Methods(http.MethodPatch).Subrouter()
+	updatePrice.HandleFunc("/appointments/editPrice/{id}", appointmentHandler.UpdatePrice)
+	updatePrice.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
 	//Initialize the server
 	server := http.Server{
 		Addr:         ":" + port,
-		Handler:      cors(router),
+		Handler:      router,
 		IdleTimeout:  120 * time.Second,
 		ReadTimeout:  1 * time.Second,
 		WriteTimeout: 1 * time.Second,

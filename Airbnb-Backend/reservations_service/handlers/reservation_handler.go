@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"reservations_service/data"
@@ -28,6 +29,48 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	id := vars["id"]
+
+	reservationByUser, err := s.reservationRepo.GetReservationByUser(id)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+	}
+
+	if reservationByUser == nil {
+		return
+	}
+
+	err = reservationByUser.ToJSON(rw)
+	if err != nil {
+		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
+		s.logger.Fatal("Unable to convert to json :", err)
+		return
+	}
+}
+
+func (s *ReservationHandler) GetReservationByAccommodation(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	id := vars["id"]
+
+	reservationByUser, err := s.reservationRepo.GetReservationByAccommodation(id)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+	}
+
+	if reservationByUser == nil {
+		return
+	}
+
+	err = reservationByUser.ToJSON(rw)
+	if err != nil {
+		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
+		s.logger.Fatal("Unable to convert to json :", err)
+		return
+	}
 }
 
 func (s *ReservationHandler) MiddlewareReservationDeserialization(next http.Handler) http.Handler {

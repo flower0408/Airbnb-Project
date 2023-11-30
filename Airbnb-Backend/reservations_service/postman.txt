@@ -6,7 +6,8 @@ APPOINTMENT
     "2023-11-22T12:15:00Z"
   ],
   "accommodationId": "5f8b26e073768a001fd5a7c1", // Replace with an actual UUID
-  "priceForInterval": []
+  "pricePerGuest": 50,
+  "pricePerAccommodation": 200
 }
 
 RESERVATION

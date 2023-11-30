@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-
 	// NoSQL: module containing Cassandra api client
 	"github.com/gocql/gocql"
 )
@@ -72,22 +71,94 @@ func (sr *ReservationRepo) CreateTables() {
 		sr.logger.Println(err)
 	}
 
+	err = sr.session.Query(
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s 
+					(by_userId text,reservation_id UUID, periodd LIST<TIMESTAMP>, accommodation_id text, price int,
+					PRIMARY KEY ((accommodation_id), reservation_id)) 
+					WITH CLUSTERING ORDER BY (reservation_id ASC)`, "reservation_by_accommodation")).Exec()
+	if err != nil {
+		sr.logger.Println(err)
+	}
+
 }
 
 // cassandra
 func (sr *ReservationRepo) InsertReservation(reservation *Reservation) error {
-
 	reservationId, _ := gocql.RandomUUID()
 
 	err := sr.session.Query(
 		`INSERT INTO reservation_by_user (by_userId, reservation_id, periodd, accommodation_id, price) 
-		VALUES (?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?)`,
 		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price).Exec()
 	if err != nil {
 		sr.logger.Println(err)
 		return err
 	}
+
+	err = sr.session.Query(
+		`INSERT INTO reservation_by_accommodation (by_userId, reservation_id, periodd, accommodation_id, price) 
+        VALUES (?, ?, ?, ?, ?)`,
+		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price).Exec()
+	if err != nil {
+		sr.logger.Println(err)
+		return err
+	}
+
 	return nil
+}
+
+func (sr *ReservationRepo) GetReservationByUser(id string) (Reservations, error) {
+	scanner := sr.session.Query(`SELECT by_userId, reservation_id, periodd, accommodation_id, price FROM reservation_by_user WHERE by_userId = ?`, id).Iter().Scanner()
+
+	var reservations Reservations
+	for scanner.Next() {
+		var r Reservation
+		err := scanner.Scan(
+			&r.ByUserId,
+			&r.ID,
+			&r.Period,
+			&r.AccommodationId,
+			&r.Price,
+		)
+		if err != nil {
+			sr.logger.Println(err)
+			return nil, err
+		}
+
+		reservations = append(reservations, &r)
+	}
+	if err := scanner.Err(); err != nil {
+		sr.logger.Println(err)
+		return nil, err
+	}
+	return reservations, nil
+}
+
+func (sr *ReservationRepo) GetReservationByAccommodation(id string) (Reservations, error) {
+	scanner := sr.session.Query(`SELECT accommodation_id, reservation_id, periodd, by_userId, price FROM reservation_by_accommodation WHERE accommodation_id = ?`, id).Iter().Scanner()
+
+	var reservations Reservations
+	for scanner.Next() {
+		var r Reservation
+		err := scanner.Scan(
+			&r.AccommodationId,
+			&r.ID,
+			&r.Period,
+			&r.ByUserId,
+			&r.Price,
+		)
+		if err != nil {
+			sr.logger.Println(err)
+			return nil, err
+		}
+
+		reservations = append(reservations, &r)
+	}
+	if err := scanner.Err(); err != nil {
+		sr.logger.Println(err)
+		return nil, err
+	}
+	return reservations, nil
 }
 
 // NoSQL: Performance issue, we never want to fetch all the data

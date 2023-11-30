@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -126,53 +125,77 @@ func (rr *AppointmentRepo) GetAppointmentByID(id string) (*Appointment, error) {
 	return &appointment, nil
 }
 
-func (rr *AppointmentRepo) AddPriceForIntervalForAppointment(id string, priceForInterval *PriceForInterval) error {
-
+func (rr *AppointmentRepo) GetAllAppointment() (*Appointments, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	appointmentsCollection := rr.getCollection()
 
-	objID, _ := primitive.ObjectIDFromHex(id)
-	priceForInterval.ID = primitive.NewObjectID()
-
-	filter := bson.M{"_id": objID}
-	update := bson.M{"$push": bson.M{
-		"priceForInterval": priceForInterval,
-	}}
-
-	result, err := appointmentsCollection.UpdateOne(ctx, filter, update)
+	var appointments Appointments
+	appointmentCursor, err := appointmentsCollection.Find(ctx, bson.M{})
 	if err != nil {
 		rr.logger.Println(err)
-		return err
+		return nil, err
 	}
-	if result.ModifiedCount == 0 {
-		return errors.New("No document updated")
+	if err = appointmentCursor.All(ctx, &appointments); err != nil {
+		rr.logger.Println(err)
+		return nil, err
 	}
-
-	rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
-	rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
-
-	return nil
+	return &appointments, nil
 }
 
-func (rr *AppointmentRepo) EditPriceForIntervalForAppointment(id string, intervalId string, priceForInterval *PriceForInterval) error {
+func (rr *AppointmentRepo) GetAppointmentsByAccommodation(id string) (Appointments, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	appointmentsCollection := rr.getCollection()
+
+	filter := bson.M{"accommodationId": id}
+
+	// Find appointments matching the filter
+	cursor, err := appointmentsCollection.Find(ctx, filter)
+	if err != nil {
+		rr.logger.Println(err)
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	// Iterate over the cursor and decode each appointment
+	var appointments Appointments
+	for cursor.Next(ctx) {
+		var appointment Appointment
+		if err := cursor.Decode(&appointment); err != nil {
+			rr.logger.Println(err)
+			return nil, err
+		}
+		appointments = append(appointments, &appointment)
+	}
+
+	// Check for errors during cursor iteration
+	if err := cursor.Err(); err != nil {
+		rr.logger.Println(err)
+		return nil, err
+	}
+
+	return appointments, nil
+}
+
+func (rr *AppointmentRepo) EditPrice(id string, appointment *Appointment) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	appointmentsCollection := rr.getCollection()
 
 	objectID, err := primitive.ObjectIDFromHex(id)
-	objectIDForPriceInterval, err := primitive.ObjectIDFromHex(intervalId)
-
 	if err != nil {
 		rr.logger.Println("Error converting ID to ObjectID:", err)
 		return err
 	}
 
-	filter := bson.M{"_id": objectID, "priceForInterval._id": objectIDForPriceInterval}
+	filter := bson.M{"_id": objectID}
 	update := bson.M{"$set": bson.M{
-		"priceForInterval.$.pricePerGuest":         priceForInterval.PricePerGuest,
-		"priceForInterval.$.pricePerAccommodation": priceForInterval.PricePerAccommodation,
+		"pricePerGuest":         appointment.PricePerGuest,
+		"pricePerAccommodation": appointment.PricePerAccommodation,
 	}}
 
 	result, err := appointmentsCollection.UpdateOne(ctx, filter, update)
