@@ -87,13 +87,3 @@ func (s *ReservationHandler) MiddlewareReservationDeserialization(next http.Hand
 		next.ServeHTTP(rw, h)
 	})
 }
-
-func (s *ReservationHandler) MiddlewareContentTypeSet(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
-		s.logger.Println("Method [", h.Method, "] - Hit path :", h.URL.Path)
-
-		rw.Header().Add("Content-Type", "application/json")
-
-		next.ServeHTTP(rw, h)
-	})
-}
