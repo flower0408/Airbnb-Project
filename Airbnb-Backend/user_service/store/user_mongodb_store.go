@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -64,14 +65,7 @@ func (store *UserMongoDBStore) GetByEmail(email string) (*domain.User, error) {
 	return store.filterOne(filter)
 }
 
-func (store *UserMongoDBStore) UpdateUser(user *domain.User) error {
-	/*_, err := store.users.UpdateOne(context.TODO(), bson.M{"_id": user.ID}, bson.M{"$set": user})
-	if err != nil {
-		log.Printf("Updating user error mongodb: %s", err.Error())
-		return err
-	}
-
-	return nil*/
+func (store *UserMongoDBStore) UpdateUserUsername(user *domain.User) error {
 	fmt.Println(user)
 	newState, err := store.users.UpdateOne(context.TODO(), bson.M{"_id": user.ID}, bson.M{"$set": user})
 	if err != nil {
@@ -79,6 +73,31 @@ func (store *UserMongoDBStore) UpdateUser(user *domain.User) error {
 	}
 	fmt.Println(newState)
 	return nil
+}
+
+func (store *UserMongoDBStore) UpdateUser(updateUser *domain.User) (*domain.User, error) {
+	updateData := bson.M{
+		"firstName": updateUser.Firstname,
+		"lastName":  updateUser.Lastname,
+		"gender":    updateUser.Gender,
+		"age":       updateUser.Age,
+		"residence": updateUser.Residence,
+		"email":     updateUser.Email,
+	}
+
+	filter := bson.M{"_id": updateUser.ID}
+	update := bson.M{"$set": updateData}
+
+	result, err := store.users.UpdateOne(context.TODO(), filter, update)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.ModifiedCount == 0 {
+		return nil, errors.New("No user updated")
+	}
+
+	return updateUser, nil
 }
 
 func (store *UserMongoDBStore) filter(filter interface{}) ([]*domain.User, error) {

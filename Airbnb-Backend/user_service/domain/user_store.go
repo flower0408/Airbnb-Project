@@ -8,5 +8,6 @@ type UserStore interface {
 	Register(user *User) (*User, error)
 	GetOneUser(username string) (*User, error)
 	GetByEmail(email string) (*User, error)
-	UpdateUser(user *User) error
+	UpdateUserUsername(user *User) error
+	UpdateUser(updateUser *User) (*User, error)
 }

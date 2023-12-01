@@ -62,6 +62,11 @@ func (service *UserService) Register(user *domain.User) (*domain.User, error) {
 
 }
 
+func (service *UserService) UpdateUser(updateUser *domain.User) (*domain.User, error) {
+
+	return service.store.UpdateUser(updateUser)
+}
+
 func (service *UserService) ChangeUsername(username domain.UsernameChange) (string, int, error) {
 
 	currentUsername := username.OldUsername
@@ -74,7 +79,7 @@ func (service *UserService) ChangeUsername(username domain.UsernameChange) (stri
 
 	user.Username = username.NewUsername
 
-	err = service.store.UpdateUser(user)
+	err = service.store.UpdateUserUsername(user)
 	if err != nil {
 		return "baseErr", http.StatusInternalServerError, err
 	}

@@ -5,6 +5,8 @@ import (
 	"github.com/casbin/casbin"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
+	"github.com/mitchellh/mapstructure"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -52,6 +54,7 @@ func (handler *UserHandler) Init(router *mux.Router) {
 	router.HandleFunc("/profile/", handler.Profile).Methods("GET")
 	router.HandleFunc("/mailExist/{mail}", handler.MailExist).Methods("GET")
 	router.HandleFunc("/changeUsername", handler.ChangeUsername).Methods("POST")
+	router.HandleFunc("/{userID}", handler.UpdateUser).Methods("PATCH")
 
 	http.Handle("/", router)
 	log.Fatal(http.ListenAndServe(":8002", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
@@ -143,6 +146,109 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 	writer.WriteHeader(200)
 	jsonResponse(newUser, writer)
 
+}
+
+func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Request) {
+
+	vars := mux.Vars(req)
+	userID, err := primitive.ObjectIDFromHex(vars["userID"])
+	if err != nil {
+		http.Error(writer, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	existingUser, err := handler.service.Get(userID)
+	if err != nil {
+		http.Error(writer, "User not found", http.StatusBadRequest)
+		return
+	}
+
+	var updatePayload map[string]interface{}
+	if err := json.NewDecoder(req.Body).Decode(&updatePayload); err != nil {
+		http.Error(writer, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := validateUserFields(updatePayload); err != nil {
+		http.Error(writer, err.Message, http.StatusBadRequest)
+		return
+	}
+
+	if newEmail, ok := updatePayload["email"].(string); ok && newEmail != existingUser.Email {
+		if _, err := handler.service.DoesEmailExist(newEmail); err == nil {
+			http.Error(writer, "Updated email already exists", http.StatusMethodNotAllowed)
+			return
+		}
+	}
+
+	for key := range updatePayload {
+		switch key {
+		case "id", "username", "userType":
+			delete(updatePayload, key)
+		}
+	}
+
+	if err := mapstructure.Decode(updatePayload, &existingUser); err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	updatedUser, err := handler.service.UpdateUser(existingUser)
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(updatedUser, writer)
+}
+
+func validateUserFields(fields bson.M) *ValidationError {
+	// Validate Email
+	if email, ok := fields["email"].(string); ok {
+		emailRegex := regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
+		if !emailRegex.MatchString(email) {
+			return &ValidationError{Message: "Invalid email format"}
+		}
+	}
+
+	// Validate Residence
+	if residence, ok := fields["residence"].(string); ok {
+		residenceRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,35}$`)
+		if !residenceRegex.MatchString(residence) {
+			return &ValidationError{Message: "Invalid residence format"}
+		}
+	}
+
+	// Validate Age
+	if age, ok := fields["age"].(int); ok {
+		if age <= 0 || age >= 100 {
+			return &ValidationError{Message: "Age should be a number over 0 and less than 100"}
+		}
+	}
+
+	// Validate Firstname and Lastname
+	if firstname, ok := fields["firstName"].(string); ok {
+		nameRegex := regexp.MustCompile(`^[a-zA-Z]{3,20}$`)
+		if !nameRegex.MatchString(firstname) {
+			return &ValidationError{Message: "Invalid firstname format. It must contain only letters and be 3-20 characters long"}
+		}
+	}
+
+	if lastname, ok := fields["lastName"].(string); ok {
+		nameRegex := regexp.MustCompile(`^[a-zA-Z]{3,20}$`)
+		if !nameRegex.MatchString(lastname) {
+			return &ValidationError{Message: "Invalid lastname format. It must contain only letters and be 3-20 characters long"}
+		}
+	}
+
+	// Validate Gender
+	if gender, ok := fields["gender"].(string); ok {
+		if gender != "Male" && gender != "Female" && gender != "Other" {
+			return &ValidationError{Message: "Gender should be either 'Male', 'Female', or 'Other'"}
+		}
+	}
+
+	return nil
 }
 
 func (handler *UserHandler) ChangeUsername(writer http.ResponseWriter, request *http.Request) {

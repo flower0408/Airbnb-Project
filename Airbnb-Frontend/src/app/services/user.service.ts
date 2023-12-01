@@ -49,4 +49,8 @@ export class UserService {
     return this.http.get<User>(`${environment.baseApiUrl}/${this.url}/profile/`)
   }
 
+  updateUserProfile(userId: string, updatedData: any): Observable<any> {
+    return this.http.patch(`${environment.baseApiUrl}/${this.url}/${userId}`, updatedData);
+  }
+
 }
