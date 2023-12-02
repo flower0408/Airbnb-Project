@@ -1,3 +1,5 @@
 p, Host, /, POST
 p, Host, /, GET
 p, Guest, /, GET
+p, Host, /*, GET
+p, Guest, /*, GET

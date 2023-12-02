@@ -1,9 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import {AccommodationService} from "../../services/accommodation.service";
 import {FormBuilder, FormGroup, Validators} from "@angular/forms";
+import { Location } from '../../models/location.model';
+import {Observable, of, throwError} from "rxjs";
+import {Router} from "@angular/router";
 
 // Define the type for Accommodation
-interface Location {
+/*interface Location {
   country: string;
   city: string;
   street: string;
@@ -19,6 +22,17 @@ interface Accommodation {
   minGuest: number;
   maxGuest: number;
   location: Location;
+}*/
+interface Accommodation {
+  id?: string;
+  name: string;
+  description?: string;
+  images: string;
+  location: Location;
+  benefits: string;
+  minGuest: number;
+  maxGuest: number;
+  ownerId: string;
 }
 
 @Component({
@@ -27,9 +41,11 @@ interface Accommodation {
   styleUrls: ['./main-page.component.css']
 })
 export class MainPageComponent implements OnInit {
-  accommodations: any[] = [];
+  accommodations: Accommodation[] = [];
+  locationFilter: string = '';
+  minGuestsFilter: number | undefined;
 
-  constructor(private accommodationService: AccommodationService) {}
+  constructor(private accommodationService: AccommodationService, private router: Router,) {}
 
   ngOnInit(): void {
     this.getAccommodations();
@@ -38,12 +54,38 @@ export class MainPageComponent implements OnInit {
   getAccommodations(): void {
     this.accommodationService.getAllAccommodations().subscribe(
       (data) => {
-        this.accommodations = data.sort((a: Accommodation, b: Accommodation) => (a.id > b.id ? -1 : 1));
+        this.accommodations = data.sort((a: Accommodation, b: Accommodation) => {
+          const idA = a.id ?? '';
+          const idB = b.id ?? '';
+          return idA > idB ? -1 : 1;
+        });
         //console.log(data);
       },
       (error) => {
         console.error(error);
       }
     );
+  }
+
+  searchAccommodations(): void {
+
+    const minGuests = this.minGuestsFilter !== undefined ? this.minGuestsFilter : 1;
+
+    if (this.locationFilter || this.minGuestsFilter !== undefined) {
+      this.accommodationService.searchAccommodations(this.locationFilter, minGuests).subscribe(
+        (data: Accommodation[]) => {
+          this.accommodations = data;
+          this.locationFilter = '';
+          this.minGuestsFilter = undefined;
+        },
+        (error) => {
+          console.error(error);
+        }
+      );
+    } else {
+      this.getAccommodations();
+      this.locationFilter = '';
+      this.minGuestsFilter = undefined;
+    }
   }
 }

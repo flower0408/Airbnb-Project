@@ -91,6 +91,10 @@ func (rr *AccommodationRepo) GetAll() ([]*Accommodation, error) {
 	return rr.filter(filter)
 }
 
+func (rr *AccommodationRepo) Search(filter interface{}) ([]*Accommodation, error) {
+	return rr.filter(filter)
+}
+
 func (rr *AccommodationRepo) filter(filter interface{}) ([]*Accommodation, error) {
 	ctx := context.TODO()
 	accommodationCollection := rr.getCollection()

@@ -1,8 +1,8 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import {HttpClient, HttpHeaders, HttpParams} from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Accommodation } from '../models/accommodation.model';
 import { environment } from 'src/environments/environment';
-import { Observable } from 'rxjs';
+import {catchError, Observable} from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -20,5 +20,13 @@ export class AccommodationService {
   getAllAccommodations(): Observable<any> {
     const url = `${environment.baseApiUrl}/${this.url}/`;
     return this.http.get(url);
+  }
+
+  searchAccommodations(location: string, minGuests: number): Observable<Accommodation[]> {
+    const params = new HttpParams()
+      .set('location', location)
+      .set('minGuests', minGuests.toString());
+
+    return this.http.get<Accommodation[]>(`${environment.baseApiUrl}/${this.url}/search`, { params });
   }
 }

@@ -1,6 +1,7 @@
 import { Location } from "./location.model";
 
 export interface Accommodation {
+    id?: string;
     name: string;
     description?: string;
     images: string;
