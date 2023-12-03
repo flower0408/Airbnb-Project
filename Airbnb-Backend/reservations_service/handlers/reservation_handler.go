@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"reservations_service/data"
+	"time"
 )
 
 type KeyProduct struct{}
@@ -70,6 +73,46 @@ func (s *ReservationHandler) GetReservationByAccommodation(rw http.ResponseWrite
 		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
 		s.logger.Fatal("Unable to convert to json :", err)
 		return
+	}
+}
+
+func (s *ReservationHandler) CheckReservation(rw http.ResponseWriter, h *http.Request) {
+	var requestBody struct {
+		AccommodationID string   `json:"accommodationId"`
+		Available       []string `json:"available"`
+	}
+
+	err := json.NewDecoder(h.Body).Decode(&requestBody)
+	if err != nil {
+		http.Error(rw, "Unable to decode JSON", http.StatusBadRequest)
+		s.logger.Println("Error decoding JSON:", err)
+		return
+	}
+
+	// Pretvori stringove u time.Time
+	var available []time.Time
+	for _, t := range requestBody.Available {
+		parsedTime, err := time.Parse(time.RFC3339, t)
+		if err != nil {
+			http.Error(rw, "Invalid time format in JSON", http.StatusBadRequest)
+			s.logger.Println("Error parsing time:", err)
+			return
+		}
+		available = append(available, parsedTime)
+	}
+	fmt.Println(available, "Available check reservation")
+
+	exists, err := s.reservationRepo.ReservationExistsForAppointment(requestBody.AccommodationID, available)
+	if err != nil {
+		http.Error(rw, "Error checking reservation", http.StatusInternalServerError)
+		s.logger.Println("Error checking reservation:", err)
+		return
+	}
+
+	if exists {
+		rw.WriteHeader(http.StatusBadRequest)
+	} else {
+		rw.WriteHeader(http.StatusOK)
 	}
 }
 

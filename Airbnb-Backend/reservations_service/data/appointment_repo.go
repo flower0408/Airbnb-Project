@@ -1,15 +1,21 @@
 package data
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -17,6 +23,11 @@ type AppointmentRepo struct {
 	cli    *mongo.Client
 	logger *log.Logger
 }
+
+var (
+	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
+	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
+)
 
 func NewAppointmentRepo(ctx context.Context, logger *log.Logger) (*AppointmentRepo, error) {
 	dburi := fmt.Sprintf("mongodb://%s:%s/", os.Getenv("APPOINTMENTS_DB_HOST"), os.Getenv("APPOINTMENTS_DB_PORT"))
@@ -82,30 +93,76 @@ func (rr *AppointmentRepo) InsertAppointment(appointment *Appointment) error {
 }
 
 func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment) error {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	originalAppointment, err := rr.GetAppointmentByID(id)
+	if err != nil {
+		rr.logger.Println("Error retrieving original appointment:", err)
+		return err
+	}
+
+	data := map[string]interface{}{
+		"accommodationId": originalAppointment.AccommodationId,
+		"available":       originalAppointment.Available,
+	}
+	body, err := json.Marshal(data)
+	if err != nil {
+		rr.logger.Println("Error marshalling JSON:", err)
+		return err
+	}
+
 	appointmentsCollection := rr.getCollection()
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	http.DefaultClient.Timeout = 60 * time.Second
+
+	reservationEndpoint := fmt.Sprintf("http://%s:%s/check", reservationServiceHost, reservationServicePort)
+	reservationRequest, err := http.NewRequest("POST", reservationEndpoint, bytes.NewReader(body))
 	if err != nil {
-		rr.logger.Println("Error converting ID to ObjectID:", err)
+		rr.logger.Println("Error creating reservation request:", err)
 		return err
 	}
 
-	filter := bson.M{"_id": objectID}
-	update := bson.M{"$set": bson.M{
-		"available": appointment.Available,
-	}}
-
-	result, err := appointmentsCollection.UpdateOne(ctx, filter, update)
-	rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
-	rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
-
+	reservationResponse, err := http.DefaultClient.Do(reservationRequest)
 	if err != nil {
-		rr.logger.Println(err)
+		rr.logger.Println("Error sending reservation request:", err)
 		return err
 	}
+	defer reservationResponse.Body.Close()
+
+	// Proveri status odgovora servisa za rezervacije
+	if reservationResponse.StatusCode == http.StatusOK {
+		rr.logger.Println("No reservation found for the appointment. Update allowed.")
+		objectID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			rr.logger.Println("Error converting ID to ObjectID:", err)
+			return err
+		}
+
+		// Ažurirajte podatke u appointmentsCollection
+		filter := bson.M{"_id": objectID}
+		update := bson.M{"$set": bson.M{
+			"available": appointment.Available,
+		}}
+
+		result, err := appointmentsCollection.UpdateOne(ctx, filter, update)
+		rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
+		rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
+
+		if err != nil {
+			rr.logger.Println(err)
+			return err
+		}
+	} else if reservationResponse.StatusCode == http.StatusBadRequest {
+		rr.logger.Println("Reservation exists for the appointment. Update not allowed.")
+
+		return errors.New("Reservation exists for the appointment.")
+	} else {
+		buf := new(strings.Builder)
+		_, _ = io.Copy(buf, reservationResponse.Body)
+		return fmt.Errorf("Reservation service error: %v", buf.String())
+	}
+
 	return nil
 }
 

@@ -69,13 +69,23 @@ func (r *AppointmentHandler) GetAppointmentsByAccommodation(rw http.ResponseWrit
 }
 
 func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.Request) {
-
 	vars := mux.Vars(h)
 	id := vars["id"]
 
 	appointment := h.Context().Value(KeyProduct{}).(*data.Appointment)
 
-	r.appointmentRepo.UpdateAppointment(id, appointment)
+	err := r.appointmentRepo.UpdateAppointment(id, appointment)
+	if err != nil {
+		if err.Error() == "Reservation exists for the appointment." {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Reservation exists for the appointment. Update not allowed."))
+		} else {
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Error updating appointment."))
+		}
+		return
+	}
+
 	rw.WriteHeader(http.StatusOK)
 }
 
