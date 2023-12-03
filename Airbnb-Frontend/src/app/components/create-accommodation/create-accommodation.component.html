@@ -200,6 +200,43 @@
                 </div>
               </div>
             </div>
+            <div class="w-full sm:w-half formbold-px-3">
+              <div class="formbold-mb-5">
+                <label class="formbold-form-label formbold-form-label-2">
+                  Define appointment
+                </label>
+                <input 
+                  type="text" 
+                  #datapicker 
+                  class="form-control datepicker" 
+                  data-provide="datepicker" 
+                  formControlName="datepicker"
+                  id="dates" name="dates" 
+                />
+              </div>
+              <div class="formbold-mb-5">
+                <input 
+                  type="number" 
+                  class="formbold-form-input"
+                  formControlName="guestPrice"
+                  placeholder="Guest price"
+                  id="guestPrice" 
+                  name="guestPrice" 
+                />
+                
+              </div>
+              <div class="formbold-mb-5">
+                <input 
+                  type="number" 
+                  class="formbold-form-input"
+                  formControlName="accommodationPrice"
+                  placeholder="Accommodation price"
+                  id="accommodationPrice" 
+                  name="accommodationPrice" 
+                />
+                
+              </div>
+            </div>
           </div>
         </div>
 

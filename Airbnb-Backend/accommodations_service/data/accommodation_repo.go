@@ -2,8 +2,10 @@ package data
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -65,19 +67,24 @@ func (rr *AccommodationRepo) Ping() {
 	fmt.Println(databases)
 }
 
-func (rr *AccommodationRepo) InsertAccommodation(accommodation *Accommodation) error {
-
+func (rr *AccommodationRepo) InsertAccommodation(accommodation *Accommodation) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	accommodationCollection := rr.getCollection()
 
-	result, err := accommodationCollection.InsertOne(ctx, &accommodation)
+	result, err := accommodationCollection.InsertOne(ctx, accommodation)
 	if err != nil {
 		rr.logger.Println(err)
-		return err
+		return "", err
 	}
-	rr.logger.Printf("Documents ID: %v\n", result.InsertedID)
-	return nil
+
+	insertedID, ok := result.InsertedID.(primitive.ObjectID)
+	if !ok {
+		rr.logger.Println("Failed to convert InsertedID to ObjectID")
+		return "", errors.New("Failed to convert InsertedID")
+	}
+
+	return insertedID.Hex(), nil
 }
 
 func (rr *AccommodationRepo) getCollection() *mongo.Collection {

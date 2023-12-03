@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnInit } from '@angular/core';
 import { AbstractControl, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Accommodation } from 'src/app/models/accommodation.model';
 import { User } from 'src/app/models/user.model';
@@ -8,17 +8,32 @@ import { UpperLetterValidator } from 'src/app/services/customValidators';
 import { MaxGuestValidator } from 'src/app/services/customValidators';
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {Router} from "@angular/router";
+import { ViewChild } from '@angular/core';
+import { Appointment } from 'src/app/models/appointment.model';
+import { AppointmentService } from 'src/app/services/appointment.service';
+declare var $: any; // Declare jQuery
 
 @Component({
   selector: 'app-create-accommodation',
   templateUrl: './create-accommodation.component.html',
   styleUrls: ['./create-accommodation.component.css']
 })
-export class CreateAccommodationComponent implements OnInit {
+export class CreateAccommodationComponent implements OnInit{
 
   accommodationForm!: FormGroup;
+  responseId: any;
+  
+  @ViewChild('datapicker') dateInput!: ElementRef;
 
-  constructor(private fb: FormBuilder,private accommodationService: AccommodationService,private userService:UserService, private _snackBar: MatSnackBar, private router: Router,) {
+  ngAfterViewInit() {
+    $(this.dateInput.nativeElement).daterangepicker({
+      locale: {
+        format: 'YYYY/MM/DD',
+      },
+    });
+  }
+
+  constructor(private fb: FormBuilder,private accommodationService: AccommodationService,private userService:UserService, private _snackBar: MatSnackBar, private router: Router,private appointmentService:AppointmentService) {
   }
 
   get f(): { [key: string]: AbstractControl } {
@@ -37,10 +52,11 @@ export class CreateAccommodationComponent implements OnInit {
      country: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(35),UpperLetterValidator(), Validators.pattern(/^[A-Z][a-zA-Z\s-]{2,35}$/)]],
      city: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(35),UpperLetterValidator(), Validators.pattern(/^[A-Z][a-zA-Z\s-]{2,35}$/)]],
      street: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(35),UpperLetterValidator(), Validators.pattern(/^[A-Z][a-zA-Z0-9\s,'-]{2,35}$/)]],
-     number: ['', [Validators.required, Validators.min(1)]]
+     number: ['', [Validators.required, Validators.min(1)]],
+     datepicker: [''],
+     guestPrice: [''],
+     accommodationPrice: []
    });
-
-
   }
 
   submitted = false;
@@ -68,23 +84,53 @@ export class CreateAccommodationComponent implements OnInit {
         ownerId: ""
       };
 
-
       this.userService.getUser().subscribe(
         (user: User) => {
           newAccommodation.ownerId = user.id
 
           this.accommodationService.createAccommodation(newAccommodation).subscribe(
-            () => {
-              this.openSnackBar("Accommodation created successfully!", "")
+            (reponseId:any) => {
+              this.responseId = reponseId.id;
               console.log('Accommodation created successfully!');
-              this.router.navigate(['/Main-Page'])
-              //this.toastr.success('Accommodation created successfully!');
+
+              let elements = document.getElementsByClassName("drp-selected");
+              let dateRange:any;
+              for (var i = 0; i < elements.length; i++) {
+                dateRange = elements[i].textContent;
+                console.log(dateRange);
+              }
+              
+
+              let [start, end] = dateRange!.split(" - ");
+
+              let datesInRange: Date[] = getDatesInRange(start, end);
+              console.log(datesInRange);
+              
+
+              const newAppointment: Appointment = {
+                available: datesInRange,
+                accommodationId: this.responseId,
+                pricePerGuest: formValues.guestPrice,
+                pricePerAccommodation: formValues.accommodationPrice
+              };
+
+              this.appointmentService.createAppointment(newAppointment).subscribe(
+                () => {
+          
+                  this.openSnackBar("Accommodation created successfully!", "")
+                  console.log('Appointment created successfully!');
+                  this.router.navigate(['/Main-Page'])
+
+                },
+                (error) => {
+                  this.openSnackBar("Error creating accommodation!", "")
+                  console.error('Error creating appointment:', error);
+                }
+              );
 
             },
             (error) => {
-              this.openSnackBar("Error creating accommodation!", "")
               console.error('Error creating accommodation:', error);
-              //this.toastr.error('Error creating accommodation!');
             }
           );
 
@@ -96,6 +142,7 @@ export class CreateAccommodationComponent implements OnInit {
 
     }
   }
+
   openSnackBar(message: string, action: string) {
     this._snackBar.open(message, action,  {
       duration: 3500
@@ -103,3 +150,16 @@ export class CreateAccommodationComponent implements OnInit {
   }
 
 }
+
+function getDatesInRange(startDate: string, endDate: string): Date[] {
+  const dateList: Date[] = [];
+  let currentDate = new Date(startDate);
+
+  while (currentDate <= new Date(endDate)) {
+    dateList.push(new Date(currentDate));
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return dateList;
+}
+

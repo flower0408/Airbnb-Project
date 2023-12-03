@@ -109,47 +109,9 @@ func (sr *ReservationRepo) InsertReservation(reservation *Reservation) error {
 	return nil
 }
 
-func (sr *ReservationRepo) GetAllReservations(tableName string) (Reservations, error) {
-
-	if tableName == "reservation_by_user" {
-
-	} else if tableName == "reservation_by_accommodation" {
-
-	} else {
-		return nil, fmt.Errorf("Invalid table name: %s", tableName)
-	}
-
-	scanner := sr.session.Query(
-		fmt.Sprintf(`SELECT by_userId, reservation_id, periodd, accommodation_id, price FROM %s`, tableName),
-	).Iter().Scanner()
-
-	var reservations Reservations
-	for scanner.Next() {
-		var r Reservation
-		err := scanner.Scan(
-			&r.ByUserId,
-			&r.ID,
-			&r.Period,
-			&r.AccommodationId,
-			&r.Price,
-		)
-		if err != nil {
-			sr.logger.Println(err)
-			return nil, err
-		}
-
-		reservations = append(reservations, &r)
-	}
-	if err := scanner.Err(); err != nil {
-		sr.logger.Println(err)
-		return nil, err
-	}
-	return reservations, nil
-}
-
 func (sr *ReservationRepo) ReservationExistsForAppointment(accommodationID string, available []time.Time) (bool, error) {
-	tableName := "reservation_by_user"
-	allReservations, err := sr.GetReservationsForAccommodation(tableName, accommodationID)
+
+	allReservations, err := sr.GetReservationByAccommodation(accommodationID)
 	if err != nil {
 		return false, err
 	}
@@ -165,21 +127,6 @@ func (sr *ReservationRepo) ReservationExistsForAppointment(accommodationID strin
 	}
 
 	return false, nil
-}
-
-func (sr *ReservationRepo) GetReservationsForAccommodation(tableName, accommodationID string) ([]*Reservation, error) {
-	allReservations, err := sr.GetAllReservations(tableName)
-	if err != nil {
-		return nil, err
-	}
-	var reservationsForAccommodation []*Reservation
-	for _, reservation := range allReservations {
-		if reservation.AccommodationId == accommodationID {
-			reservationsForAccommodation = append(reservationsForAccommodation, reservation)
-		}
-	}
-
-	return reservationsForAccommodation, nil
 }
 
 func (sr *ReservationRepo) GetReservationByUser(id string) (Reservations, error) {

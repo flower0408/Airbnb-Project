@@ -25,7 +25,6 @@ func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo) *Accommod
 }
 
 func (s *AccommodationHandler) CreateAccommodation(rw http.ResponseWriter, h *http.Request) {
-
 	accommodation := h.Context().Value(KeyProduct{}).(*data.Accommodation)
 
 	if err := validateAccommodation(accommodation); err != nil {
@@ -33,13 +32,20 @@ func (s *AccommodationHandler) CreateAccommodation(rw http.ResponseWriter, h *ht
 		return
 	}
 
-	err := s.repo.InsertAccommodation(accommodation)
+	insertedID, err := s.repo.InsertAccommodation(accommodation)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	s.logger.Println("Inserted ID:", insertedID)
+
+	// Respond with HTTP status 200 and the inserted ID in the response body
 	rw.WriteHeader(http.StatusOK)
+	rw.Header().Set("Content-Type", "application/json")
+	responseJSON := map[string]string{"id": insertedID}
+	json.NewEncoder(rw).Encode(responseJSON)
 }
 
 func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {

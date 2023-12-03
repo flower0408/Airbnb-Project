@@ -30,7 +30,6 @@ import {ChangePasswordComponent} from "./components/change-password/change-passw
 import { NgxCaptchaModule } from 'ngx-captcha';
 import { CreateAccommodationComponent } from './components/create-accommodation/create-accommodation.component';
 import { XSSInterceptor } from './services/xss.interceptor';
-
 @NgModule({
   declarations: [
     AppComponent,
