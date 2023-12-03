@@ -13,6 +13,16 @@
   text-align: center;
 }
 
+.profile-info-box {
+  border: 2px solid #F88379;
+  padding-left: 140px;
+  padding-right: 140px;
+  padding-top: 20px;
+  padding-bottom: 20px;
+  margin-bottom: 40px;
+  width: 100%;
+}
+
 .profile-header {
   margin-bottom: 20px;
 }
@@ -48,5 +58,41 @@
   color: black;
 }
 .color{
+  color: #F88379;
+}
+
+.profile-info1 label[for="gender"] {
+  color: #F88379;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.profile-info1 label[for="gender"] + div label {
+  color: #F88379;
+  font-weight: bold;
+  font-size: 16px;
+  padding-right: 10px;
+}
+
+.profile-container1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.profile-info1 {
+  flex: 1;
+  margin-right: 50px;
+  margin-left: 50px;
+}
+
+.profile-options1 {
+  flex-basis: 200px;
+}
+
+.profile-info1 .info {
+  font-size: 18px;
+  margin: 10px 0;
   color: #F88379;
 }

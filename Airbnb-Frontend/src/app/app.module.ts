@@ -30,6 +30,8 @@ import {ChangePasswordComponent} from "./components/change-password/change-passw
 import { NgxCaptchaModule } from 'ngx-captcha';
 import { CreateAccommodationComponent } from './components/create-accommodation/create-accommodation.component';
 import { XSSInterceptor } from './services/xss.interceptor';
+import {AccommodationDetailsComponent} from "./components/accommodation-details/accommodation-details.component";
+
 @NgModule({
   declarations: [
     AppComponent,
@@ -44,6 +46,7 @@ import { XSSInterceptor } from './services/xss.interceptor';
     MyProfileComponent,
     ChangePasswordComponent,
     CreateAccommodationComponent,
+    AccommodationDetailsComponent,
   ],
   imports: [
     BrowserModule,
@@ -64,7 +67,7 @@ import { XSSInterceptor } from './services/xss.interceptor';
     ReactiveFormsModule,
     NgxCaptchaModule
   ],
-  providers: 
+  providers:
   [{
     provide: HTTP_INTERCEPTORS,
     useClass: AuthInterceptor,

@@ -12,6 +12,7 @@ import {ChangePasswordComponent} from "./components/change-password/change-passw
 import { CreateAccommodationComponent } from './components/create-accommodation/create-accommodation.component';
 import {LoginGuardService} from "./guards/login-guard.service";
 import {RoleGuardService} from "./guards/role-guard.service";
+import {AccommodationDetailsComponent} from "./components/accommodation-details/accommodation-details.component";
 
 const routes: Routes = [
   {
@@ -19,6 +20,13 @@ const routes: Routes = [
     component: MainPageComponent,
     canActivate: [RoleGuardService],
     data: {expectedRoles: 'Host|Guest'}
+  },
+
+  {
+    path: 'AccommodationDetails/:id',
+    component: AccommodationDetailsComponent,
+    canActivate: [RoleGuardService],
+    data: { expectedRoles: 'Host|Guest' }
   },
 
   {

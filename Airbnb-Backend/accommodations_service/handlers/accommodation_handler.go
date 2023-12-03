@@ -4,9 +4,13 @@ import (
 	"accommodations_service/data"
 	"context"
 	"encoding/json"
+	"github.com/gorilla/mux"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 )
 
 type KeyProduct struct{}
@@ -49,7 +53,6 @@ func (s *AccommodationHandler) CreateAccommodation(rw http.ResponseWriter, h *ht
 }
 
 func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
-	// No need to extract accommodation from context in GetAll
 
 	accommodations, err := s.repo.GetAll()
 	if err != nil {
@@ -58,7 +61,61 @@ func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
 		return
 	}
 
-	// Serialize accommodations to JSON and send the response
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(accommodations)
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	id, err := primitive.ObjectIDFromHex(vars["id"])
+	if err != nil {
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	accommodation, err := s.repo.GetByID(id)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(accommodation)
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *http.Request) {
+
+	location := h.URL.Query().Get("location")
+	minGuests := h.URL.Query().Get("minGuests")
+
+	minGuestsInt, err := strconv.Atoi(minGuests)
+	if err != nil {
+		http.Error(rw, "Invalid minGuests parameter", http.StatusBadRequest)
+		return
+	}
+
+	filter := bson.M{}
+	if location != "" {
+		filter["location.country"] = location
+	}
+	if minGuests != "" {
+		// Condition to filter by Guests
+		filter["$and"] = bson.A{
+			bson.M{"minGuest": bson.M{"$lte": minGuestsInt}},
+			bson.M{"maxGuest": bson.M{"$gte": minGuestsInt}},
+		}
+	}
+
+	accommodations, err := s.repo.Search(filter)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	rw.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(rw).Encode(accommodations)
 	rw.WriteHeader(http.StatusOK)
