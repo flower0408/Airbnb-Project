@@ -51,6 +51,8 @@ func main() {
 	getAccommodation.HandleFunc("/", accommodationHandler.GetAll)
 	searchAccommodations := router.Methods(http.MethodGet).Subrouter()
 	searchAccommodations.HandleFunc("/search", accommodationHandler.SearchAccommodations)
+	getAccommodationId := router.Methods(http.MethodGet).Subrouter()
+	getAccommodationId.HandleFunc("/{id}", accommodationHandler.GetByID)
 	postAccommodation := router.Methods(http.MethodPost).Subrouter()
 	postAccommodation.HandleFunc("/", accommodationHandler.CreateAccommodation)
 	postAccommodation.Use(accommodationHandler.MiddlewareAccommodationDeserialization)

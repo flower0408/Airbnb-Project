@@ -1,28 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import {AccommodationService} from "../../services/accommodation.service";
-import {FormBuilder, FormGroup, Validators} from "@angular/forms";
 import { Location } from '../../models/location.model';
-import {Observable, of, throwError} from "rxjs";
 import {Router} from "@angular/router";
 
-// Define the type for Accommodation
-/*interface Location {
-  country: string;
-  city: string;
-  street: string;
-  number: number;
-}
-
-interface Accommodation {
-  id: string;
-  name: string;
-  description: string;
-  images: string;
-  benefits: string;
-  minGuest: number;
-  maxGuest: number;
-  location: Location;
-}*/
 interface Accommodation {
   id?: string;
   name: string;

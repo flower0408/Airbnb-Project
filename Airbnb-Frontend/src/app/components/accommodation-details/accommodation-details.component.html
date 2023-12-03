@@ -1,0 +1,33 @@
+<app-header></app-header>
+<div *ngIf="accommodation" class="accommodation-details">
+  <h2 class="accommodation-title">{{ accommodation.name }}</h2>
+  <p class="accommodation-description">{{ accommodation.description }}</p>
+
+  <div *ngIf="accommodation.location">
+    <div class="detail location">
+      <span class="detail-label">Location:</span>
+      <span class="detail-value">
+        {{ accommodation.location.street }},
+        {{ accommodation.location.number }},
+        {{ accommodation.location.city }},
+        {{ accommodation.location.country }}
+      </span>
+    </div>
+  </div>
+
+  <div class="detail benefits">
+    <span class="detail-label">Benefits:</span>
+    <ul>
+      <li *ngFor="let benefit of accommodation.benefits.split(',')">{{ benefit }}</li>
+    </ul>
+  </div>
+
+  <div class="detail guests">
+    <span class="detail-label">Guests:</span>
+    <span class="detail-value">
+      {{ accommodation.minGuest }} - {{ accommodation.maxGuest }} guests
+    </span>
+  </div>
+
+</div>
+

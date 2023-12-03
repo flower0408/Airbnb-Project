@@ -4,7 +4,9 @@ import (
 	"accommodations_service/data"
 	"context"
 	"encoding/json"
+	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
 	"net/http"
 	"regexp"
@@ -55,6 +57,26 @@ func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
 
 	rw.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(rw).Encode(accommodations)
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	id, err := primitive.ObjectIDFromHex(vars["id"])
+	if err != nil {
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	accommodation, err := s.repo.GetByID(id)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(accommodation)
 	rw.WriteHeader(http.StatusOK)
 }
 

@@ -22,6 +22,11 @@ export class AccommodationService {
     return this.http.get(url);
   }
 
+  getAccommodationById(accommodationId: string): Observable<Accommodation> {
+    const url = `${environment.baseApiUrl}/${this.url}/${accommodationId}`;
+    return this.http.get<Accommodation>(url);
+  }
+
   searchAccommodations(location: string, minGuests: number): Observable<Accommodation[]> {
     const params = new HttpParams()
       .set('location', location)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -89,6 +90,24 @@ func (rr *AccommodationRepo) getCollection() *mongo.Collection {
 func (rr *AccommodationRepo) GetAll() ([]*Accommodation, error) {
 	filter := bson.D{{}}
 	return rr.filter(filter)
+}
+
+func (rr *AccommodationRepo) GetByID(id primitive.ObjectID) (*Accommodation, error) {
+	filter := bson.D{{"_id", id}}
+	return rr.getByFilter(filter)
+}
+
+func (rr *AccommodationRepo) getByFilter(filter interface{}) (*Accommodation, error) {
+	ctx := context.TODO()
+	accommodationCollection := rr.getCollection()
+
+	var accommodation Accommodation
+	err := accommodationCollection.FindOne(ctx, filter).Decode(&accommodation)
+	if err != nil {
+		return nil, err
+	}
+
+	return &accommodation, nil
 }
 
 func (rr *AccommodationRepo) Search(filter interface{}) ([]*Accommodation, error) {
