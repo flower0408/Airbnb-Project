@@ -27,8 +27,15 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 	reservation := h.Context().Value(KeyProduct{}).(*data.Reservation)
 	err := s.reservationRepo.InsertReservation(reservation)
 	if err != nil {
-		s.logger.Print("Database exception: ", err)
-		rw.WriteHeader(http.StatusBadRequest)
+		if err.Error() == "Reservation already exists for the specified dates and accommodation." {
+			s.logger.Print("No one else can book accommodation for the reserved dates. ")
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("No one else can book accommodation for the reserved dates"))
+		} else {
+			s.logger.Print("Database exception: ", err)
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Error creating reservation."))
+		}
 		return
 	}
 	rw.WriteHeader(http.StatusOK)

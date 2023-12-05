@@ -1,6 +1,7 @@
 package data
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -86,9 +87,18 @@ func (sr *ReservationRepo) CreateTables() {
 
 // cassandra
 func (sr *ReservationRepo) InsertReservation(reservation *Reservation) error {
+
+	exists, err := sr.ReservationExistsForAppointment(reservation.AccommodationId, reservation.Period)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return errors.New("Reservation already exists for the specified dates and accommodation.")
+	}
+
 	reservationId, _ := gocql.RandomUUID()
 
-	err := sr.session.Query(
+	err = sr.session.Query(
 		`INSERT INTO reservation_by_user (by_userId, reservation_id, periodd, accommodation_id, price) 
         VALUES (?, ?, ?, ?, ?)`,
 		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price).Exec()
