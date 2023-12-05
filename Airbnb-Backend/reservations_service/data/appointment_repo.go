@@ -141,11 +141,24 @@ func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment
 
 		// Ažurirajte podatke u appointmentsCollection
 		filter := bson.M{"_id": objectID}
-		update := bson.M{"$set": bson.M{
-			"available": appointment.Available,
-		}}
+		update := bson.M{}
 
-		result, err := appointmentsCollection.UpdateOne(ctx, filter, update)
+		if appointment.Available != nil {
+			update["available"] = appointment.Available
+		}
+
+		if appointment.PricePerGuest != 0 {
+			update["pricePerGuest"] = appointment.PricePerGuest
+		}
+
+		if appointment.PricePerAccommodation != 0 {
+			update["pricePerAccommodation"] = appointment.PricePerAccommodation
+		}
+
+		updateQuery := bson.M{"$set": update}
+
+		result, err := appointmentsCollection.UpdateOne(ctx, filter, updateQuery)
+
 		rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
 		rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
 
@@ -235,35 +248,6 @@ func (rr *AppointmentRepo) GetAppointmentsByAccommodation(id string) (Appointmen
 	}
 
 	return appointments, nil
-}
-
-func (rr *AppointmentRepo) EditPrice(id string, appointment *Appointment) error {
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	appointmentsCollection := rr.getCollection()
-
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		rr.logger.Println("Error converting ID to ObjectID:", err)
-		return err
-	}
-
-	filter := bson.M{"_id": objectID}
-	update := bson.M{"$set": bson.M{
-		"pricePerGuest":         appointment.PricePerGuest,
-		"pricePerAccommodation": appointment.PricePerAccommodation,
-	}}
-
-	result, err := appointmentsCollection.UpdateOne(ctx, filter, update)
-	rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
-	rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
-
-	if err != nil {
-		rr.logger.Println(err)
-		return err
-	}
-	return nil
 }
 
 func (rr *AppointmentRepo) getCollection() *mongo.Collection {

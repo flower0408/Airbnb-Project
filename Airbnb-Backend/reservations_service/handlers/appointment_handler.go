@@ -89,15 +89,6 @@ func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.R
 	rw.WriteHeader(http.StatusOK)
 }
 
-func (r *AppointmentHandler) UpdatePrice(rw http.ResponseWriter, h *http.Request) {
-	vars := mux.Vars(h)
-	id := vars["id"]
-	appointment := h.Context().Value(KeyProduct{}).(*data.Appointment)
-
-	r.appointmentRepo.EditPrice(id, appointment)
-	rw.WriteHeader(http.StatusOK)
-}
-
 func (s *AppointmentHandler) MiddlewareAppointmentDeserialization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
 		appointments := &data.Appointment{}

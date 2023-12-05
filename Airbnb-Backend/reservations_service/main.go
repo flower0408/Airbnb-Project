@@ -81,10 +81,6 @@ func main() {
 	updateAppointment.HandleFunc("/appointments/{id}", appointmentHandler.UpdateAppointment)
 	updateAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
-	updatePrice := router.Methods(http.MethodPatch).Subrouter()
-	updatePrice.HandleFunc("/appointments/editPrice/{id}", appointmentHandler.UpdatePrice)
-	updatePrice.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
-
 	//Initialize the server
 	server := http.Server{
 		Addr:         ":" + port,
