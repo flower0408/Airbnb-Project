@@ -22,12 +22,91 @@
     </ul>
   </div>
 
-  <div class="detail guests">
-    <span class="detail-label">Guests:</span>
-    <span class="detail-value">
-      {{ accommodation.minGuest }} - {{ accommodation.maxGuest }} guests
-    </span>
-  </div>
+  <form *ngIf="userRole === 'Guest'" [formGroup]="reservationForm" (ngSubmit)="onSubmit()">
+    <label>Start day</label>
+    <mat-form-field appearance="outline">
+    <input matInput formControlName="startDay"
+           [matDatepickerFilter]="dateFilter"
+           [matDatepicker]="releasedAtPicker1">
+    <mat-datepicker-toggle matSuffix [for]="releasedAtPicker1"></mat-datepicker-toggle>
+    <mat-datepicker #releasedAtPicker1></mat-datepicker>
+    </mat-form-field>
+
+    <label>End day</label>
+    <mat-form-field appearance="outline">
+      <input matInput formControlName="endDay"
+             [matDatepickerFilter]="dateFilter"
+             [matDatepicker]="releasedAtPicker2">
+      <mat-datepicker-toggle matSuffix [for]="releasedAtPicker2"></mat-datepicker-toggle>
+      <mat-datepicker #releasedAtPicker2></mat-datepicker>
+    </mat-form-field>
+
+    <div *ngIf="submitted && f['endDay'].errors" class="invalid-feedback">
+      <div *ngIf="f['endDay'].errors['validator']">Error.</div>
+    </div>
+
+    <div class="container">
+      <button type="submit" class="formbold-btn">Create reservation</button>
+    </div>
+    
+  </form>
+</div>
+
+<div class="container" *ngIf="userRole === 'Host'">
+  <button type="button" (click)="moreOptions()" class="btn btn-outline-primary">More options</button>
+</div>
+
+<div *ngIf="showMoreOption && userRole === 'Host'" class="accommodation-details">
+
+  <form [formGroup]="addAppointmentForm" (ngSubmit)="onSubmitAddAppointment()">
+    <label>Start day</label>
+    <mat-form-field appearance="outline">
+    <input matInput formControlName="startDay"
+           [matDatepickerFilter]="dateFilter2"
+           [matDatepicker]="releasedAtPicker3">
+    <mat-datepicker-toggle matSuffix [for]="releasedAtPicker3"></mat-datepicker-toggle>
+    <mat-datepicker #releasedAtPicker3></mat-datepicker>
+    </mat-form-field>
+
+    <label>End day</label>
+    <mat-form-field appearance="outline">
+      <input matInput formControlName="endDay"
+             [matDatepickerFilter]="dateFilter2"
+             [matDatepicker]="releasedAtPicker4">
+      <mat-datepicker-toggle matSuffix [for]="releasedAtPicker4"></mat-datepicker-toggle>
+      <mat-datepicker #releasedAtPicker4></mat-datepicker>
+    </mat-form-field>
+
+    <div class="formbold-mb-5">
+      <input 
+        type="number" 
+        class="formbold-form-input"
+        formControlName="guestPrice"
+        placeholder="Guest price"
+        id="guestPrice" 
+        name="guestPrice" 
+      />
+      
+    </div>
+    <div class="formbold-mb-5">
+      <input 
+        type="number" 
+        class="formbold-form-input"
+        formControlName="accommodationPrice"
+        placeholder="Accommodation price"
+        id="accommodationPrice" 
+        name="accommodationPrice" 
+      />
+      
+    </div>
+
+    <div class="container">
+      <button type="submit" class="btn btn-primary">Create appointment</button>
+    </div>
+    
+  </form>
 
 </div>
+
+
 

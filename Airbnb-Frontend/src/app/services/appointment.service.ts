@@ -17,5 +17,8 @@ export class AppointmentService {
     return this.http.post<any>(`${environment.baseApiUrl}/${this.url}/appointments`, appointment);
   }
 
+  getAppointmentsByAccommodation(id: any): Observable<any> {
+    return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/appointmentsByAccommodation/${id}`);
+  }
 
 }

@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit } from '@angular/core';
 import { AbstractControl, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Accommodation } from 'src/app/models/accommodation.model';
 import { User } from 'src/app/models/user.model';
@@ -11,6 +11,7 @@ import {Router} from "@angular/router";
 import { ViewChild } from '@angular/core';
 import { Appointment } from 'src/app/models/appointment.model';
 import { AppointmentService } from 'src/app/services/appointment.service';
+
 declare var $: any; // Declare jQuery
 
 @Component({
@@ -30,6 +31,7 @@ export class CreateAccommodationComponent implements OnInit{
       locale: {
         format: 'YYYY/MM/DD',
       },
+      minDate: new Date(),
     });
   }
 
@@ -156,8 +158,8 @@ function getDatesInRange(startDate: string, endDate: string): Date[] {
   let currentDate = new Date(startDate);
 
   while (currentDate <= new Date(endDate)) {
-    dateList.push(new Date(currentDate));
     currentDate.setDate(currentDate.getDate() + 1);
+    dateList.push(new Date(currentDate));
   }
 
   return dateList;

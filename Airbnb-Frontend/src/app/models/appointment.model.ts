@@ -1,6 +1,6 @@
 export interface Appointment {
     available: Date[];
-    accommodationId: string;
+    accommodationId?: string;
     pricePerGuest: number;
     pricePerAccommodation: number;
   }

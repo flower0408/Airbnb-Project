@@ -37,6 +37,32 @@ export class UserService {
     return null;
   }
 
+  getRoleFromToken(): any {
+    const token = localStorage.getItem('authToken');
+
+    if (token) {
+      try {
+        const payload = token.split('.')[1];
+        const decodedPayload = atob(payload);
+        const user = JSON.parse(decodedPayload);
+
+        if (user && user.userType) {
+          const role = user.userType;
+          return role;
+        } else {
+          console.error('Role not found in user payload:', user);
+        }
+
+      } catch (error) {
+        console.error('Error decoding token payload:', error);
+      }
+    } else {
+      console.error('Token not found.');
+    }
+
+    return null;
+  }
+
 
   getUser(): Observable<any> {
 
