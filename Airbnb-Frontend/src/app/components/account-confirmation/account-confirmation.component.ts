@@ -58,7 +58,7 @@ export class AccountConfirmationComponent implements OnInit {
     this.authService.VerifyAccount(request)
       .subscribe({
         next: (response: void) => {
-          this.openSnackBar("You have been successfully registered to Airbnb", "OK")
+          this.openSnackBar("You have been successfully registered to Airbnb", "")
           this.router.navigate([''])
         },
         error: (error: HttpErrorResponse) => {

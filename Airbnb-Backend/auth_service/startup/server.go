@@ -30,11 +30,20 @@ func NewServer(config *config.Config) *Server {
 }
 
 func (server *Server) Start() {
-	mongoClient := server.initMongoClient()
+
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        10,
+			MaxIdleConnsPerHost: 10,
+			MaxConnsPerHost:     10,
+		},
+	}
+
+	mongoClient := server.initMongoClient(httpClient)
 	defer func(mongoClient *mongo.Client, ctx context.Context) {
 		err := mongoClient.Disconnect(ctx)
 		if err != nil {
-
+			log.Printf("Error disconnecting from MongoDB: %v", err)
 		}
 	}(mongoClient, context.Background())
 
@@ -47,8 +56,8 @@ func (server *Server) Start() {
 	server.start(authHandler)
 }
 
-func (server *Server) initMongoClient() *mongo.Client {
-	client, err := store2.GetClient(server.config.AuthDBHost, server.config.AuthDBPort)
+func (server *Server) initMongoClient(httpClient *http.Client) *mongo.Client {
+	client, err := store2.GetClientWithHTTPConfig(server.config.AuthDBHost, server.config.AuthDBPort, httpClient)
 	if err != nil {
 		log.Fatal(err)
 	}

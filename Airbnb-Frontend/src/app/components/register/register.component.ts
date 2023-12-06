@@ -6,6 +6,7 @@ import { PasswordStrengthValidator } from 'src/app/services/customValidators';
 import {Router} from "@angular/router";
 import {VerificationService} from "../../services/verify.service";
 import {HttpErrorResponse} from "@angular/common/http";
+import {MatSnackBar} from "@angular/material/snack-bar";
 
 @Component({
   selector: 'app-register',
@@ -39,7 +40,8 @@ export class RegisterComponent implements OnInit {
   constructor(private authService: AuthService,
               private formBuilder: FormBuilder,
               private router: Router,
-              private verificationService: VerificationService) { }
+              private verificationService: VerificationService,
+              private _snackBar: MatSnackBar,) { }
 
   // @ts-ignore
   formGroup: FormGroup;
@@ -91,17 +93,25 @@ export class RegisterComponent implements OnInit {
         },
         error: (error: HttpErrorResponse) => {
           if (error.status === 409) {
-            alert('User with that username already exists!');
+            this.openSnackBar('User with that username already exists!', "");
+          } else if (error.status === 406) {
+            this.openSnackBar('Password is in blacklist!', "");
+          } else if (error.status === 405) {
+            this.openSnackBar('User with that email already exists!', "");
+          } else if (error.status === 503) {
+            this.openSnackBar("User service is currently unavailable. Please try again later.", "");
+          } else {
+            // console.log(error);
           }
-          else if (error.status === 406) {
-            alert('Password is in blacklist!');
-          }
-          else if (error.status === 405) {
-            alert('User with that email already exists!');
-          }
-          //console.log(error)
         }
       });
+  }
+
+
+  openSnackBar(message: string, action: string) {
+    this._snackBar.open(message, action,  {
+      duration: 3500
+    });
   }
 
 }
