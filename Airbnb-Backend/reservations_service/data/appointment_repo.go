@@ -24,11 +24,6 @@ type AppointmentRepo struct {
 	logger *log.Logger
 }
 
-var (
-	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
-	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
-)
-
 func NewAppointmentRepo(ctx context.Context, logger *log.Logger) (*AppointmentRepo, error) {
 	dburi := fmt.Sprintf("mongodb://%s:%s/", os.Getenv("APPOINTMENTS_DB_HOST"), os.Getenv("APPOINTMENTS_DB_PORT"))
 
@@ -82,6 +77,11 @@ func (rr *AppointmentRepo) InsertAppointment(appointment *Appointment) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	appointmentsCollection := rr.getCollection()
+
+	if appointment.PricePerGuest != 0 && appointment.PricePerAccommodation != 0 {
+		rr.logger.Printf("Error adding accommodation price and guest price at the same time.")
+		return errors.New("Error adding accommodation price and guest price at the same time.")
+	}
 
 	result, err := appointmentsCollection.InsertOne(ctx, &appointment)
 	if err != nil {

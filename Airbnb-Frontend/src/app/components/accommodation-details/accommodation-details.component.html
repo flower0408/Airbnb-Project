@@ -41,11 +41,11 @@
       <mat-datepicker #releasedAtPicker2></mat-datepicker>
     </mat-form-field>
 
-    <div *ngIf="submitted && f['endDay'].errors" class="invalid-feedback">
-      <div *ngIf="f['endDay'].errors['validator']">Error.</div>
-    </div>
+    <div style="border-bottom: 1px solid gray;" class="container" *ngIf="reservationForm.get('startDay')?.value !== '' && reservationForm.get('endDay')?.value !== ''">
+      <h2 style="color: rgb(67, 67, 67);">Total price: {{sum}}€</h2>
+    </div>    
 
-    <div class="container">
+    <div class="container" style="padding-top: 25px;">
       <button type="submit" class="formbold-btn">Create reservation</button>
     </div>
     
@@ -59,6 +59,7 @@
 <div *ngIf="showMoreOption && userRole === 'Host'" class="accommodation-details">
 
   <form [formGroup]="addAppointmentForm" (ngSubmit)="onSubmitAddAppointment()">
+    <h2 style="text-align: center;color: blue;">Add appointment</h2>
     <label>Start day</label>
     <mat-form-field appearance="outline">
     <input matInput formControlName="startDay"
@@ -77,7 +78,7 @@
       <mat-datepicker #releasedAtPicker4></mat-datepicker>
     </mat-form-field>
 
-    <div class="formbold-mb-5">
+    <div class="formbold-mb-5" *ngIf="inputGuestPrice">
       <input 
         type="number" 
         class="formbold-form-input"
@@ -88,7 +89,7 @@
       />
       
     </div>
-    <div class="formbold-mb-5">
+    <div class="formbold-mb-5" *ngIf="inputAccommodationPrice">
       <input 
         type="number" 
         class="formbold-form-input"
@@ -102,6 +103,64 @@
 
     <div class="container">
       <button type="submit" class="btn btn-primary">Create appointment</button>
+    </div>
+    
+  </form>
+
+</div>
+
+<div *ngIf="showMoreOption && userRole === 'Host'" class="accommodation-details">
+
+  <form [formGroup]="editAppointmentForm" (ngSubmit)="onSubmitEditAppointment()">
+    <h2 style="text-align: center;color: red;">Edit appointment</h2>
+
+    <select class="form-select" aria-label="Default select example" formControlName="selectedAppointment">
+      <option *ngFor="let ap of appointments; let i = index" [ngValue]="i">{{ ap.available[0] }} - {{ ap.available[ap.available.length - 1] }}</option>
+    </select>
+
+    <label>New start day</label>
+    <mat-form-field appearance="outline">
+    <input matInput formControlName="startDayEdit"
+           [matDatepickerFilter]="dateFilter2"
+           [matDatepicker]="releasedAtPicker5">
+    <mat-datepicker-toggle matSuffix [for]="releasedAtPicker5"></mat-datepicker-toggle>
+    <mat-datepicker #releasedAtPicker5></mat-datepicker>
+    </mat-form-field>
+
+    <label>New end day</label>
+    <mat-form-field appearance="outline">
+      <input matInput formControlName="endDayEdit"
+             [matDatepickerFilter]="dateFilter2"
+             [matDatepicker]="releasedAtPicker6">
+      <mat-datepicker-toggle matSuffix [for]="releasedAtPicker6"></mat-datepicker-toggle>
+      <mat-datepicker #releasedAtPicker6></mat-datepicker>
+    </mat-form-field>
+
+    <div class="formbold-mb-5" *ngIf="inputGuestPrice">
+      <input 
+        type="number" 
+        class="formbold-form-input"
+        formControlName="guestPriceEdit"
+        placeholder="Guest price"
+        id="guestPriceEdit" 
+        name="guestPriceEdit" 
+      />
+      
+    </div>
+    <div class="formbold-mb-5" *ngIf="inputAccommodationPrice">
+      <input 
+        type="number" 
+        class="formbold-form-input"
+        formControlName="accommodationPriceEdit"
+        placeholder="Accommodation price"
+        id="accommodationPriceEdit" 
+        name="accommodationPriceEdit" 
+      />
+      
+    </div>
+
+    <div class="container">
+      <button type="submit" class="btn btn-danger">Edit appointment</button>
     </div>
     
   </form>

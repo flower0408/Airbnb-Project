@@ -26,10 +26,15 @@ export class AccommodationDetailsComponent implements OnInit {
   appointments!: Appointment[];
   reservationForm!: FormGroup;
   addAppointmentForm!: FormGroup;
+  editAppointmentForm!: FormGroup;
   allDates: Date[] = [];
   submitted = false;
   showMoreOption = false;
   userRole:any;
+  inputAccommodationPrice = false;
+  inputGuestPrice = false;
+  sum: number = 0
+
 
   constructor(private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {}
 
@@ -88,11 +93,27 @@ export class AccommodationDetailsComponent implements OnInit {
       endDay: ['', [Validators.required, endDayValidator('startDay')]]
     });
 
+    this.reservationForm.get('startDay')?.valueChanges.subscribe(startDayValue => {
+      this.handleFormChanges();
+    });
+
+    this.reservationForm.get('endDay')?.valueChanges.subscribe(endDayValue => {
+      this.handleFormChanges();
+    });
+
     this.addAppointmentForm = this.fb.group({
       startDay: ['', [Validators.required]],
       endDay: ['', [Validators.required, endDayValidator('startDay')]],
       guestPrice:[''],
       accommodationPrice: ['']
+    });
+
+    this.editAppointmentForm = this.fb.group({
+      startDayEdit: [''],
+      endDayEdit: ['', [endDayValidator('startDayEdit')]],
+      guestPriceEdit:[''],
+      accommodationPriceEdit: [''],
+      selectedAppointment: [0]
     });
 
     this.getAccommodationById();
@@ -129,6 +150,13 @@ export class AccommodationDetailsComponent implements OnInit {
           })
           console.log(this.appointments);
           console.log(this.allDates);
+          
+          if(this.appointments[0].pricePerAccommodation !== 0){
+            this.inputAccommodationPrice = true;
+          }else{
+            this.inputGuestPrice = true;
+          } 
+
         },
         (error) => {
           console.error(error);
@@ -192,11 +220,18 @@ export class AccommodationDetailsComponent implements OnInit {
       const formValues = this.addAppointmentForm.value;
 
       const newAppointment: Appointment = {
+        id: "",
         available: [],
         accommodationId: this.accommodation?.id,
-        pricePerGuest:  formValues.guestPrice,
-        pricePerAccommodation: formValues.accommodationPrice
+        pricePerGuest:  0,
+        pricePerAccommodation: 0
       };
+
+      if(this.appointments[0].pricePerAccommodation !== 0){
+        newAppointment.pricePerAccommodation = formValues.accommodationPrice
+      }else{
+        newAppointment.pricePerGuest = formValues.guestPrice
+      } 
 
 
       let datesInRange: Date[] = getDatesInRange(formValues.startDay, formValues.endDay);
@@ -224,6 +259,50 @@ export class AccommodationDetailsComponent implements OnInit {
     }
   }
 
+  onSubmitEditAppointment(){
+    if (this.editAppointmentForm.valid) {
+
+      const formValues = this.editAppointmentForm.value;
+
+      let appointmentForEdit = this.appointments[formValues.selectedAppointment];
+
+      if(formValues.startDayEdit !== "" && formValues.endDayEdit !== ""){
+        let datesInRange: Date[] = getDatesInRange(formValues.startDayEdit, formValues.endDayEdit);
+        console.log(datesInRange);
+        appointmentForEdit.available = datesInRange
+      }
+
+      if(this.appointments[0].pricePerAccommodation !== 0 && formValues.accommodationPriceEdit !== ""){
+        appointmentForEdit.pricePerAccommodation = formValues.accommodationPriceEdit
+      }
+
+      if(this.appointments[0].pricePerGuest !== 0 && formValues.guestPriceEdit !== ""){
+        appointmentForEdit.pricePerGuest = formValues.guestPriceEdit
+      }
+        console.log(appointmentForEdit);
+
+      this.appointmentService.editAppointment(appointmentForEdit.id, appointmentForEdit).subscribe(
+        () => {
+          
+          this.openSnackBar("Appointment edited successfully!", "")
+          console.log('Appointment edited successfully!');
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+          
+        },
+        (error) => {
+          this.openSnackBar("Error editing appointment!", "")
+          console.error('Error editing appointment:', error);
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+      );
+
+    }
+  }
+
   moreOptions(){
     this.showMoreOption = !this.showMoreOption;
   }
@@ -233,6 +312,38 @@ export class AccommodationDetailsComponent implements OnInit {
       duration: 3500
     });
   }
+
+  handleFormChanges() {
+    const startDayValue = this.reservationForm.get('startDay')?.value;
+    const endDayValue = this.reservationForm.get('endDay')?.value;
+  
+    if (startDayValue && endDayValue) {
+      const datesInRange: Date[] = getDatesInRange(startDayValue, endDayValue);
+  
+      this.sum = 0; 
+  
+      this.appointments.forEach(appointment => {
+        appointment.available.forEach(date => {
+          date = new Date(date)
+          datesInRange.forEach(reservedDate => {
+            reservedDate = new Date(reservedDate)
+            if (date.toISOString() === reservedDate.toISOString()) {
+              if (appointment.pricePerGuest !== 0) {
+                this.sum += appointment.pricePerGuest;
+              } else {
+                this.sum += appointment.pricePerAccommodation;
+              }
+            }
+          });
+        });
+      });
+
+      console.log('Total price:', this.sum);
+    }
+  }
+  
+
+
 }
 
 function getDatesInRange(startDate: string, endDate: string): Date[] {
@@ -246,4 +357,6 @@ function getDatesInRange(startDate: string, endDate: string): Date[] {
 
   return dateList;
 }
+
+
 

@@ -1,14 +1,22 @@
 package data
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
 	// NoSQL: module containing Cassandra api client
 	"github.com/gocql/gocql"
+)
+
+var (
+	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
+	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
 )
 
 type ReservationRepo struct {
@@ -97,6 +105,31 @@ func (sr *ReservationRepo) InsertReservation(reservation *Reservation) error {
 	}
 
 	reservationId, _ := gocql.RandomUUID()
+
+	appointments, err := getAppointmentsByAccommodation(reservation.AccommodationId)
+	if err != nil {
+		return err
+	}
+
+	var sum int
+
+	for _, appointment := range appointments {
+		for _, date := range appointment.Available {
+			for _, reservedDate := range reservation.Period {
+				if date.Equal(reservedDate) {
+					if appointment.PricePerGuest != 0 {
+						sum = sum + appointment.PricePerGuest
+					} else {
+						sum = sum + appointment.PricePerAccommodation
+					}
+
+				}
+			}
+		}
+	}
+
+	reservation.Price = sum
+	sr.logger.Println(reservation.Price)
 
 	err = sr.session.Query(
 		`INSERT INTO reservation_by_user (by_userId, reservation_id, periodd, accommodation_id, price) 
@@ -215,4 +248,40 @@ func (sr *ReservationRepo) GetDistinctIds(idColumnName string, tableName string)
 		return nil, err
 	}
 	return ids, nil
+}
+
+func getAppointmentsByAccommodation(id string) (Appointments, error) {
+
+	reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/appointmentsByAccommodation/%s", reservationServiceHost, reservationServicePort, id)
+	reservationServiceRequest, _ := http.NewRequest("GET", reservationServiceEndpoint, nil)
+	response, _ := http.DefaultClient.Do(reservationServiceRequest)
+	if response.StatusCode != 200 {
+		if response.StatusCode == 404 {
+			return nil, errors.New("Appointments not found")
+		}
+	}
+
+	var appointments Appointments
+	err := responseToType(response.Body, &appointments)
+	if err != nil {
+		return nil, err
+	}
+
+	return appointments, nil
+}
+
+func responseToType(response io.ReadCloser, any any) error {
+	responseBodyBytes, err := io.ReadAll(response)
+	if err != nil {
+		log.Printf("err in readAll %s", err.Error())
+		return err
+	}
+
+	err = json.Unmarshal(responseBodyBytes, &any)
+	if err != nil {
+		log.Printf("err in Unmarshal %s", err.Error())
+		return err
+	}
+
+	return nil
 }

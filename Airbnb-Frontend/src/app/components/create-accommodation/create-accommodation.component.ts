@@ -56,8 +56,7 @@ export class CreateAccommodationComponent implements OnInit{
      street: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(35),UpperLetterValidator(), Validators.pattern(/^[A-Z][a-zA-Z0-9\s,'-]{2,35}$/)]],
      number: ['', [Validators.required, Validators.min(1)]],
      datepicker: [''],
-     guestPrice: [''],
-     accommodationPrice: []
+     price: ['', [Validators.required]]
    });
   }
 
@@ -107,14 +106,23 @@ export class CreateAccommodationComponent implements OnInit{
 
               let datesInRange: Date[] = getDatesInRange(start, end);
               console.log(datesInRange);
-              
 
               const newAppointment: Appointment = {
+                id:"",
                 available: datesInRange,
                 accommodationId: this.responseId,
-                pricePerGuest: formValues.guestPrice,
-                pricePerAccommodation: formValues.accommodationPrice
+                pricePerGuest: 0,
+                pricePerAccommodation: 0
               };
+
+              let selectedRadio = getSelectedRadio();
+              console.log(selectedRadio);
+
+              if(selectedRadio === 'Guest price'){
+                newAppointment.pricePerGuest = formValues.price;
+              }else{
+                newAppointment.pricePerAccommodation = formValues.price;
+              }
 
               this.appointmentService.createAppointment(newAppointment).subscribe(
                 () => {
@@ -164,4 +172,18 @@ function getDatesInRange(startDate: string, endDate: string): Date[] {
 
   return dateList;
 }
+
+function getSelectedRadio() {
+  const radioButtons = document.getElementsByName('flexRadioDefault');
+  const radioArray = Array.from(radioButtons);
+
+  for (const radioButton of radioArray) {
+    if ((radioButton as HTMLInputElement).checked) {
+      return (radioButton as HTMLInputElement).value;
+    }
+  }
+
+  return null;
+}
+
 
