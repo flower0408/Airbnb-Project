@@ -1,16 +1,29 @@
 package handlers
 
 import (
+	"accommodations_service/authorization"
 	"accommodations_service/data"
+	"accommodations_service/errors"
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
+	"strings"
+)
+
+var (
+	jwtKey          = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _     = jwt.NewVerifierHS(jwt.HS256, jwtKey)
+	userServiceHost = os.Getenv("USER_SERVICE_HOST")
+	userServicePort = os.Getenv("USER_SERVICE_PORT")
 )
 
 type KeyProduct struct{}
@@ -28,22 +41,84 @@ func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo) *Accommod
 	return &AccommodationHandler{l, r}
 }
 
-func (s *AccommodationHandler) CreateAccommodation(rw http.ResponseWriter, h *http.Request) {
+func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, req *http.Request) {
+	bearer := req.Header.Get("Authorization")
+	if bearer == "" {
+		log.Println("Authorization header missing")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
-	accommodation := h.Context().Value(KeyProduct{}).(*data.Accommodation)
+	bearerToken := strings.Split(bearer, "Bearer ")
+	if len(bearerToken) != 2 {
+		log.Println("Malformed Authorization header")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tokenString := bearerToken[1]
+	log.Printf("Token: %s\n", tokenString)
+
+	token, err := jwt.Parse([]byte(tokenString), verifier)
+	if err != nil {
+		log.Println("Token parsing error:", err)
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	claims := authorization.GetMapClaims(token.Bytes())
+	log.Printf("Token Claims: %+v\n", claims)
+	username := claims["username"]
+
+	userID, statusCode, err := s.getUserIDFromUserService(username)
+	if err != nil {
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}
+
+	accommodation := req.Context().Value(KeyProduct{}).(*data.Accommodation)
+
+	accommodation.OwnerId = userID
 
 	if err := validateAccommodation(accommodation); err != nil {
-		http.Error(rw, err.Message, http.StatusUnprocessableEntity)
+		http.Error(writer, err.Message, http.StatusUnprocessableEntity)
 		return
 	}
 
-	err := s.repo.InsertAccommodation(accommodation)
+	err = s.repo.InsertAccommodation(accommodation)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
-		rw.WriteHeader(http.StatusBadRequest)
+		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	rw.WriteHeader(http.StatusOK)
+
+	writer.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) getUserIDFromUserService(username interface{}) (string, int, error) {
+	userServiceEndpoint := fmt.Sprintf("http://%s:%s/getOne/%s", userServiceHost, userServicePort, username)
+	userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
+	response, err := http.DefaultClient.Do(userServiceRequest)
+	if err != nil {
+		return "", http.StatusInternalServerError, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return "", response.StatusCode, fmt.Errorf(errors.NotFoundUserError)
+	}
+
+	var user map[string]interface{}
+	if err := json.NewDecoder(response.Body).Decode(&user); err != nil {
+		return "", http.StatusInternalServerError, err
+	}
+
+	userID, ok := user["id"].(string)
+	if !ok {
+		return "", http.StatusInternalServerError, fmt.Errorf("User ID not found in the response")
+	}
+
+	return userID, http.StatusOK, nil
 }
 
 func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {

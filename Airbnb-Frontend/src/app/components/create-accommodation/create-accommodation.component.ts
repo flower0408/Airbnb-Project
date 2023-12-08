@@ -65,32 +65,18 @@ export class CreateAccommodationComponent implements OnInit {
         benefits: formValues.benefits,
         minGuest: formValues.Minguest,
         maxGuest: formValues.Maxguest,
-        ownerId: ""
+        ownerId: '',
       };
 
-
-      this.userService.getUser().subscribe(
-        (user: User) => {
-          newAccommodation.ownerId = user.id
-
-          this.accommodationService.createAccommodation(newAccommodation).subscribe(
-            () => {
-              this.openSnackBar("Accommodation created successfully!", "")
-              console.log('Accommodation created successfully!');
-              this.router.navigate(['/Main-Page'])
-              //this.toastr.success('Accommodation created successfully!');
-
-            },
-            (error) => {
-              this.openSnackBar("Error creating accommodation!", "")
-              console.error('Error creating accommodation:', error);
-              //this.toastr.error('Error creating accommodation!');
-            }
-          );
-
+      this.accommodationService.createAccommodation(newAccommodation).subscribe(
+        () => {
+          this.openSnackBar("Accommodation created successfully!", "");
+          console.log('Accommodation created successfully!');
+          this.router.navigate(['/Main-Page']);
         },
         (error) => {
-          console.error('Error get user data:', error);
+          this.openSnackBar("Error creating accommodation!", "");
+          console.error('Error creating accommodation:', error);
         }
       );
 
