@@ -39,6 +39,30 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
+	s.logger.Print("Reservation created succesfully")
+}
+
+func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	reservationID := vars["id"]
+
+	err := s.reservationRepo.CancelReservation(reservationID)
+	if err != nil {
+		if err.Error() == "Can not cancel reservation. You can only cancel it before it starts." {
+			s.logger.Print("Can not cancel reservation. You can only cancel it before it starts. ")
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Can not cancel reservation. You can only cancel it before it starts."))
+		} else {
+			s.logger.Print("Error cancelling reservation: ", err)
+			rw.WriteHeader(http.StatusInternalServerError)
+			rw.Write([]byte("Error cancelling reservation."))
+		}
+		return
+	}
+
+	rw.WriteHeader(http.StatusOK)
+	s.logger.Print("Reservation cancelled succesfully")
+	rw.Write([]byte("Reservation cancelled successfully."))
 }
 
 func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *http.Request) {

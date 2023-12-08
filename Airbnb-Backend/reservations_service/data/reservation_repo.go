@@ -129,7 +129,6 @@ func (sr *ReservationRepo) InsertReservation(reservation *Reservation) error {
 	}
 
 	reservation.Price = sum
-	sr.logger.Println(reservation.Price)
 
 	err = sr.session.Query(
 		`INSERT INTO reservation_by_user (by_userId, reservation_id, periodd, accommodation_id, price) 
@@ -170,6 +169,72 @@ func (sr *ReservationRepo) ReservationExistsForAppointment(accommodationID strin
 	}
 
 	return false, nil
+}
+
+func (sr *ReservationRepo) CancelReservation(reservationID string) error {
+
+	reservation, err := sr.GetReservationByID(reservationID)
+	if err != nil {
+		sr.logger.Println(err)
+		return err
+	}
+
+	for _, date := range reservation.Period {
+		if time.Now().After(date) || time.Now().Equal(date) {
+			return errors.New("Can not cancel reservation. You can only cancel it before it starts.")
+		}
+	}
+
+	err = sr.session.Query(
+		`DELETE FROM reservation_by_user WHERE reservation_id = ? AND by_userid = ?`,
+		reservation.ID, reservation.ByUserId).Exec()
+	if err != nil {
+		sr.logger.Println(err)
+		return err
+	}
+	err = sr.session.Query(
+		`DELETE FROM reservation_by_accommodation WHERE reservation_id = ? AND accommodation_id = ?`,
+		reservation.ID, reservation.AccommodationId).Exec()
+	if err != nil {
+		sr.logger.Println(err)
+		return err
+	}
+
+	return nil
+}
+
+func (sr *ReservationRepo) GetReservationByID(reservationID string) (*Reservation, error) {
+
+	parsedUUID, err := gocql.ParseUUID(reservationID)
+	if err != nil {
+		fmt.Println("Error parsing UUID:", err, reservationID, " ", parsedUUID)
+		return nil, err
+	}
+
+	scanner := sr.session.Query(
+		`SELECT by_userId, reservation_id, periodd, accommodation_id, price FROM reservation_by_user WHERE reservation_id = ? ALLOW FILTERING`,
+		parsedUUID).Iter().Scanner()
+
+	var reservation Reservation
+	for scanner.Next() {
+		err := scanner.Scan(
+			&reservation.ByUserId,
+			&reservation.ID,
+			&reservation.Period,
+			&reservation.AccommodationId,
+			&reservation.Price,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		sr.logger.Println(err)
+		return nil, err
+	}
+
+	return &reservation, nil
 }
 
 func (sr *ReservationRepo) GetReservationByUser(id string) (Reservations, error) {

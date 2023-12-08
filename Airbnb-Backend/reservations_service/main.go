@@ -53,6 +53,10 @@ func main() {
 	createReservation.HandleFunc("/reservations", reservationHandler.CreateReservation)
 	createReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
 
+	cancelReservation := router.Methods(http.MethodDelete).Subrouter()
+	cancelReservation.HandleFunc("/cancelReservation/{id}", reservationHandler.CancelReservation)
+	//cancelReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
 	checkReservation := router.Methods(http.MethodPost).Subrouter()
 	checkReservation.HandleFunc("/check", reservationHandler.CheckReservation)
 	//checkReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
