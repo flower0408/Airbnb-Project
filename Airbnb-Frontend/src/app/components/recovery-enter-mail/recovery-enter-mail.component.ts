@@ -54,10 +54,12 @@ export class RecoveryEnterMailComponent implements OnInit {
       error: (error: HttpErrorResponse) => {
         if(error.status == 404){
           this.formGroup.setErrors({userNotExist:true})
-        this.openSnackBar("User with that e-mail not exists in system.", "")
-
+        this.openSnackBar("User with that e-mail not exists in system.", "")}
+        else if (error.status === 503 ) {
+          this.openSnackBar("User service is currently unavailable. Please try again later.", "");
         }
       }
+
     })
   }
 

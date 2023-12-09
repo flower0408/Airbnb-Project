@@ -6,6 +6,7 @@ import { LoginDTO } from 'src/app/dto/loginDTO';
 import { User } from 'src/app/models/user.model';
 import { AuthService } from 'src/app/services/auth.service';
 import { UserService } from 'src/app/services/user.service';
+import {MatSnackBar} from "@angular/material/snack-bar";
 
 
 @Component({
@@ -25,7 +26,8 @@ export class LoginComponent implements OnInit {
   constructor(
     private authService: AuthService,
     private router: Router,
-    private formBuilder: FormBuilder
+    private formBuilder: FormBuilder,
+    private _snackBar: MatSnackBar,
   ) { }
 
   submitted = false;
@@ -97,18 +99,18 @@ export class LoginComponent implements OnInit {
                 },
                 error: (error) => {
                   this.formGroup.setErrors({ unauthenticated: true });
-                  window.alert('Username or password are incorrect!');
-                  console.log(error);
+                  this.openSnackBar("Username or password are incorrect!", "");
+                  //console.log(error);
                 }
               });
             } else {
               // Ako reCAPTCHA nije uspešno prošla
-              window.alert('reCAPTCHA verification failed.');
+              this.openSnackBar("reCAPTCHA verification failed.", "");
             }
           },
           error: (error) => {
             console.error('Error verifying reCAPTCHA:', error);
-            window.alert('Error verifying reCAPTCHA. Please try again.');
+            this.openSnackBar("Error verifying reCAPTCHA. Please try again.", "");
           }
         });
       } else {
@@ -117,5 +119,12 @@ export class LoginComponent implements OnInit {
 
 
   }
+
+  openSnackBar(message: string, action: string) {
+    this._snackBar.open(message, action,  {
+      duration: 3500
+    });
+  }
+
 
 }

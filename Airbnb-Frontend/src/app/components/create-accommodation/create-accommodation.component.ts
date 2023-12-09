@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { AbstractControl, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Accommodation } from 'src/app/models/accommodation.model';
 import { User } from 'src/app/models/user.model';
@@ -8,6 +8,7 @@ import { UpperLetterValidator } from 'src/app/services/customValidators';
 import { MaxGuestValidator } from 'src/app/services/customValidators';
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {Router} from "@angular/router";
+import {HttpErrorResponse} from "@angular/common/http";
 import { ViewChild } from '@angular/core';
 import { Appointment } from 'src/app/models/appointment.model';
 import { AppointmentService } from 'src/app/services/appointment.service';
@@ -23,7 +24,7 @@ export class CreateAccommodationComponent implements OnInit{
 
   accommodationForm!: FormGroup;
   responseId: any;
-  
+
   @ViewChild('datapicker') dateInput!: ElementRef;
 
   ngAfterViewInit() {
@@ -82,71 +83,84 @@ export class CreateAccommodationComponent implements OnInit{
         benefits: formValues.benefits,
         minGuest: formValues.Minguest,
         maxGuest: formValues.Maxguest,
-        ownerId: ""
+        ownerId: '',
       };
 
-      this.userService.getUser().subscribe(
-        (user: User) => {
-          newAccommodation.ownerId = user.id
 
-          this.accommodationService.createAccommodation(newAccommodation).subscribe(
-            (reponseId:any) => {
-              this.responseId = reponseId.id;
-              console.log('Accommodation created successfully!');
 
-              let elements = document.getElementsByClassName("drp-selected");
-              let dateRange:any;
-              for (var i = 0; i < elements.length; i++) {
-                dateRange = elements[i].textContent;
-                console.log(dateRange);
-              }
-              
+      this.accommodationService.createAccommodation(newAccommodation).subscribe(
+        () => {
 
-              let [start, end] = dateRange!.split(" - ");
+          let elements = document.getElementsByClassName("drp-selected");
+          let dateRange:any;
+          for (var i = 0; i < elements.length; i++) {
+            dateRange = elements[i].textContent;
+            console.log(dateRange);
+          }
 
-              let datesInRange: Date[] = getDatesInRange(start, end);
-              console.log(datesInRange);
+          let [start, end] = dateRange!.split(" - ");
 
-              const newAppointment: Appointment = {
-                id:"",
-                available: datesInRange,
-                accommodationId: this.responseId,
-                pricePerGuest: 0,
-                pricePerAccommodation: 0
-              };
+          let datesInRange: Date[] = getDatesInRange(start, end);
+          console.log(datesInRange);
 
-              let selectedRadio = getSelectedRadio();
-              console.log(selectedRadio);
+          const newAppointment: Appointment = {
+            id:"",
+            available: datesInRange,
+            accommodationId: "",
+            pricePerGuest: 0,
+            pricePerAccommodation: 0
+          };
 
-              if(selectedRadio === 'Guest price'){
-                newAppointment.pricePerGuest = formValues.price;
-              }else{
-                newAppointment.pricePerAccommodation = formValues.price;
-              }
+          let selectedRadio = getSelectedRadio();
+          console.log(selectedRadio);
 
-              this.appointmentService.createAppointment(newAppointment).subscribe(
-                () => {
-          
-                  this.openSnackBar("Accommodation created successfully!", "")
-                  console.log('Appointment created successfully!');
-                  this.router.navigate(['/Main-Page'])
+          if(selectedRadio === 'Guest price'){
+            newAppointment.pricePerGuest = formValues.price;
+          }else{
+            newAppointment.pricePerAccommodation = formValues.price;
+          }
 
-                },
-                (error) => {
-                  this.openSnackBar("Error creating accommodation!", "")
-                  console.error('Error creating appointment:', error);
-                }
-              );
+          this.appointmentService.createAppointment(newAppointment).subscribe(
+            () => {
+
+              this.openSnackBar("Accommodation created successfully!", "")
+              console.log('Appointment created successfully!');
+              this.router.navigate(['/Main-Page'])
 
             },
             (error) => {
-              console.error('Error creating accommodation:', error);
+              this.openSnackBar("Error creating accommodation!", "")
+              console.error('Error creating appointment:', error);
             }
           );
 
         },
         (error) => {
-          console.error('Error get user data:', error);
+          console.error('Error creating accommodation:', error);
+        }
+      );
+
+          this.openSnackBar("Accommodation created successfully!", "");
+          console.log('Accommodation created successfully!');
+          this.router.navigate(['/Main-Page']);
+        },
+        (error) => {
+          console.error('Error creating accommodation:', error);
+
+          if (error instanceof HttpErrorResponse) {
+            if (error.status === 503) {
+              this.openSnackBar("User service is currently unavailable. Please try again later.", "");
+            }
+            else if (error.status === 502) {
+              this.openSnackBar("User service is currently unavailable. Please try again later.", "");
+            }
+            else {
+              this.openSnackBar(`Error creating accommodation: ${error.message}`, "");
+            }
+          } else {
+            console.error('Error creating accommodation:', error);
+           // this.openSnackBar(`Unexpected error: ${error}`, "");
+          }
         }
       );
 

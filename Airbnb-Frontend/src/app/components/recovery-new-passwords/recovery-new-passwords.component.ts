@@ -56,35 +56,31 @@ export class RecoveryNewPasswordsComponent implements OnInit {
     recoverPasswordReq.new_password = this.formGroup.get("newPassword")?.value;
     recoverPasswordReq.repeated_new = this.formGroup.get("repeatPassword")?.value;
     if (recoverPasswordReq.new_password != recoverPasswordReq.repeated_new) {
-      this.formGroup.setErrors({passwordsDontMatch: true});
+      this._snackBar.open('Passwords don\'t match.', '', {
+        duration: 3500,
+        panelClass: ['error-snackbar']
+      });
       return;
-    }
-    else{
-      this.formGroup.setErrors({passwordsDontMatch: false});
     }
 
     this.authService.RecoverPassword(recoverPasswordReq)
       .subscribe({
         next: () => {
-          this.openSnackBar("Successfully recovered password.", "OK")
+          this.openSnackBar("Successfully recovered password.", "")
           this.router.navigate(['']);
         },
-        /*error: (error: HttpErrorResponse) => {
-          console.log(error.status);
-          console.log(error.message);
-        }*/
         error: (err: HttpErrorResponse) => {
           if (err.status === 400) {
-            alert('Password is in the blacklist!');
+            this.openSnackBar("Password is in the blacklist!", "")
           }
           else if (err.status == 406){
-            alert("New password not match!")
+            this.openSnackBar("New password not match!", "")
           }
           else if (err.status === 500) {
-            alert('Internal server error!');
+            this.openSnackBar("Internal server error!", "")
           }
           else if (err.status == 200){
-            alert("Password recovered successfully!")
+            this.openSnackBar("Password recovered successfully!", "")
           }
         }
       });

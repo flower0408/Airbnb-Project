@@ -22,6 +22,8 @@ import (
 	"unicode"
 )
 
+const EmailServiceUnavailableStatusCode = 55
+
 type AuthHandler struct {
 	service *application.AuthService
 	store   *store.AuthMongoDBStore
@@ -254,13 +256,20 @@ func (handler *AuthHandler) Register(writer http.ResponseWriter, req *http.Reque
 	}
 
 	token, statusCode, err := handler.service.Register(&myUser)
-	if statusCode == 55 {
+	if statusCode == EmailServiceUnavailableStatusCode {
 		writer.WriteHeader(http.StatusFound)
-		http.Error(writer, err.Error(), 302)
+		http.Error(writer, err.Error(), http.StatusFound)
 		return
 	}
 	if err != nil {
-		http.Error(writer, err.Error(), statusCode)
+		switch err.Error() {
+		case "EmailServiceError":
+			http.Error(writer, "Email service is currently unavailable. Please try again later.", http.StatusServiceUnavailable)
+		case "UserServiceError":
+			http.Error(writer, "User service is currently unavailable. Please try again later.", http.StatusServiceUnavailable)
+		default:
+			http.Error(writer, err.Error(), statusCode)
+		}
 		return
 	}
 
@@ -333,7 +342,14 @@ func (handler *AuthHandler) SendRecoveryPasswordToken(writer http.ResponseWriter
 
 	id, statusCode, err := handler.service.SendRecoveryPasswordToken(buf.String())
 	if err != nil {
-		http.Error(writer, err.Error(), statusCode)
+		switch err.Error() {
+		case "EmailServiceError":
+			http.Error(writer, "Email service is currently unavailable. Please try again later.", http.StatusServiceUnavailable)
+		case "UserServiceError":
+			http.Error(writer, "User service is currently unavailable. Please try again later.", http.StatusServiceUnavailable)
+		default:
+			http.Error(writer, err.Error(), statusCode)
+		}
 		return
 	}
 
@@ -456,6 +472,8 @@ func (handler *AuthHandler) ChangeUsername(writer http.ResponseWriter, request *
 			errorMessage = "Wrong new username"
 		case "baseErr":
 			errorMessage = "Internal server error"
+		case "UserServiceError":
+			errorMessage = "User service is currently unavailable. Please try again later."
 		default:
 			errorMessage = "An error occurred"
 		}

@@ -124,7 +124,10 @@ export class MyProfileComponent implements OnInit {
               this.openSnackBar("User with that username already exists!", "")
               //alert('User with that username already exists!');
             }
-            //console.error('Error updating username', error);
+            else if (error.status === 503 ) {
+              this.openSnackBar("User service is currently unavailable. Please try again later.", "");
+            }
+            console.error('Error updating username', error);
           }
         );
     }

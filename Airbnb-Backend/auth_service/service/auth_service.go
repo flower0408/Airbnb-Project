@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/google/uuid"
+	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/gomail.v2"
@@ -38,12 +39,14 @@ var (
 type AuthService struct {
 	store domain.AuthStore
 	cache domain.AuthCache
+	cb    *gobreaker.CircuitBreaker
 }
 
 func NewAuthService(store domain.AuthStore, cache domain.AuthCache) *AuthService {
 	return &AuthService{
 		store: store,
 		cache: cache,
+		cb:    CircuitBreaker("authService"),
 	}
 }
 
@@ -194,6 +197,16 @@ func validateUser(user *domain.User) *ValidationError {
 	return nil
 }
 
+type StatusError struct {
+	Code int
+	Err  error
+}
+
+// Error interface for StatusError for Circuit Breaker
+func (se StatusError) Error() string {
+	return fmt.Sprintf("HTTP Status %d: %s", se.Code, se.Err.Error())
+}
+
 func (service *AuthService) Register(user *domain.User) (string, int, error) {
 
 	if err := validateUser(user); err != nil {
@@ -216,15 +229,35 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 		return "", 409, fmt.Errorf(errors.UsernameExist)
 	}
 
-	/*// PAZI OVDE OVO JE TRENUTNO ZAKOMENTARISANO - PROVERA DA NE POSTOJI USER SA ISTIM MAILOM
+	// Circuit breaker for email existence check
+	/*result, breakerErr := service.cb.Execute(func() (interface{}, error) {
+		userServiceEndpointMail := fmt.Sprintf("http://%s:%s/mailExist/%s", userServiceHost, userServicePort, user.Email)
+		userServiceRequestMail, _ := http.NewRequest("GET", userServiceEndpointMail, nil)
 
-	userServiceEndpointMail := fmt.Sprintf("http://%s:%s/mailExist/%s", userServiceHost, userServicePort, user.Email)
-	userServiceRequestMail, _ := http.NewRequest("GET", userServiceEndpointMail, nil)
-	response, _ := http.DefaultClient.Do(userServiceRequestMail)
-	if response.StatusCode != 404 {
-		return "", 405, fmt.Errorf(errors.EmailAlreadyExist)
+		response, err := http.DefaultClient.Do(userServiceRequestMail)
+		if err != nil {
+			fmt.Println(err)
+			return nil, fmt.Errorf("EmailServiceError")
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusNotFound {
+			return nil, StatusError{Code: http.StatusMethodNotAllowed, Err: fmt.Errorf(errors.EmailAlreadyExist)}
+		}
+
+		return "EmailOK", nil
+	})
+
+	if breakerErr != nil {
+		if statusErr, ok := breakerErr.(StatusError); ok {
+			return "", statusErr.Code, statusErr.Err
+		}
+		return "", http.StatusServiceUnavailable, breakerErr
+	}
+
+	if result != nil {
+		fmt.Println("Received meaningful data:", result)
 	}*/
-
 	pass := []byte(user.Password)
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
 	if err != nil {
@@ -237,52 +270,54 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 		return "", 500, err
 	}
 
-	userServiceEndpoint := fmt.Sprintf("http://%s:%s/", userServiceHost, userServicePort)
-	userServiceRequest, _ := http.NewRequest("POST", userServiceEndpoint, bytes.NewReader(body))
-	responseUser, err := http.DefaultClient.Do(userServiceRequest)
+	// Circuit breaker for user service request
+	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
 
-	if responseUser.StatusCode != 200 {
-		buf := new(strings.Builder)
-		_, _ = io.Copy(buf, responseUser.Body)
-		return "", responseUser.StatusCode, fmt.Errorf(buf.String())
+		userServiceEndpoint := fmt.Sprintf("http://%s:%s/", userServiceHost, userServicePort)
+		userServiceRequest, _ := http.NewRequest("POST", userServiceEndpoint, bytes.NewReader(body))
+
+		responseUser, err := http.DefaultClient.Do(userServiceRequest)
+		if err != nil {
+			return nil, fmt.Errorf("UserServiceError")
+		}
+		defer responseUser.Body.Close()
+
+		if responseUser.StatusCode != http.StatusOK {
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, responseUser.Body)
+			return nil, fmt.Errorf(buf.String())
+		}
+
+		var newUser domain.User
+
+		err = responseToType(responseUser.Body, newUser)
+		if err != nil {
+			return nil, err
+		}
+
+		credentials := domain.Credentials{
+			ID:       newUser.ID,
+			Username: user.Username,
+			Password: user.Password,
+			UserType: user.UserType,
+			Verified: false,
+		}
+
+		err = service.store.Register(&credentials)
+		if err != nil {
+			return nil, err
+		}
+
+		return "UserRegistered", nil
+	})
+
+	if breakerErr != nil {
+		return "UserServiceError", http.StatusServiceUnavailable, breakerErr
 	}
 
-	var newUser domain.User
-	err = responseToType(responseUser.Body, newUser)
-	if err != nil {
-		return "", 500, err
+	if result != nil {
+		fmt.Println("Received meaningful data:", result)
 	}
-
-	credentials := domain.Credentials{
-		ID:       newUser.ID,
-		Username: user.Username,
-		Password: user.Password,
-		UserType: user.UserType,
-		Verified: false,
-	}
-
-	err = service.store.Register(&credentials)
-	if err != nil {
-		return "", 500, err
-	}
-
-	/*  OVDE JE POKUSANO SA ID-EM DA SE URADI ALI KONVERZIJA NE RADI IZ NEKOG RAZLOGA
-	validationToken := uuid.New()
-	log.Printf("User ID (Hex): %s", newUser.ID.Hex())
-	log.Printf("Generated validation token: %s", validationToken.String())
-
-	err = service.cache.PostCacheData(newUser.ID.Hex(), validationToken.String())
-	if err != nil {
-		log.Fatalf("Failed to post validation data to redis: %s", err)
-		return "", 500, err
-	}
-
-	err = sendValidationMail(validationToken, user.Email)
-	if err != nil {
-		return "", 500, err
-	}
-
-	return newUser.ID.Hex(), 200, nil*/
 
 	validationToken := uuid.New()
 	log.Printf("Username: %s", user.Username)
@@ -340,11 +375,7 @@ func (service *AuthService) AccountConfirmation(validation *domain.RegisterValid
 		}
 
 		log.Printf("validation.UserToken: %s", validation.UserToken)
-		/* ovaj deo je takodje vezan za pokusaj sa id-em
-		userID, err := primitive.ObjectIDFromHex(validation.UserToken)
-		user := service.store.GetOneUserByID(userID)
 
-		user.Verified = true*/
 		user, err := service.store.GetOneUser(validation.UserToken)
 		if user == nil {
 			log.Println("User is not found")
@@ -388,61 +419,84 @@ func (service *AuthService) ResendVerificationToken(request *domain.ResendVerifi
 }
 
 func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int, error) {
-
-	userServiceEndpoint := fmt.Sprintf("http://%s:%s/mailExist/%s", userServiceHost, userServicePort, email)
-	userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
-	response, _ := http.DefaultClient.Do(userServiceRequest)
-	if response.StatusCode != 200 {
-		if response.StatusCode == 404 {
-			return "", 404, fmt.Errorf(errors.NotFoundMailError)
+	// Circuit breaker for communication with user service
+	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
+		userServiceEndpoint := fmt.Sprintf("http://%s:%s/mailExist/%s", userServiceHost, userServicePort, email)
+		userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
+		response, err := http.DefaultClient.Do(userServiceRequest)
+		if err != nil {
+			return nil, fmt.Errorf("EmailServiceError")
 		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			if response.StatusCode == http.StatusNotFound {
+				return nil, fmt.Errorf(errors.NotFoundMailError)
+			}
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, response.Body)
+			return nil, fmt.Errorf(buf.String())
+		}
+
+		buf := new(strings.Builder)
+		_, _ = io.Copy(buf, response.Body)
+		userID := buf.String()
+
+		userDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", userServiceHost, userServicePort, userID)
+		userDetailsRequest, _ := http.NewRequest("GET", userDetailsEndpoint, nil)
+		userDetailsResponse, err := http.DefaultClient.Do(userDetailsRequest)
+		if err != nil {
+			return nil, fmt.Errorf("UserServiceError")
+		}
+
+		body, err := ioutil.ReadAll(userDetailsResponse.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		responseBodyString := string(body)
+		log.Printf("User details response: %s", responseBodyString)
+
+		var userDetails UserDetails
+		err = json.Unmarshal(body, &userDetails)
+		if err != nil {
+			fmt.Println("Error unmarshaling JSON:", err)
+			return nil, err
+		}
+
+		fmt.Println("Username:", userDetails.Username)
+
+		userUsernameCredentials, err := service.store.GetOneUser(userDetails.Username)
+		if err != nil {
+			return nil, err
+		}
+		userID = userUsernameCredentials.ID.Hex()
+
+		fmt.Println("Retrieved user ID:", userID)
+
+		recoverUUID, _ := uuid.NewUUID()
+		err = sendRecoverPasswordMail(recoverUUID, email)
+		if err != nil {
+			return nil, err
+		}
+
+		err = service.cache.PostCacheData(userID, recoverUUID.String())
+		if err != nil {
+			return nil, err
+		}
+
+		return userID, nil
+	})
+
+	if breakerErr != nil {
+		return "", http.StatusServiceUnavailable, breakerErr
 	}
 
-	buf := new(strings.Builder)
-	_, _ = io.Copy(buf, response.Body)
-	userID := buf.String()
-
-	userDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", userServiceHost, userServicePort, userID)
-	userDetailsRequest, _ := http.NewRequest("GET", userDetailsEndpoint, nil)
-	userDetailsResponse, _ := http.DefaultClient.Do(userDetailsRequest)
-
-	body, err := ioutil.ReadAll(userDetailsResponse.Body)
-	if err != nil {
-		return "", 500, err
+	if result != nil {
+		fmt.Println("Received meaningful data:", result)
 	}
 
-	responseBodyString := string(body)
-	log.Printf("User details response: %s", responseBodyString)
-
-	var userDetails UserDetails
-	err = json.Unmarshal(body, &userDetails)
-	if err != nil {
-		fmt.Println("Error unmarshaling JSON:", err)
-		return "", 0, nil
-	}
-
-	fmt.Println("Username:", userDetails.Username)
-
-	userUsernameCredentials, err := service.store.GetOneUser(userDetails.Username)
-	if err != nil {
-		return "", 500, err
-	}
-	userID = userUsernameCredentials.ID.Hex()
-
-	fmt.Println("Retrieved user ID:", userID)
-
-	recoverUUID, _ := uuid.NewUUID()
-	err = sendRecoverPasswordMail(recoverUUID, email)
-	if err != nil {
-		return "", 500, err
-	}
-
-	err = service.cache.PostCacheData(userID, recoverUUID.String())
-	if err != nil {
-		return "", 500, err
-	}
-
-	return userID, 200, nil
+	return result.(string), http.StatusOK, nil
 }
 
 type UserDetails struct {
@@ -613,7 +667,6 @@ func (service *AuthService) ChangePassword(password domain.PasswordChange, token
 }
 
 func (service *AuthService) ChangeUsername(username domain.UsernameChange, token string) (string, int, error) {
-
 	parsedToken := authorization.GetToken(token)
 	claims := authorization.GetMapClaims(parsedToken.Bytes())
 
@@ -644,25 +697,38 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 		return "MarshalError", http.StatusInternalServerError, err
 	}
 
-	userServiceEndpoint := fmt.Sprintf("http://%s:%s/changeUsername", userServiceHost, userServicePort)
-	userServiceRequest, _ := http.NewRequest("POST", userServiceEndpoint, bytes.NewReader(body))
-	responseUser, err := http.DefaultClient.Do(userServiceRequest)
+	// Circuit breaker for communication with user service
+	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
+		userServiceEndpoint := fmt.Sprintf("http://%s:%s/changeUsername", userServiceHost, userServicePort)
+		userServiceRequest, _ := http.NewRequest("POST", userServiceEndpoint, bytes.NewReader(body))
+		responseUser, err := http.DefaultClient.Do(userServiceRequest)
 
-	if err != nil {
-		log.Println(err)
-		return "UserServiceError", http.StatusInternalServerError, err
+		if err != nil {
+			fmt.Println(err)
+			return nil, fmt.Errorf("UserServiceError")
+		}
+		defer responseUser.Body.Close()
+
+		if responseUser.StatusCode != http.StatusOK {
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, responseUser.Body)
+			return nil, fmt.Errorf(buf.String())
+		}
+
+		return nil, nil
+	})
+
+	if result != nil {
+
+		fmt.Println("Received meaningful data:", result)
 	}
-	defer responseUser.Body.Close()
-
-	if responseUser.StatusCode != http.StatusOK {
-		buf := new(strings.Builder)
-		_, _ = io.Copy(buf, responseUser.Body)
-		return "UserServiceError", responseUser.StatusCode, fmt.Errorf(buf.String())
+	if breakerErr != nil {
+		return "UserServiceError", http.StatusServiceUnavailable, breakerErr
 	}
 
 	user, err := service.store.GetOneUser(currentUsername)
 	if err != nil {
-		log.Println(err)
+		fmt.Println(err)
 		return "GetUserErr", http.StatusInternalServerError, err
 	}
 	fmt.Println("Retrieved User:", user)
@@ -689,35 +755,6 @@ func (service *AuthService) Login(credentials *domain.Credentials) (string, erro
 
 	if user == nil {
 		return "", fmt.Errorf(errors.InvalidCredentials)
-	}
-
-	if !user.Verified {
-		userServiceEndpoint := fmt.Sprintf("http://%s:%s/%s", userServiceHost, userServicePort, user.ID.Hex())
-		userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
-		response, _ := http.DefaultClient.Do(userServiceRequest)
-		if response.StatusCode != 200 {
-			if response.StatusCode == 404 {
-				return "", fmt.Errorf("user doesn't exist")
-			}
-		}
-
-		var userUser domain.User
-		err := responseToType(response.Body, &userUser)
-		if err != nil {
-			return "", err
-		}
-
-		verify := domain.ResendVerificationRequest{
-			UserToken: user.ID.Hex(),
-			UserMail:  userUser.Email,
-		}
-
-		err = service.ResendVerificationToken(&verify)
-		if err != nil {
-			return "", err
-		}
-
-		return user.ID.Hex(), fmt.Errorf(errors.NotVerificatedUser)
 	}
 
 	passError := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(credentials.Password))
@@ -793,4 +830,31 @@ func blackListChecking(username string) (bool, error) {
 	} else {
 		return false, nil
 	}
+}
+
+func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
+	return gobreaker.NewCircuitBreaker(
+		gobreaker.Settings{
+			Name:        name,
+			MaxRequests: 1,
+			Timeout:     10 * time.Second,
+			Interval:    0,
+			ReadyToTrip: func(counts gobreaker.Counts) bool {
+				return counts.ConsecutiveFailures > 2
+			},
+			OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
+				//fmt.Printf("DEBUG: Before Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
+				log.Printf("Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
+				//fmt.Printf("DEBUG: After Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
+			},
+
+			IsSuccessful: func(err error) bool {
+				if err == nil {
+					return true
+				}
+				errResp, ok := err.(domain.ErrResp)
+				return ok && errResp.StatusCode >= 400 && errResp.StatusCode < 500
+			},
+		},
+	)
 }

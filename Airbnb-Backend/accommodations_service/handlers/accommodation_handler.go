@@ -1,16 +1,31 @@
 package handlers
 
 import (
+	"accommodations_service/authorization"
 	"accommodations_service/data"
+	"accommodations_service/errors"
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
+	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
+	"strings"
+	"time"
+)
+
+var (
+	jwtKey          = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _     = jwt.NewVerifierHS(jwt.HS256, jwtKey)
+	userServiceHost = os.Getenv("USER_SERVICE_HOST")
+	userServicePort = os.Getenv("USER_SERVICE_PORT")
 )
 
 type KeyProduct struct{}
@@ -18,6 +33,7 @@ type KeyProduct struct{}
 type AccommodationHandler struct {
 	logger *log.Logger
 	repo   *data.AccommodationRepo
+	cb     *gobreaker.CircuitBreaker
 }
 
 type ValidationError struct {
@@ -25,31 +41,129 @@ type ValidationError struct {
 }
 
 func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo) *AccommodationHandler {
-	return &AccommodationHandler{l, r}
+	return &AccommodationHandler{
+		logger: l,
+		repo:   r,
+		cb:     CircuitBreaker("accommodationService"),
+	}
 }
 
-func (s *AccommodationHandler) CreateAccommodation(rw http.ResponseWriter, h *http.Request) {
-	accommodation := h.Context().Value(KeyProduct{}).(*data.Accommodation)
+func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, req *http.Request) {
+	bearer := req.Header.Get("Authorization")
+	if bearer == "" {
+		log.Println("Authorization header missing")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	bearerToken := strings.Split(bearer, "Bearer ")
+	if len(bearerToken) != 2 {
+		log.Println("Malformed Authorization header")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tokenString := bearerToken[1]
+	log.Printf("Token: %s\n", tokenString)
+
+	token, err := jwt.Parse([]byte(tokenString), verifier)
+	if err != nil {
+		log.Println("Token parsing error:", err)
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	claims := authorization.GetMapClaims(token.Bytes())
+	log.Printf("Token Claims: %+v\n", claims)
+	username := claims["username"]
+
+	/*userID, statusCode, err := s.getUserIDFromUserService(username)
+	if err != nil {
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}*/
+
+	// Circuit breaker for user service
+	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		userID, statusCode, err := s.getUserIDFromUserService(username)
+		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
+	})
+
+	if breakerErr != nil {
+		log.Println("Circuit breaker open:", breakerErr)
+		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		log.Println("Internal server error: Unexpected result type")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	userID, ok := resultMap["userID"].(string)
+	if !ok {
+		log.Println("Internal server error: User ID not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	statusCode, ok := resultMap["statusCode"].(int)
+	if !ok {
+		log.Println("Internal server error: Status code not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err, ok := resultMap["err"].(error); ok && err != nil {
+		log.Println("Error from user service:", err)
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}
+	accommodation := req.Context().Value(KeyProduct{}).(*data.Accommodation)
+
+	accommodation.OwnerId = userID
 
 	if err := validateAccommodation(accommodation); err != nil {
-		http.Error(rw, err.Message, http.StatusUnprocessableEntity)
+		http.Error(writer, err.Message, http.StatusUnprocessableEntity)
 		return
 	}
 
-	insertedID, err := s.repo.InsertAccommodation(accommodation)
+	err = s.repo.InsertAccommodation(accommodation)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
-		rw.WriteHeader(http.StatusBadRequest)
+		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	s.logger.Println("Inserted ID:", insertedID)
+	writer.WriteHeader(http.StatusOK)
+}
 
-	// Respond with HTTP status 200 and the inserted ID in the response body
-	rw.WriteHeader(http.StatusOK)
-	rw.Header().Set("Content-Type", "application/json")
-	responseJSON := map[string]string{"id": insertedID}
-	json.NewEncoder(rw).Encode(responseJSON)
+func (s *AccommodationHandler) getUserIDFromUserService(username interface{}) (string, int, error) {
+	userServiceEndpoint := fmt.Sprintf("http://%s:%s/getOne/%s", userServiceHost, userServicePort, username)
+	userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
+	response, err := http.DefaultClient.Do(userServiceRequest)
+	if err != nil {
+		return "", http.StatusInternalServerError, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return "", response.StatusCode, fmt.Errorf(errors.NotFoundUserError)
+	}
+
+	var user map[string]interface{}
+	if err := json.NewDecoder(response.Body).Decode(&user); err != nil {
+		return "", http.StatusInternalServerError, err
+	}
+
+	userID, ok := user["id"].(string)
+	if !ok {
+		return "", http.StatusInternalServerError, fmt.Errorf("User ID not found in the response")
+	}
+
+	return userID, http.StatusOK, nil
 }
 
 func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
@@ -210,4 +324,29 @@ func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.
 		h = h.WithContext(ctx)
 		next.ServeHTTP(rw, h)
 	})
+}
+
+func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
+	return gobreaker.NewCircuitBreaker(
+		gobreaker.Settings{
+			Name:        name,
+			MaxRequests: 1,
+			Timeout:     10 * time.Second,
+			Interval:    0,
+			ReadyToTrip: func(counts gobreaker.Counts) bool {
+				return counts.ConsecutiveFailures > 2
+			},
+			OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
+				log.Printf("Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
+			},
+
+			IsSuccessful: func(err error) bool {
+				if err == nil {
+					return true
+				}
+				errResp, ok := err.(data.ErrResp)
+				return ok && errResp.StatusCode >= 400 && errResp.StatusCode < 500
+			},
+		},
+	)
 }

@@ -63,19 +63,19 @@ export class ChangePasswordComponent implements OnInit {
         },
         error: (err: HttpErrorResponse) => {
           if(err.status == 409){
-            alert("Old password not match!")
+            this.openSnackBar("Old password not match!", "")
           }
           else if (err.status === 400) {
-            alert('Password is in the blacklist!');
+            this.openSnackBar("Password is in the blacklist!", "")
           }
           else if (err.status == 406){
-              alert("New password not match!")
+            this.openSnackBar("New password not match!", "")
           }
           else if (err.status === 500) {
-            alert('Internal server error!');
+            this.openSnackBar("Internal server error!", "")
           }
           else if (err.status == 200){
-            alert("Password changed successfully!")
+            this.openSnackBar("Password changed successfully!", "")
           }
         }
       }
