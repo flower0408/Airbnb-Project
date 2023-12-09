@@ -54,5 +54,36 @@ export function UpperLetterValidator(): ValidatorFn {
   };
 }
 
+export function endDayValidator(startDayControlName: string): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const value = control.value;
+    const startDay = control.root.get(startDayControlName)?.value;
+
+    if (!value) {
+      return null;
+    }
+
+    if (isNaN(value) || isNaN(startDay)) {
+      return { invalidNumber: true };
+    }
+
+    const endDayValue = new Date(value.toDateString());
+    const startDayValue = new Date(startDay.toDateString());
+
+    if (
+      endDayValue.getFullYear() < startDayValue.getFullYear() ||
+      (endDayValue.getFullYear() === startDayValue.getFullYear() &&
+        endDayValue.getMonth() < startDayValue.getMonth()) ||
+      (endDayValue.getFullYear() === startDayValue.getFullYear() &&
+        endDayValue.getMonth() === startDayValue.getMonth() &&
+        endDayValue.getDate() <= startDayValue.getDate())
+    ) {
+      return { validator: true };
+    }
+
+    return null;
+  };
+}
+
 
 

@@ -130,14 +130,28 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 		return
 	}
 
-	err = s.repo.InsertAccommodation(accommodation)
+	id := ""
+	id, err = s.repo.InsertAccommodation(accommodation)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
+	responseJSON := map[string]string{"id": id}
+	responseBytes, err := json.Marshal(responseJSON)
+	if err != nil {
+		s.logger.Print("Error encoding response:", err)
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
+	_, err = writer.Write(responseBytes)
+	if err != nil {
+		s.logger.Print("Error writing response:", err)
+	}
 }
 
 func (s *AccommodationHandler) getUserIDFromUserService(username interface{}) (string, int, error) {

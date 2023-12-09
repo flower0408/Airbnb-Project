@@ -31,6 +31,9 @@ import { NgxCaptchaModule } from 'ngx-captcha';
 import { CreateAccommodationComponent } from './components/create-accommodation/create-accommodation.component';
 import { XSSInterceptor } from './services/xss.interceptor';
 import {AccommodationDetailsComponent} from "./components/accommodation-details/accommodation-details.component";
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatInputModule } from '@angular/material/input';
+import { MatNativeDateModule } from '@angular/material/core';
 
 @NgModule({
   declarations: [
@@ -65,7 +68,10 @@ import {AccommodationDetailsComponent} from "./components/accommodation-details/
     MatDividerModule,
     MatSnackBarModule,
     ReactiveFormsModule,
-    NgxCaptchaModule
+    NgxCaptchaModule,
+    MatDatepickerModule,
+    MatInputModule,
+    MatNativeDateModule
   ],
   providers:
   [{

@@ -1,15 +1,21 @@
 package data
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -72,6 +78,32 @@ func (rr *AppointmentRepo) InsertAppointment(appointment *Appointment) error {
 	defer cancel()
 	appointmentsCollection := rr.getCollection()
 
+	if appointment.PricePerGuest != 0 && appointment.PricePerAccommodation != 0 {
+		rr.logger.Printf("Error adding accommodation price and guest price at the same time.")
+		return errors.New("Error adding accommodation price and guest price at the same time.")
+	}
+
+	existingAppointments, err := rr.GetAppointmentsByAccommodation(appointment.AccommodationId)
+	if err != nil {
+		return err
+	}
+
+	for _, existingAppointment := range existingAppointments {
+		for _, existAppointment := range existingAppointment.Available {
+			for _, newAppointment := range appointment.Available {
+				if newAppointment.Equal(existAppointment) {
+					return errors.New("Error adding appointment. Date already exists. ")
+				}
+			}
+		}
+	}
+
+	for _, newAppointment := range appointment.Available {
+		if time.Now().After(newAppointment) {
+			return errors.New("Error adding appointment. Cannot add appointment in the past.")
+		}
+	}
+
 	result, err := appointmentsCollection.InsertOne(ctx, &appointment)
 	if err != nil {
 		rr.logger.Println(err)
@@ -82,30 +114,114 @@ func (rr *AppointmentRepo) InsertAppointment(appointment *Appointment) error {
 }
 
 func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment) error {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	originalAppointment, err := rr.GetAppointmentByID(id)
+	if err != nil {
+		rr.logger.Println("Error retrieving original appointment:", err)
+		return err
+	}
+
+	data := map[string]interface{}{
+		"accommodationId": originalAppointment.AccommodationId,
+		"available":       originalAppointment.Available,
+	}
+	body, err := json.Marshal(data)
+	if err != nil {
+		rr.logger.Println("Error marshalling JSON:", err)
+		return err
+	}
+
 	appointmentsCollection := rr.getCollection()
 
-	objectID, err := primitive.ObjectIDFromHex(id)
+	http.DefaultClient.Timeout = 60 * time.Second
+
+	reservationEndpoint := fmt.Sprintf("http://%s:%s/check", reservationServiceHost, reservationServicePort)
+	reservationRequest, err := http.NewRequest("POST", reservationEndpoint, bytes.NewReader(body))
 	if err != nil {
-		rr.logger.Println("Error converting ID to ObjectID:", err)
+		rr.logger.Println("Error creating reservation request:", err)
 		return err
 	}
 
-	filter := bson.M{"_id": objectID}
-	update := bson.M{"$set": bson.M{
-		"available": appointment.Available,
-	}}
-
-	result, err := appointmentsCollection.UpdateOne(ctx, filter, update)
-	rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
-	rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
-
+	reservationResponse, err := http.DefaultClient.Do(reservationRequest)
 	if err != nil {
-		rr.logger.Println(err)
+		rr.logger.Println("Error sending reservation request:", err)
 		return err
 	}
+	defer reservationResponse.Body.Close()
+
+	if reservationResponse.StatusCode == http.StatusOK {
+		//existingAppointments, err := rr.GetAppointmentsByAccommodation(originalAppointment.AccommodationId)
+		if err != nil {
+			return err
+		}
+
+		/*for _, existingAppointment := range existingAppointments {
+			for _, existAppointment := range existingAppointment.Available {
+				for _, newAppointment := range appointment.Available {
+					if newAppointment.Equal(existAppointment) {
+						return errors.New("Error editing appointment. Date already exists. ")
+					}
+				}
+			}
+		}*/
+
+		for _, newAppointment := range appointment.Available {
+			if time.Now().After(newAppointment) {
+				return errors.New("Error editing appointment. Cannot add appointment in the past.")
+			}
+		}
+
+		if appointment.PricePerGuest != 0 && appointment.PricePerAccommodation != 0 {
+			rr.logger.Printf("Error adding accommodation price and guest price at the same time.")
+			return errors.New("Error adding accommodation price and guest price at the same time.")
+		}
+
+		rr.logger.Println("No reservation found for the appointment. Update allowed.")
+		objectID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			rr.logger.Println("Error converting ID to ObjectID:", err)
+			return err
+		}
+
+		// Ažurirajte podatke u appointmentsCollection
+		filter := bson.M{"_id": objectID}
+		update := bson.M{}
+
+		if appointment.Available != nil {
+			update["available"] = appointment.Available
+		}
+
+		if appointment.PricePerGuest != 0 {
+			update["pricePerGuest"] = appointment.PricePerGuest
+		}
+
+		if appointment.PricePerAccommodation != 0 {
+			update["pricePerAccommodation"] = appointment.PricePerAccommodation
+		}
+
+		updateQuery := bson.M{"$set": update}
+
+		result, err := appointmentsCollection.UpdateOne(ctx, filter, updateQuery)
+
+		rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
+		rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
+
+		if err != nil {
+			rr.logger.Println(err)
+			return err
+		}
+	} else if reservationResponse.StatusCode == http.StatusBadRequest {
+		rr.logger.Println("Reservation exists for the appointment. Update not allowed.")
+
+		return errors.New("Reservation exists for the appointment.")
+	} else {
+		buf := new(strings.Builder)
+		_, _ = io.Copy(buf, reservationResponse.Body)
+		return fmt.Errorf("Reservation service error: %v", buf.String())
+	}
+
 	return nil
 }
 
@@ -178,35 +294,6 @@ func (rr *AppointmentRepo) GetAppointmentsByAccommodation(id string) (Appointmen
 	}
 
 	return appointments, nil
-}
-
-func (rr *AppointmentRepo) EditPrice(id string, appointment *Appointment) error {
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	appointmentsCollection := rr.getCollection()
-
-	objectID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		rr.logger.Println("Error converting ID to ObjectID:", err)
-		return err
-	}
-
-	filter := bson.M{"_id": objectID}
-	update := bson.M{"$set": bson.M{
-		"pricePerGuest":         appointment.PricePerGuest,
-		"pricePerAccommodation": appointment.PricePerAccommodation,
-	}}
-
-	result, err := appointmentsCollection.UpdateOne(ctx, filter, update)
-	rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
-	rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
-
-	if err != nil {
-		rr.logger.Println(err)
-		return err
-	}
-	return nil
 }
 
 func (rr *AppointmentRepo) getCollection() *mongo.Collection {

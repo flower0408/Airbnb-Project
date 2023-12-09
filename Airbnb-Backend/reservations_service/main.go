@@ -53,6 +53,14 @@ func main() {
 	createReservation.HandleFunc("/reservations", reservationHandler.CreateReservation)
 	createReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
 
+	cancelReservation := router.Methods(http.MethodDelete).Subrouter()
+	cancelReservation.HandleFunc("/cancelReservation/{id}", reservationHandler.CancelReservation)
+	//cancelReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
+	checkReservation := router.Methods(http.MethodPost).Subrouter()
+	checkReservation.HandleFunc("/check", reservationHandler.CheckReservation)
+	//checkReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
 	getReservationByUser := router.Methods(http.MethodGet).Subrouter()
 	getReservationByUser.HandleFunc("/reservationsByUser/{id}", reservationHandler.GetReservationByUser)
 	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
@@ -76,10 +84,6 @@ func main() {
 	updateAppointment := router.Methods(http.MethodPatch).Subrouter()
 	updateAppointment.HandleFunc("/appointments/{id}", appointmentHandler.UpdateAppointment)
 	updateAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
-
-	updatePrice := router.Methods(http.MethodPatch).Subrouter()
-	updatePrice.HandleFunc("/appointments/editPrice/{id}", appointmentHandler.UpdatePrice)
-	updatePrice.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
 	//Initialize the server
 	server := http.Server{
@@ -120,7 +124,7 @@ func MiddlewareContentTypeSet(next http.Handler) http.Handler {
 		rw.Header().Set("X-Content-Type-Options", "nosniff")
 		rw.Header().Set("X-Frame-Options", "DENY")
 
-		rw.Header().Set("Content-Security-Policy", "script-src 'self' https://cdn.jsdelivr.net https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com 'unsafe-inline'; font-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: https://i.ibb.co;")
+		rw.Header().Set("Content-Security-Policy", "script-src 'self' https://code.jquery.com https://cdn.jsdelivr.net https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' https://code.jquery.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com 'unsafe-inline'; font-src 'self' https://code.jquery.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: https://code.jquery.com https://i.ibb.co;")
 
 		next.ServeHTTP(rw, h)
 	})
