@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit } from '@angular/core';
 import { AbstractControl, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Accommodation } from 'src/app/models/accommodation.model';
 import { User } from 'src/app/models/user.model';
@@ -63,13 +63,12 @@ export class CreateAccommodationComponent implements OnInit{
 
   submitted = false;
 
-  onSubmit(){
+  onSubmit() {
     this.submitted = true;
-
+  
     if (this.accommodationForm.valid) {
-
       const formValues = this.accommodationForm.value;
-
+  
       const newAccommodation: Accommodation = {
         name: formValues.name,
         description: formValues.description,
@@ -85,68 +84,54 @@ export class CreateAccommodationComponent implements OnInit{
         maxGuest: formValues.Maxguest,
         ownerId: '',
       };
-
-
-
+  
       this.accommodationService.createAccommodation(newAccommodation).subscribe(
-        () => {
-
+        (id:any) => {
+          this.responseId = id;
           let elements = document.getElementsByClassName("drp-selected");
-          let dateRange:any;
+          let dateRange: any;
           for (var i = 0; i < elements.length; i++) {
             dateRange = elements[i].textContent;
             console.log(dateRange);
           }
-
+  
           let [start, end] = dateRange!.split(" - ");
-
+  
           let datesInRange: Date[] = getDatesInRange(start, end);
           console.log(datesInRange);
-
+  
           const newAppointment: Appointment = {
-            id:"",
+            id: "",
             available: datesInRange,
-            accommodationId: "",
+            accommodationId: this.responseId.id,
             pricePerGuest: 0,
             pricePerAccommodation: 0
           };
-
+  
           let selectedRadio = getSelectedRadio();
           console.log(selectedRadio);
-
-          if(selectedRadio === 'Guest price'){
+  
+          if (selectedRadio === 'Guest price') {
             newAppointment.pricePerGuest = formValues.price;
-          }else{
+          } else {
             newAppointment.pricePerAccommodation = formValues.price;
           }
-
+  
           this.appointmentService.createAppointment(newAppointment).subscribe(
             () => {
-
-              this.openSnackBar("Accommodation created successfully!", "")
+              this.openSnackBar("Accommodation created successfully!", "");
               console.log('Appointment created successfully!');
-              this.router.navigate(['/Main-Page'])
-
+              this.router.navigate(['/Main-Page']);
             },
             (error) => {
-              this.openSnackBar("Error creating accommodation!", "")
+              this.openSnackBar("Error creating accommodation!", "");
               console.error('Error creating appointment:', error);
             }
           );
-
         },
         (error) => {
           console.error('Error creating accommodation:', error);
-        }
-      );
-
-          this.openSnackBar("Accommodation created successfully!", "");
-          console.log('Accommodation created successfully!');
-          this.router.navigate(['/Main-Page']);
-        },
-        (error) => {
-          console.error('Error creating accommodation:', error);
-
+  
           if (error instanceof HttpErrorResponse) {
             if (error.status === 503) {
               this.openSnackBar("User service is currently unavailable. Please try again later.", "");
@@ -163,10 +148,9 @@ export class CreateAccommodationComponent implements OnInit{
           }
         }
       );
-
     }
   }
-
+  
   openSnackBar(message: string, action: string) {
     this._snackBar.open(message, action,  {
       duration: 3500
