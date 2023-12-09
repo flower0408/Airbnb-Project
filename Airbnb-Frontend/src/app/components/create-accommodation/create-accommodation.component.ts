@@ -8,6 +8,7 @@ import { UpperLetterValidator } from 'src/app/services/customValidators';
 import { MaxGuestValidator } from 'src/app/services/customValidators';
 import {MatSnackBar} from "@angular/material/snack-bar";
 import {Router} from "@angular/router";
+import {HttpErrorResponse} from "@angular/common/http";
 
 @Component({
   selector: 'app-create-accommodation',
@@ -75,8 +76,22 @@ export class CreateAccommodationComponent implements OnInit {
           this.router.navigate(['/Main-Page']);
         },
         (error) => {
-          this.openSnackBar("Error creating accommodation!", "");
           console.error('Error creating accommodation:', error);
+
+          if (error instanceof HttpErrorResponse) {
+            if (error.status === 503) {
+              this.openSnackBar("User service is currently unavailable. Please try again later.", "");
+            }
+            else if (error.status === 502) {
+              this.openSnackBar("User service is currently unavailable. Please try again later.", "");
+            }
+            else {
+              this.openSnackBar(`Error creating accommodation: ${error.message}`, "");
+            }
+          } else {
+            console.error('Error creating accommodation:', error);
+           // this.openSnackBar(`Unexpected error: ${error}`, "");
+          }
         }
       );
 

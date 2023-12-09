@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
+	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
@@ -17,6 +18,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -31,6 +33,7 @@ type KeyProduct struct{}
 type AccommodationHandler struct {
 	logger *log.Logger
 	repo   *data.AccommodationRepo
+	cb     *gobreaker.CircuitBreaker
 }
 
 type ValidationError struct {
@@ -38,7 +41,11 @@ type ValidationError struct {
 }
 
 func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo) *AccommodationHandler {
-	return &AccommodationHandler{l, r}
+	return &AccommodationHandler{
+		logger: l,
+		repo:   r,
+		cb:     CircuitBreaker("accommodationService"),
+	}
 }
 
 func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, req *http.Request) {
@@ -70,12 +77,50 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	log.Printf("Token Claims: %+v\n", claims)
 	username := claims["username"]
 
-	userID, statusCode, err := s.getUserIDFromUserService(username)
+	/*userID, statusCode, err := s.getUserIDFromUserService(username)
 	if err != nil {
 		http.Error(writer, err.Error(), statusCode)
 		return
+	}*/
+
+	// Circuit breaker for user service
+	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		userID, statusCode, err := s.getUserIDFromUserService(username)
+		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
+	})
+
+	if breakerErr != nil {
+		log.Println("Circuit breaker open:", breakerErr)
+		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
+		return
 	}
 
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		log.Println("Internal server error: Unexpected result type")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	userID, ok := resultMap["userID"].(string)
+	if !ok {
+		log.Println("Internal server error: User ID not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	statusCode, ok := resultMap["statusCode"].(int)
+	if !ok {
+		log.Println("Internal server error: Status code not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err, ok := resultMap["err"].(error); ok && err != nil {
+		log.Println("Error from user service:", err)
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}
 	accommodation := req.Context().Value(KeyProduct{}).(*data.Accommodation)
 
 	accommodation.OwnerId = userID
@@ -279,4 +324,29 @@ func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.
 		h = h.WithContext(ctx)
 		next.ServeHTTP(rw, h)
 	})
+}
+
+func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
+	return gobreaker.NewCircuitBreaker(
+		gobreaker.Settings{
+			Name:        name,
+			MaxRequests: 1,
+			Timeout:     10 * time.Second,
+			Interval:    0,
+			ReadyToTrip: func(counts gobreaker.Counts) bool {
+				return counts.ConsecutiveFailures > 2
+			},
+			OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
+				log.Printf("Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
+			},
+
+			IsSuccessful: func(err error) bool {
+				if err == nil {
+					return true
+				}
+				errResp, ok := err.(data.ErrResp)
+				return ok && errResp.StatusCode >= 400 && errResp.StatusCode < 500
+			},
+		},
+	)
 }
