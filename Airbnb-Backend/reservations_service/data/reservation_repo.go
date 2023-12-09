@@ -111,6 +111,29 @@ func (sr *ReservationRepo) InsertReservation(reservation *Reservation) error {
 		return err
 	}
 
+	for _, reservedDate := range reservation.Period {
+		dateFound := false
+
+		for _, appointment := range appointments {
+			for _, availableDate := range appointment.Available {
+				if reservedDate.Equal(availableDate) {
+					dateFound = true
+					break
+				}
+			}
+		}
+
+		if !dateFound {
+			return errors.New("Can not reserve a date that does not exist in appointments.")
+		}
+	}
+
+	for _, newReservation := range reservation.Period {
+		if time.Now().After(newReservation) {
+			return errors.New("Error creating reservation. Cannot create reservation in the past.")
+		}
+	}
+
 	var sum int
 
 	for _, appointment := range appointments {

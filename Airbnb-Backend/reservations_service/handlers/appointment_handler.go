@@ -22,8 +22,19 @@ func (r *AppointmentHandler) CreateAppointment(rw http.ResponseWriter, h *http.R
 	appointment := h.Context().Value(KeyProduct{}).(*data.Appointment)
 	err := r.appointmentRepo.InsertAppointment(appointment)
 	if err != nil {
-		r.logger.Print("Database exception: ", err)
-		rw.WriteHeader(http.StatusBadRequest)
+		if err.Error() == "Error adding appointment. Date already exists. " {
+			r.logger.Print("Error adding appointment. Date already exists. ")
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Error adding appointment. Date already exists. "))
+		} else if err.Error() == "Error adding appointment. Cannot add appointment in the past." {
+			r.logger.Print("Error adding appointment. Cannot add appointment in the past.")
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Error adding appointment. Cannot add appointment in the past."))
+		} else {
+			r.logger.Print("Database exception: ", err)
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Error creating reservation."))
+		}
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
@@ -79,6 +90,14 @@ func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.R
 		if err.Error() == "Reservation exists for the appointment." {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte("Reservation exists for the appointment. Update not allowed."))
+		} else if err.Error() == "Error editing appointment. Date already exists. " {
+			r.logger.Print("Error editing appointment. Date already exists. ")
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Error editing appointment. Date already exists. "))
+		} else if err.Error() == "Error editing appointment. Cannot add appointment in the past." {
+			r.logger.Print("Error editing appointment. Cannot add appointment in the past.")
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Error editing appointment. Cannot add appointment in the past."))
 		} else {
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte("Error updating appointment."))

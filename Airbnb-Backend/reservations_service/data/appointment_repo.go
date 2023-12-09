@@ -83,6 +83,27 @@ func (rr *AppointmentRepo) InsertAppointment(appointment *Appointment) error {
 		return errors.New("Error adding accommodation price and guest price at the same time.")
 	}
 
+	existingAppointments, err := rr.GetAppointmentsByAccommodation(appointment.AccommodationId)
+	if err != nil {
+		return err
+	}
+
+	for _, existingAppointment := range existingAppointments {
+		for _, existAppointment := range existingAppointment.Available {
+			for _, newAppointment := range appointment.Available {
+				if newAppointment.Equal(existAppointment) {
+					return errors.New("Error adding appointment. Date already exists. ")
+				}
+			}
+		}
+	}
+
+	for _, newAppointment := range appointment.Available {
+		if time.Now().After(newAppointment) {
+			return errors.New("Error adding appointment. Cannot add appointment in the past.")
+		}
+	}
+
 	result, err := appointmentsCollection.InsertOne(ctx, &appointment)
 	if err != nil {
 		rr.logger.Println(err)
@@ -130,8 +151,33 @@ func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment
 	}
 	defer reservationResponse.Body.Close()
 
-	// Proveri status odgovora servisa za rezervacije
 	if reservationResponse.StatusCode == http.StatusOK {
+		existingAppointments, err := rr.GetAppointmentsByAccommodation(originalAppointment.AccommodationId)
+		if err != nil {
+			return err
+		}
+
+		for _, existingAppointment := range existingAppointments {
+			for _, existAppointment := range existingAppointment.Available {
+				for _, newAppointment := range appointment.Available {
+					if newAppointment.Equal(existAppointment) {
+						return errors.New("Error editing appointment. Date already exists. ")
+					}
+				}
+			}
+		}
+
+		for _, newAppointment := range appointment.Available {
+			if time.Now().After(newAppointment) {
+				return errors.New("Error editing appointment. Cannot add appointment in the past.")
+			}
+		}
+
+		if appointment.PricePerGuest != 0 && appointment.PricePerAccommodation != 0 {
+			rr.logger.Printf("Error adding accommodation price and guest price at the same time.")
+			return errors.New("Error adding accommodation price and guest price at the same time.")
+		}
+
 		rr.logger.Println("No reservation found for the appointment. Update allowed.")
 		objectID, err := primitive.ObjectIDFromHex(id)
 		if err != nil {

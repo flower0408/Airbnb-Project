@@ -31,6 +31,14 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 			s.logger.Print("No one else can book accommodation for the reserved dates. ")
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte("No one else can book accommodation for the reserved dates"))
+		} else if err.Error() == "Can not reserve a date that does not exist in appointments." {
+			s.logger.Print("Can not reserve a date that does not exist in appointments.")
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Can not reserve a date that does not exist in appointments."))
+		} else if err.Error() == "Error creating reservation. Cannot create reservation in the past." {
+			s.logger.Print("Error creating reservation. Cannot create reservation in the past.")
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Error creating reservation. Cannot create reservation in the past."))
 		} else {
 			s.logger.Print("Database exception: ", err)
 			rw.WriteHeader(http.StatusBadRequest)
