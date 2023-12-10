@@ -122,14 +122,18 @@
   <form [formGroup]="editAppointmentForm" (ngSubmit)="onSubmitEditAppointment()">
     <h2 style="text-align: center;color: red;">Edit appointment</h2>
 
-    <select class="form-select" aria-label="Default select example" formControlName="selectedAppointment">
-      <option *ngFor="let ap of appointments; let i = index" [ngValue]="i">{{ ap.available[0] | date:'mediumDate':'UTC' }} - {{ ap.available[ap.available.length - 1] | date:'mediumDate':'UTC' }}</option>
+    <select class="form-select" aria-label="Default select example" formControlName="selectedAppointment" (change)="onSelectedAppointmentChange($event)">
+      <option *ngFor="let ap of appointments; let i = index" [ngValue]="i">
+        {{ ap.available[0] | date:'mediumDate':'UTC' }} - {{ ap.available[ap.available.length - 1] | date:'mediumDate':'UTC' }}
+      </option>
     </select>
+
+
 
     <label>New start day</label>
     <mat-form-field appearance="outline">
     <input matInput formControlName="startDayEdit"
-           [matDatepickerFilter]="dateFilter2"
+           [matDatepickerFilter]="dateFilter3"
            [matDatepicker]="releasedAtPicker5">
     <mat-datepicker-toggle matSuffix [for]="releasedAtPicker5"></mat-datepicker-toggle>
     <mat-datepicker #releasedAtPicker5></mat-datepicker>
@@ -138,7 +142,7 @@
     <label>New end day</label>
     <mat-form-field appearance="outline">
       <input matInput formControlName="endDayEdit"
-             [matDatepickerFilter]="dateFilter2"
+             [matDatepickerFilter]="dateFilter3"
              [matDatepicker]="releasedAtPicker6">
       <mat-datepicker-toggle matSuffix [for]="releasedAtPicker6"></mat-datepicker-toggle>
       <mat-datepicker #releasedAtPicker6></mat-datepicker>
