@@ -152,20 +152,26 @@ func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment
 	defer reservationResponse.Body.Close()
 
 	if reservationResponse.StatusCode == http.StatusOK {
-		//existingAppointments, err := rr.GetAppointmentsByAccommodation(originalAppointment.AccommodationId)
+		existingAppointments, err := rr.GetAppointmentsByAccommodation(originalAppointment.AccommodationId)
 		if err != nil {
 			return err
 		}
 
-		/*for _, existingAppointment := range existingAppointments {
+		for _, existingAppointment := range existingAppointments {
+			if existingAppointment.ID == originalAppointment.ID {
+				continue
+			}
 			for _, existAppointment := range existingAppointment.Available {
 				for _, newAppointment := range appointment.Available {
+
 					if newAppointment.Equal(existAppointment) {
 						return errors.New("Error editing appointment. Date already exists. ")
 					}
+
 				}
 			}
-		}*/
+
+		}
 
 		for _, newAppointment := range appointment.Available {
 			if time.Now().After(newAppointment) {
