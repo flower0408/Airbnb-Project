@@ -22,6 +22,14 @@
     </ul>
   </div>
 
+  <div class="detail guests">
+    <span class="detail-label">Guests:</span>
+    <span class="detail-value">
+      {{ accommodation.minGuest }} - {{ accommodation.maxGuest }} guests
+    </span>
+  </div>
+
+
   <form *ngIf="userRole === 'Guest'" [formGroup]="reservationForm" (ngSubmit)="onSubmit()">
     <label>Start day</label>
     <mat-form-field appearance="outline">
@@ -43,16 +51,16 @@
 
     <div style="border-bottom: 1px solid gray;" class="container" *ngIf="reservationForm.get('startDay')?.value !== '' && reservationForm.get('endDay')?.value !== ''">
       <h2 style="color: rgb(67, 67, 67);">Total price: {{sum}}€</h2>
-    </div>    
+    </div>
 
     <div class="container" style="padding-top: 25px;">
       <button type="submit" class="formbold-btn">Create reservation</button>
     </div>
-    
+
   </form>
 </div>
 
-<div class="container" *ngIf="userRole === 'Host'">
+<div class="container" *ngIf="userRole === 'Host' && hostId === accommodation?.ownerId">
   <button type="button" (click)="moreOptions()" class="btn btn-outline-primary">More options</button>
 </div>
 
@@ -79,32 +87,32 @@
     </mat-form-field>
 
     <div class="formbold-mb-5" *ngIf="inputGuestPrice">
-      <input 
-        type="number" 
+      <input
+        type="number"
         class="formbold-form-input"
         formControlName="guestPrice"
         placeholder="Guest price"
-        id="guestPrice" 
-        name="guestPrice" 
+        id="guestPrice"
+        name="guestPrice"
       />
-      
+
     </div>
     <div class="formbold-mb-5" *ngIf="inputAccommodationPrice">
-      <input 
-        type="number" 
+      <input
+        type="number"
         class="formbold-form-input"
         formControlName="accommodationPrice"
         placeholder="Accommodation price"
-        id="accommodationPrice" 
-        name="accommodationPrice" 
+        id="accommodationPrice"
+        name="accommodationPrice"
       />
-      
+
     </div>
 
     <div class="container">
       <button type="submit" class="btn btn-primary">Create appointment</button>
     </div>
-    
+
   </form>
 
 </div>
@@ -115,7 +123,7 @@
     <h2 style="text-align: center;color: red;">Edit appointment</h2>
 
     <select class="form-select" aria-label="Default select example" formControlName="selectedAppointment">
-      <option *ngFor="let ap of appointments; let i = index" [ngValue]="i">{{ ap.available[0] }} - {{ ap.available[ap.available.length - 1] }}</option>
+      <option *ngFor="let ap of appointments; let i = index" [ngValue]="i">{{ ap.available[0] | date:'mediumDate':'UTC' }} - {{ ap.available[ap.available.length - 1] | date:'mediumDate':'UTC' }}</option>
     </select>
 
     <label>New start day</label>
@@ -137,32 +145,32 @@
     </mat-form-field>
 
     <div class="formbold-mb-5" *ngIf="inputGuestPrice">
-      <input 
-        type="number" 
+      <input
+        type="number"
         class="formbold-form-input"
         formControlName="guestPriceEdit"
         placeholder="Guest price"
-        id="guestPriceEdit" 
-        name="guestPriceEdit" 
+        id="guestPriceEdit"
+        name="guestPriceEdit"
       />
-      
+
     </div>
     <div class="formbold-mb-5" *ngIf="inputAccommodationPrice">
-      <input 
-        type="number" 
+      <input
+        type="number"
         class="formbold-form-input"
         formControlName="accommodationPriceEdit"
         placeholder="Accommodation price"
-        id="accommodationPriceEdit" 
-        name="accommodationPriceEdit" 
+        id="accommodationPriceEdit"
+        name="accommodationPriceEdit"
       />
-      
+
     </div>
 
     <div class="container">
       <button type="submit" class="btn btn-danger">Edit appointment</button>
     </div>
-    
+
   </form>
 
 </div>

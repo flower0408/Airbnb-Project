@@ -34,7 +34,7 @@ export class AccommodationDetailsComponent implements OnInit {
   inputAccommodationPrice = false;
   inputGuestPrice = false;
   sum: number = 0
-
+  hostId: string | undefined;
 
   constructor(private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {}
 
@@ -46,32 +46,32 @@ export class AccommodationDetailsComponent implements OnInit {
     if (!date) {
       return false;
     }
-  
+
     const formattedDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  
+
     //console.log(formattedDate);
     //console.log(this.allDates);
 
-    return this.allDates.some(allowedDate => 
+    return this.allDates.some(allowedDate =>
       new Date(allowedDate).getUTCDate() === formattedDate.getUTCDate() &&
       new Date(allowedDate).getUTCMonth() === formattedDate.getUTCMonth() &&
       new Date(allowedDate).getUTCFullYear() === formattedDate.getUTCFullYear()
     );
   };
-  
+
   dateFilter2 = (date: Date | null): boolean => {
     if (!date) {
       return false;
     }
-  
+
     const currentDate = new Date();
     const formattedDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  
+
     // Check if the date is in the past
     if (formattedDate < currentDate) {
       return false;
     }
-  
+
     return !this.allDates.some(
       (allowedDate) =>
         new Date(allowedDate).getUTCDate() === formattedDate.getUTCDate() &&
@@ -79,13 +79,13 @@ export class AccommodationDetailsComponent implements OnInit {
         new Date(allowedDate).getUTCFullYear() === formattedDate.getUTCFullYear()
     );
   };
-  
+
 
   // Handle datepicker value change
   addEvent(event: MatDatepickerInputEvent<Date>) {
     console.log(event.value);
   }
-  
+
   ngOnInit(): void {
 
     this.reservationForm = this.fb.group({
@@ -121,6 +121,15 @@ export class AccommodationDetailsComponent implements OnInit {
 
     this.userRole = this.userService.getRoleFromToken();
 
+    this.userService.getUser().subscribe(
+      (user: User) => {
+        this.hostId = user.id;
+      },
+      (error) => {
+        console.error('Error getting user:', error);
+      }
+    );
+
   }
 
   getAccommodationById(): void {
@@ -150,12 +159,12 @@ export class AccommodationDetailsComponent implements OnInit {
           })
           console.log(this.appointments);
           console.log(this.allDates);
-          
+
           if(this.appointments[0].pricePerAccommodation !== 0){
             this.inputAccommodationPrice = true;
           }else{
             this.inputGuestPrice = true;
-          } 
+          }
 
         },
         (error) => {
@@ -185,13 +194,13 @@ export class AccommodationDetailsComponent implements OnInit {
 
               let datesInRange: Date[] = getDatesInRange(formValues.startDay, formValues.endDay);
               console.log(datesInRange);
-              
+
 
               newReservation.period = datesInRange
 
               this.reservationService.createReservation(newReservation).subscribe(
                 () => {
-          
+
                   this.openSnackBar("Reservation created successfully!", "")
                   console.log('Reservation created successfully!');
                   setTimeout(() => {
@@ -231,24 +240,24 @@ export class AccommodationDetailsComponent implements OnInit {
         newAppointment.pricePerAccommodation = formValues.accommodationPrice
       }else{
         newAppointment.pricePerGuest = formValues.guestPrice
-      } 
+      }
 
 
       let datesInRange: Date[] = getDatesInRange(formValues.startDay, formValues.endDay);
       console.log(datesInRange);
-              
+
 
       newAppointment.available = datesInRange
 
       this.appointmentService.createAppointment(newAppointment).subscribe(
         () => {
-          
+
           this.openSnackBar("Appointment created successfully!", "")
           console.log('Appointment created successfully!');
           setTimeout(() => {
             window.location.reload();
           }, 2000);
-          
+
         },
         (error) => {
           this.openSnackBar("Error creating appointment!", "")
@@ -283,13 +292,13 @@ export class AccommodationDetailsComponent implements OnInit {
 
       this.appointmentService.editAppointment(appointmentForEdit.id, appointmentForEdit).subscribe(
         () => {
-          
+
           this.openSnackBar("Appointment edited successfully!", "")
           console.log('Appointment edited successfully!');
           setTimeout(() => {
             window.location.reload();
           }, 2000);
-          
+
         },
         (error) => {
           this.openSnackBar("Error editing appointment!", "")
@@ -316,12 +325,12 @@ export class AccommodationDetailsComponent implements OnInit {
   handleFormChanges() {
     const startDayValue = this.reservationForm.get('startDay')?.value;
     const endDayValue = this.reservationForm.get('endDay')?.value;
-  
+
     if (startDayValue && endDayValue) {
       const datesInRange: Date[] = getDatesInRange(startDayValue, endDayValue);
-  
-      this.sum = 0; 
-  
+
+      this.sum = 0;
+
       this.appointments.forEach(appointment => {
         appointment.available.forEach(date => {
           date = new Date(date)
@@ -341,7 +350,7 @@ export class AccommodationDetailsComponent implements OnInit {
       console.log('Total price:', this.sum);
     }
   }
-  
+
 
 
 }
