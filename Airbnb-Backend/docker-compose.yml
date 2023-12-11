@@ -87,6 +87,7 @@ services:
       RESERVATIONS_SERVICE_HOST: ${RESERVATIONS_SERVICE_HOST}
       APPOINTMENTS_DB_HOST: ${APPOINTMENTS_DB_HOST}
       APPOINTMENTS_DB_PORT: ${APPOINTMENTS_DB_PORT}
+      SECRET_KEY: ${SECRET_KEY}
     depends_on:
       - reservations_db
     networks:
