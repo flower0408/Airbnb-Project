@@ -9,4 +9,5 @@ type AuthStore interface {
 	GetOneUserByID(id primitive.ObjectID) *Credentials
 	UpdateUser(user *Credentials) error
 	UpdateUserUsername(user *Credentials) error
+	DeleteUser(username string) error
 }

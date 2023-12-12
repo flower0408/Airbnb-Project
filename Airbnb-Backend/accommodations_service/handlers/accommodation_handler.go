@@ -22,10 +22,12 @@ import (
 )
 
 var (
-	jwtKey          = []byte(os.Getenv("SECRET_KEY"))
-	verifier, _     = jwt.NewVerifierHS(jwt.HS256, jwtKey)
-	userServiceHost = os.Getenv("USER_SERVICE_HOST")
-	userServicePort = os.Getenv("USER_SERVICE_PORT")
+	jwtKey                 = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _            = jwt.NewVerifierHS(jwt.HS256, jwtKey)
+	userServiceHost        = os.Getenv("USER_SERVICE_HOST")
+	userServicePort        = os.Getenv("USER_SERVICE_PORT")
+	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
+	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
 )
 
 type KeyProduct struct{}
@@ -154,6 +156,54 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	}
 }
 
+func extractBearerToken(authHeader string) string {
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return ""
+	}
+
+	return parts[1]
+}
+
+func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	ownerID := vars["ownerID"]
+
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/deleteAppointments/%s", reservationServiceHost, reservationServicePort, ownerID)
+	reservationServiceRequest, _ := http.NewRequest(http.MethodDelete, reservationServiceEndpoint, nil)
+	reservationServiceRequest.Header.Set("Authorization", "Bearer "+authToken)
+	response, err := http.DefaultClient.Do(reservationServiceRequest)
+	if err != nil {
+		http.Error(rw, "Error communicating with reservation service", http.StatusInternalServerError)
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		http.Error(rw, "Error deleting appointments in reservation service", http.StatusInternalServerError)
+		return
+	}
+
+	err = s.repo.DeleteAccommodationsByOwner(ownerID)
+	if err != nil {
+		s.logger.Print("Database exception")
+		http.Error(rw, "Error deleting accommodations", http.StatusInternalServerError)
+		return
+	}
+
+	rw.WriteHeader(http.StatusOK)
+	rw.Write([]byte("Accommodations deleted successfully"))
+}
+
 func (s *AccommodationHandler) getUserIDFromUserService(username interface{}) (string, int, error) {
 	userServiceEndpoint := fmt.Sprintf("http://%s:%s/getOne/%s", userServiceHost, userServicePort, username)
 	userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
@@ -211,6 +261,25 @@ func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) 
 
 	rw.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(rw).Encode(accommodation)
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) GetAccommodationsByOwner(rw http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	ownerID := vars["ownerID"]
+
+	accommodations, err := s.repo.GetAccommodationsByOwner(ownerID)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(accommodations)
+
+	//resp, err := json.Marshal(accommodations)
+	//_, err = rw.Write(resp)
 	rw.WriteHeader(http.StatusOK)
 }
 

@@ -15,6 +15,8 @@ services:
       USER_DB_HOST: ${USER_DB_HOST}
       USER_DB_PORT: ${USER_DB_PORT}
       USER_SERVICE_PORT: ${USER_SERVICE_PORT}
+      RESERVATIONS_SERVICE_HOST: ${RESERVATIONS_SERVICE_HOST}
+      RESERVATIONS_SERVICE_PORT: ${RESERVATIONS_SERVICE_PORT}
       SECRET_KEY: ${SECRET_KEY}
     depends_on:
       - user_db
@@ -41,6 +43,10 @@ services:
       SECRET_CAPTCHA_KEY: ${SECRET_CAPTCHA_KEY}
       USER_SERVICE_HOST: ${USER_SERVICE_HOST}
       USER_SERVICE_PORT: ${USER_SERVICE_PORT}
+      RESERVATIONS_SERVICE_PORT: ${RESERVATIONS_SERVICE_PORT}
+      RESERVATIONS_SERVICE_HOST: ${RESERVATIONS_SERVICE_HOST}
+      ACCOMMODATIONS_SERVICE_PORT: ${ACCOMMODATIONS_SERVICE_PORT}
+      ACCOMMODATIONS_SERVICE_HOST: ${ACCOMMODATIONS_SERVICE_HOST}
       SMTP_AUTH_MAIL: ${SMTP_AUTH_MAIL}
       SMTP_AUTH_PASSWORD: ${SMTP_AUTH_PASSWORD}
     depends_on:
@@ -63,6 +69,8 @@ services:
       ACCOMMODATIONS_DB_HOST: ${ACCOMMODATIONS_DB_HOST}
       ACCOMMODATIONS_DB_PORT: ${ACCOMMODATIONS_DB_PORT}
       ACCOMMODATIONS_SERVICE_PORT: ${ACCOMMODATIONS_SERVICE_PORT}
+      RESERVATIONS_SERVICE_HOST: ${RESERVATIONS_SERVICE_HOST}
+      RESERVATIONS_SERVICE_PORT: ${RESERVATIONS_SERVICE_PORT}
       USER_SERVICE_HOST: ${USER_SERVICE_HOST}
       USER_SERVICE_PORT: ${USER_SERVICE_PORT}
       SECRET_KEY: ${SECRET_KEY}
@@ -85,10 +93,16 @@ services:
       RESERVATIONS_DB_PORT: ${RESERVATIONS_DB_PORT}
       RESERVATIONS_SERVICE_PORT: ${RESERVATIONS_SERVICE_PORT}
       RESERVATIONS_SERVICE_HOST: ${RESERVATIONS_SERVICE_HOST}
+      ACCOMMODATIONS_SERVICE_HOST: ${ACCOMMODATIONS_SERVICE_HOST}
+      ACCOMMODATIONS_SERVICE_PORT: ${ACCOMMODATIONS_SERVICE_PORT}
       APPOINTMENTS_DB_HOST: ${APPOINTMENTS_DB_HOST}
       APPOINTMENTS_DB_PORT: ${APPOINTMENTS_DB_PORT}
+      # depends_on:
+      # - reservations_db
+    # Pokretanje reservation servisa tek kada je baza uspesno pokrenuta
     depends_on:
-      - reservations_db
+      reservations_db:
+        condition: service_healthy
     networks:
       - network
 
@@ -130,6 +144,21 @@ services:
     image: cassandra
     container_name: reservations_db
     restart: on-failure
+    # Healthcheck za cassandra bazu podataka
+    # Docker healtcheck - checks if database is "alive"
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster'"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+    # Preporuka da dodatno podesite healtcheck i za ostale baze
+    # (healtcheck provere mozete naci u primerima sa vezbi)
+    # Dodatno, bilo bi dobro da konfigurisete volumes za svaku bazu
+    # kako biste imali sacuvane podatke i izmedju dva pokretanja
+    # recimo:
+    volumes:
+      - reservations_db_store:/var/lib/cassandra/data
+    # I zatim navodite u volumes
     networks:
       - network
 
@@ -155,7 +184,8 @@ services:
       - auth_cache:/data
 
 volumes:
-
+  # Volume na koji se povezuje reservations_db baza podataka
+  reservations_db_store:
   auth_cache:
     driver: local
 

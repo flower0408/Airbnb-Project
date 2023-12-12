@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"auth_service/authorization"
 	"auth_service/casbinAuthorization"
 	"auth_service/domain"
 	"auth_service/errors"
@@ -14,8 +15,10 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -28,6 +31,15 @@ type AuthHandler struct {
 	service *application.AuthService
 	store   *store.AuthMongoDBStore
 }
+
+var (
+	reservationServiceHost   = os.Getenv("RESERVATIONS_SERVICE_HOST")
+	reservationServicePort   = os.Getenv("RESERVATIONS_SERVICE_PORT")
+	userServiceHost          = os.Getenv("USER_SERVICE_HOST")
+	userServicePort          = os.Getenv("USER_SERVICE_PORT")
+	accommodationServiceHost = os.Getenv("ACCOMMODATIONS_SERVICE_HOST")
+	accommodationServicePort = os.Getenv("ACCOMMODATIONS_SERVICE_PORT")
+)
 
 func NewAuthHandler(service *application.AuthService) *AuthHandler {
 	return &AuthHandler{
@@ -70,6 +82,8 @@ func (handler *AuthHandler) Init(router *mux.Router) {
 	router.HandleFunc("/changePassword", handler.ChangePassword).Methods("POST")
 	router.HandleFunc("/changeUsername", handler.ChangeUsername).Methods("POST")
 	router.HandleFunc("/logout", handler.logoutHandler).Methods("POST")
+	router.HandleFunc("/deleteUser", handler.DeleteUser).Methods("DELETE")
+
 	http.Handle("/", router)
 	log.Fatal(http.ListenAndServe(":8003", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
 }
@@ -509,6 +523,241 @@ func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request)
 	}
 
 	writer.Write([]byte(token))
+}
+
+func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Request) {
+	tokenString, err := extractTokenFromHeader(req)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		writer.Write([]byte("No token found"))
+		return
+	}
+
+	username, err := handler.service.ExtractUsernameFromToken(tokenString)
+	if err != nil {
+		fmt.Println("Error extracting username:", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		writer.Write([]byte("Error parsing token"))
+		return
+	}
+
+	userID, err := handler.getUserIDByUsername(username, tokenString)
+	if err != nil {
+		fmt.Println("Error getting userId by username:", err)
+		return
+	}
+
+	parsedToken := authorization.GetToken(tokenString)
+	claims := authorization.GetMapClaims(parsedToken.Bytes())
+	userType := claims["userType"]
+
+	if userType == "Host" {
+		hasReservations, err := handler.hasHostReservations(userID, tokenString)
+		if err != nil {
+			http.Error(writer, "Error checking host reservations", http.StatusInternalServerError)
+			return
+		}
+		if hasReservations {
+			http.Error(writer, "Host has reservations, cannot delete account", http.StatusForbidden)
+			return
+		} else {
+			deleteAccommodationsEndpoint := fmt.Sprintf("http://%s:%s/delete_accommodations/%s", accommodationServiceHost, accommodationServicePort, userID)
+			deleteAccommodationsRequest, err := http.NewRequest("DELETE", deleteAccommodationsEndpoint, nil)
+			deleteAccommodationsRequest.Header.Set("Authorization", "Bearer "+tokenString)
+			if err != nil {
+				log.Println("Error creating deleteAccommodationsRequest:", err)
+				http.Error(writer, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			deleteAccommodationsResponse, err := http.DefaultClient.Do(deleteAccommodationsRequest)
+			if err != nil {
+				log.Println("Error sending deleteAccommodationsRequest:", err)
+				http.Error(writer, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			defer deleteAccommodationsResponse.Body.Close()
+
+			if deleteAccommodationsResponse.StatusCode != http.StatusOK {
+				log.Println("Error deleting accommodations:", deleteAccommodationsResponse.Status)
+				http.Error(writer, "Error deleting accommodations", http.StatusInternalServerError)
+				return
+			}
+		}
+
+	} else if userType == "Guest" {
+		hasReservations, err := handler.hasGuestReservations(userID, tokenString)
+		if err != nil {
+			http.Error(writer, "Error checking guest reservations", http.StatusInternalServerError)
+			return
+		}
+		if hasReservations {
+			http.Error(writer, "Guest has reservations, cannot delete account", http.StatusForbidden)
+			return
+		}
+	}
+
+	err = handler.userServiceDeleteUser(userID, tokenString)
+	if err != nil {
+		log.Println(err)
+		http.Error(writer, "Error deleting user in user service", http.StatusInternalServerError)
+		return
+	}
+
+	status, statusCode, err := handler.service.DeleteUser(username)
+
+	if err != nil {
+		var errorMessage string
+
+		switch status {
+		case "baseErr":
+			errorMessage = "Internal server error"
+		case "UserServiceError":
+			errorMessage = "User service is currently unavailable. Please try again later."
+		default:
+			errorMessage = "An error occurred"
+		}
+
+		http.Error(writer, errorMessage, statusCode)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
+	writer.Write([]byte("User deleted successfully"))
+}
+
+func (handler *AuthHandler) hasHostReservations(userID string, authToken string) (bool, error) {
+	reservationEndpoint := fmt.Sprintf("http://%s:%s/reservationsByHost/%s", reservationServiceHost, reservationServicePort, userID)
+
+	reservationRequest, err := http.NewRequest("GET", reservationEndpoint, nil)
+	if err != nil {
+		log.Println("Error creating reservation request:", err)
+		return false, err
+	}
+
+	reservationRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	reservationResponse, err := http.DefaultClient.Do(reservationRequest)
+	if err != nil {
+		log.Println("Error sending reservation request:", err)
+		return false, err
+	}
+
+	if reservationResponse.StatusCode != http.StatusOK {
+		log.Println(reservationResponse.StatusCode, reservationResponse)
+		log.Printf("Error getting host reservations. Status code: %d\n", reservationResponse.StatusCode)
+		return false, nil
+	}
+
+	defer reservationResponse.Body.Close()
+
+	var hasReservations bool
+
+	err = json.NewDecoder(reservationResponse.Body).Decode(&hasReservations)
+	if err != nil {
+		log.Println("Error decoding reservation response:", err)
+		return false, err
+	}
+
+	return hasReservations, nil
+}
+
+func (handler *AuthHandler) hasGuestReservations(userID string, authToken string) (bool, error) {
+	reservationEndpoint := fmt.Sprintf("http://%s:%s/reservationsByUser/%s", reservationServiceHost, reservationServicePort, userID)
+
+	reservationRequest, err := http.NewRequest("GET", reservationEndpoint, nil)
+	if err != nil {
+		log.Println("Error creating reservation request:", err)
+		return false, err
+	}
+
+	reservationRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	reservationResponse, err := http.DefaultClient.Do(reservationRequest)
+	if err != nil {
+		log.Println("Error sending reservation request:", err)
+		return false, err
+	}
+
+	if reservationResponse.StatusCode != http.StatusOK {
+		log.Printf("Error getting guest reservations. Status code: %d\n", reservationResponse.StatusCode)
+		return false, err
+	}
+
+	body, err := ioutil.ReadAll(reservationResponse.Body)
+	if err != nil {
+		log.Println("Error reading response body:", err)
+		return false, err
+	}
+
+	if len(body) == 0 {
+		return false, nil
+	}
+
+	defer reservationResponse.Body.Close()
+	return true, nil
+}
+
+func (handler *AuthHandler) getUserIDByUsername(username string, authToken string) (string, error) {
+	userserviceEndpoint := fmt.Sprintf("http://%s:%s/getId/%s", userServiceHost, userServicePort, username)
+
+	userserviceRequest, err := http.NewRequest("GET", userserviceEndpoint, nil)
+	if err != nil {
+		log.Println("Error creating user request:", err)
+		return "", err
+	}
+
+	userserviceRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	userserviceResponse, err := http.DefaultClient.Do(userserviceRequest)
+	if err != nil {
+		log.Println("Error sending user request:", err)
+		return "", err
+	}
+
+	defer userserviceResponse.Body.Close()
+
+	if userserviceResponse.StatusCode != http.StatusOK {
+		log.Printf("Error getting user ID. Status code: %d\n", userserviceResponse.StatusCode)
+		return "", err
+	}
+
+	var userID string
+
+	err = json.NewDecoder(userserviceResponse.Body).Decode(&userID)
+	if err != nil {
+		log.Println("Error decoding user ID response:", err)
+		return "", err
+	}
+
+	return userID, nil
+}
+
+func (handler *AuthHandler) userServiceDeleteUser(userID string, authToken string) error {
+	userserviceEndpoint := fmt.Sprintf("http://%s:%s/%s/delete", userServiceHost, userServicePort, userID)
+
+	userserviceRequest, err := http.NewRequest("DELETE", userserviceEndpoint, nil)
+	if err != nil {
+		log.Println("Error creating user request:", err)
+		return err
+	}
+
+	userserviceRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	userserviceResponse, err := http.DefaultClient.Do(userserviceRequest)
+	if err != nil {
+		log.Println("Error sending user request:", err)
+		return err
+	}
+
+	defer userserviceResponse.Body.Close()
+
+	if userserviceResponse.StatusCode != http.StatusOK {
+		log.Printf("Error deleting user. Status code: %d\n", userserviceResponse.StatusCode)
+		return err
+	}
+
+	return nil
 }
 
 func MiddlewareUserValidation(next http.Handler) http.Handler {

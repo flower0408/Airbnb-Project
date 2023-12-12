@@ -10,4 +10,5 @@ type UserStore interface {
 	GetByEmail(email string) (*User, error)
 	UpdateUserUsername(user *User) error
 	UpdateUser(updateUser *User) (*User, error)
+	DeleteAccount(userID primitive.ObjectID) error
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"io"
 	"log"
 	"net/http"
@@ -15,8 +16,10 @@ import (
 )
 
 var (
-	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
-	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
+	reservationServiceHost   = os.Getenv("RESERVATIONS_SERVICE_HOST")
+	reservationServicePort   = os.Getenv("RESERVATIONS_SERVICE_PORT")
+	accommodationServiceHost = os.Getenv("ACCOMMODATIONS_SERVICE_HOST")
+	accommodationServicePort = os.Getenv("ACCOMMODATIONS_SERVICE_PORT")
 )
 
 type ReservationRepo struct {
@@ -192,6 +195,76 @@ func (sr *ReservationRepo) ReservationExistsForAppointment(accommodationID strin
 	}
 
 	return false, nil
+}
+
+func (sr *ReservationRepo) HasReservationsForHost(userID string, authToken string) (bool, error) {
+
+	accommodationEndpoint := fmt.Sprintf("http://%s:%s/owner/%s", accommodationServiceHost, accommodationServicePort, userID)
+	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
+	if err != nil {
+		sr.logger.Println("Error creating accommodation request:", err)
+		return false, err
+	}
+
+	accommodationRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
+	if err != nil {
+		sr.logger.Println("Error sending accommodation request:", err)
+		return false, err
+	}
+
+	if accommodationResponse.StatusCode != http.StatusOK {
+		sr.logger.Println("Accommodation service returned an error:", accommodationResponse.Status)
+		return false, errors.New("Accommodation service returned an error")
+	}
+
+	var accommodations []primitive.ObjectID
+
+	//err = responseToType(accommodationResponse.Body, accommodations)
+	err = json.NewDecoder(accommodationResponse.Body).Decode(&accommodations)
+	if err != nil {
+		sr.logger.Println("Error decoding accommodation response:", err)
+		return false, err
+	}
+
+	defer accommodationResponse.Body.Close()
+	for _, accommodationID := range accommodations {
+		hasReservations, err := sr.HasReservationsForAccommodation(accommodationID)
+		if err != nil {
+			sr.logger.Println(err)
+			return false, err
+		}
+
+		if hasReservations {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (sr *ReservationRepo) HasReservationsForAccommodation(accommodationID primitive.ObjectID) (bool, error) {
+	scanner := sr.session.Query(
+		`SELECT COUNT(*) FROM reservation_by_accommodation WHERE accommodation_id = ?`, accommodationID.Hex()).
+		Iter().Scanner()
+
+	var count int
+	if scanner.Next() {
+		err := scanner.Scan(&count)
+		if err != nil {
+			sr.logger.Println(err)
+			return false, err
+		}
+	} else {
+		return false, nil
+	}
+
+	if err := scanner.Err(); err != nil {
+		sr.logger.Println(err)
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (sr *ReservationRepo) CancelReservation(reservationID string) error {

@@ -3,3 +3,5 @@ p, Host, /, GET
 p, Guest, /, GET
 p, Host, /*, GET
 p, Guest, /*, GET
+p, Host, /*, DELETE
+p, Guest, /*, DELETE

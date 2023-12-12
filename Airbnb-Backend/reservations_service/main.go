@@ -16,7 +16,7 @@ func main() {
 
 	port := os.Getenv("RESERVATIONS_SERVICE_PORT")
 
-	timeoutContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	timeoutContext, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
 
 	//Initialize the logger we are going to use, with prefix and datetime for every log
@@ -61,6 +61,9 @@ func main() {
 	checkReservation.HandleFunc("/check", reservationHandler.CheckReservation)
 	//checkReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
 
+	checkReservationsForHost := router.Methods(http.MethodGet).Subrouter()
+	checkReservationsForHost.HandleFunc("/reservationsByHost/{id}", reservationHandler.CheckHostReservations)
+
 	getReservationByUser := router.Methods(http.MethodGet).Subrouter()
 	getReservationByUser.HandleFunc("/reservationsByUser/{id}", reservationHandler.GetReservationByUser)
 	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
@@ -84,6 +87,9 @@ func main() {
 	updateAppointment := router.Methods(http.MethodPatch).Subrouter()
 	updateAppointment.HandleFunc("/appointments/{id}", appointmentHandler.UpdateAppointment)
 	updateAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
+
+	deleteAppointment := router.Methods(http.MethodDelete).Subrouter()
+	deleteAppointment.HandleFunc("/deleteAppointments/{id}", appointmentHandler.DeleteAppointmentsByAccommodationIDs)
 
 	//Initialize the server
 	server := http.Server{
@@ -123,7 +129,6 @@ func MiddlewareContentTypeSet(next http.Handler) http.Handler {
 		rw.Header().Add("Content-Type", "application/json")
 		rw.Header().Set("X-Content-Type-Options", "nosniff")
 		rw.Header().Set("X-Frame-Options", "DENY")
-
 		rw.Header().Set("Content-Security-Policy", "script-src 'self' https://code.jquery.com https://cdn.jsdelivr.net https://www.google.com https://www.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' https://code.jquery.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com 'unsafe-inline'; font-src 'self' https://code.jquery.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: https://code.jquery.com https://i.ibb.co;")
 
 		next.ServeHTTP(rw, h)

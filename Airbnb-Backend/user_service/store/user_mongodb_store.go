@@ -100,6 +100,21 @@ func (store *UserMongoDBStore) UpdateUser(updateUser *domain.User) (*domain.User
 	return updateUser, nil
 }
 
+func (store *UserMongoDBStore) DeleteAccount(userID primitive.ObjectID) error {
+
+	filter := bson.M{"_id": userID}
+	result, err := store.users.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return err
+	}
+
+	if result.DeletedCount == 0 {
+		return errors.New("No user deleted")
+	}
+
+	return nil
+}
+
 func (store *UserMongoDBStore) filter(filter interface{}) ([]*domain.User, error) {
 	cursor, err := store.users.Find(context.TODO(), filter)
 	defer cursor.Close(context.TODO())
