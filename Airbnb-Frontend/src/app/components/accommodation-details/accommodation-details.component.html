@@ -49,6 +49,9 @@
       <mat-datepicker #releasedAtPicker2></mat-datepicker>
     </mat-form-field>
 
+    <div *ngFor="let row of counterRows" class="container">
+      <p>{{ row }}</p>
+    </div>
     <div style="border-bottom: 1px solid gray;" class="container" *ngIf="reservationForm.get('startDay')?.value !== '' && reservationForm.get('endDay')?.value !== ''">
       <h2 style="color: rgb(67, 67, 67);">Total price: {{sum}}€</h2>
     </div>

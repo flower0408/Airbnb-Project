@@ -14,16 +14,35 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Reservation } from 'src/app/models/reservation.model';
 import { UserService } from 'src/app/services/user.service';
 import { User } from 'src/app/models/user.model';
+import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
+
+export const MY_DATE_FORMATS = {
+  parse: {
+    dateInput: 'LL',
+  },
+  display: {
+    dateInput: 'DD/MM/YYYY',
+    monthYearLabel: 'MMM YYYY',
+    dateA11yLabel: 'LL',
+    monthYearA11yLabel: 'MMMM YYYY',
+  },
+};
+
 
 @Component({
   selector: 'app-accommodation-details',
   templateUrl: './accommodation-details.component.html',
-  styleUrls: ['./accommodation-details.component.css']
+  styleUrls: ['./accommodation-details.component.css'],
+  providers: [
+    { provide: MAT_DATE_FORMATS, useValue: MY_DATE_FORMATS },
+  ]
 })
+
 export class AccommodationDetailsComponent implements OnInit {
 
   accommodation: Accommodation | null = null;
   appointments!: Appointment[];
+  reservationDates: Date[] = [];
   reservationForm!: FormGroup;
   addAppointmentForm!: FormGroup;
   editAppointmentForm!: FormGroup;
@@ -36,9 +55,13 @@ export class AccommodationDetailsComponent implements OnInit {
   sum: number = 0
   hostId: string | undefined;
   selectedAppointment: number | null = null;
+  counter:string = "";
+  counterRows: string[] = [];
 
 
-  constructor(private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {}
+  constructor(private dateAdapter: DateAdapter<Date>,private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {
+    this.dateAdapter.setLocale('en-GB'); 
+  }
 
   get f(): { [key: string]: AbstractControl } {
     return this.reservationForm.controls;
@@ -158,6 +181,7 @@ export class AccommodationDetailsComponent implements OnInit {
 
     this.getAccommodationById();
     this.getAppoitmentsByAccommodation();
+    this.getReservationsByAccommodation();
 
     this.userRole = this.userService.getRoleFromToken();
 
@@ -194,7 +218,7 @@ export class AccommodationDetailsComponent implements OnInit {
       this.appointmentService.getAppointmentsByAccommodation(accommodationId).subscribe(
         (data: any) => {
           this.appointments = data;
-          this.appointments.forEach(a =>{
+          this.appointments?.forEach(a =>{
             a.available.forEach(d =>{
               this.allDates.push(d);
             })
@@ -208,6 +232,26 @@ export class AccommodationDetailsComponent implements OnInit {
             this.inputGuestPrice = true;
           }
 
+        },
+        (error) => {
+          console.error(error);
+        }
+      );
+    }
+  }
+
+  getReservationsByAccommodation(): void {
+    const accommodationId = this.route.snapshot.paramMap.get('id');
+    if (accommodationId) {
+      this.reservationService.getReservationsByAccommodation(accommodationId).subscribe(
+        (data: any) => {
+          let reservations:Reservation[] = data;
+          reservations?.forEach(r =>{
+            r.period.forEach(d =>{
+              this.reservationDates.push(d);
+            })
+          })
+          console.log(this.reservationDates);
         },
         (error) => {
           console.error(error);
@@ -373,18 +417,32 @@ export class AccommodationDetailsComponent implements OnInit {
       const datesInRange: Date[] = getDatesInRange(startDayValue, endDayValue);
 
       this.sum = 0;
+      this.counter = "";
 
+      function formatDateWithoutTime(date: Date): string {
+        const year = date.getUTCFullYear();
+        const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+        const day = date.getUTCDate().toString().padStart(2, '0');
+      
+        return `${day}/${month}/${year}`;
+      }
+      
       this.appointments.forEach(appointment => {
         appointment.available.forEach(date => {
           date = new Date(date)
           datesInRange.forEach(reservedDate => {
             reservedDate = new Date(reservedDate)
             if (date.toISOString() === reservedDate.toISOString()) {
+              let row = '';
               if (appointment.pricePerGuest !== 0) {
                 this.sum += appointment.pricePerGuest;
+                row = formatDateWithoutTime(reservedDate) + " = " + appointment.pricePerGuest + "€";
               } else {
                 this.sum += appointment.pricePerAccommodation;
+                row = formatDateWithoutTime(reservedDate) + " = " + appointment.pricePerAccommodation + "€";
               }
+              this.counterRows.push(row);
+              
             }
           });
         });

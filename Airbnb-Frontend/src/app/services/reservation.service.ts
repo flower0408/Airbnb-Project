@@ -17,4 +17,9 @@ export class ReservationService {
     return this.http.post<any>(`${environment.baseApiUrl}/${this.url}/reservations`, reservation);
   }
 
+  getReservationsByAccommodation(id: any): Observable<any> {
+
+    return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/reservationsByAccommodation/${id}`);
+  }
+
 }
