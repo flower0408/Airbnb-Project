@@ -77,6 +77,7 @@ export class AccommodationDetailsComponent implements OnInit {
     //console.log(this.allDates);
 
     return this.allDates.some(allowedDate =>
+      new Date(allowedDate).getUTCDate() >= new Date().getUTCDate() &&
       new Date(allowedDate).getUTCDate() === formattedDate.getUTCDate() &&
       new Date(allowedDate).getUTCMonth() === formattedDate.getUTCMonth() &&
       new Date(allowedDate).getUTCFullYear() === formattedDate.getUTCFullYear()
@@ -407,6 +408,7 @@ export class AccommodationDetailsComponent implements OnInit {
 
       this.sum = 0;
       this.counter = "";
+      this.counterRows = [];
 
       function formatDateWithoutTime(date: Date): string {
         const year = date.getUTCFullYear();

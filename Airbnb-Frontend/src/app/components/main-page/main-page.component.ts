@@ -4,6 +4,20 @@ import { Location } from '../../models/location.model';
 import {Router} from "@angular/router";
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 import {MatSnackBar} from "@angular/material/snack-bar";
+import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
+
+export const MY_DATE_FORMATS = {
+  parse: {
+    dateInput: 'LL',
+  },
+  display: {
+    dateInput: 'DD/MM/YYYY',
+    monthYearLabel: 'MMM YYYY',
+    dateA11yLabel: 'LL',
+    monthYearA11yLabel: 'MMMM YYYY',
+  },
+};
+
 
 interface Accommodation {
   id?: string;
@@ -20,7 +34,10 @@ interface Accommodation {
 @Component({
   selector: 'app-main-page',
   templateUrl: './main-page.component.html',
-  styleUrls: ['./main-page.component.css']
+  styleUrls: ['./main-page.component.css'],
+  providers: [
+    { provide: MAT_DATE_FORMATS, useValue: MY_DATE_FORMATS },
+  ]
 })
 export class MainPageComponent implements OnInit {
   accommodations: Accommodation[] = [];
@@ -37,13 +54,14 @@ export class MainPageComponent implements OnInit {
   };
 
 
-  constructor(private accommodationService: AccommodationService, private router: Router, private _snackBar: MatSnackBar,) {
+  constructor(private dateAdapter: DateAdapter<Date>,private accommodationService: AccommodationService, private router: Router, private _snackBar: MatSnackBar,) {
     this.searchForm = new FormGroup({
       location: new FormControl(''),
       minGuests: new FormControl(1),
       startDay: new FormControl('', [Validators.required]),
       endDay: new FormControl('', [Validators.required]),
     });
+    this.dateAdapter.setLocale('en-GB');
   }
 
   ngOnInit(): void {
