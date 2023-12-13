@@ -97,30 +97,9 @@ func main() {
 	checkReservationsForHost := router.Methods(http.MethodGet).Subrouter()
 	checkReservationsForHost.HandleFunc("/reservationsByHost/{id}", reservationHandler.CheckHostReservations)
 
-
 	getReservationByUser := router.Methods(http.MethodGet).Subrouter()
 	getReservationByUser.HandleFunc("/reservationsByUser/{id}", reservationHandler.GetReservationByUser)
 	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
-
-	getReservationByAccommodation = router.Methods(http.MethodGet).Subrouter()
-	getReservationByAccommodation.HandleFunc("/reservationsByAccommodation/{id}", reservationHandler.GetReservationByAccommodation)
-	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
-
-	createAppointment = router.Methods(http.MethodPost).Subrouter()
-	createAppointment.HandleFunc("/appointments", appointmentHandler.CreateAppointment)
-	createAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
-
-	getAllAppointment = router.Methods(http.MethodGet).Subrouter()
-	getAllAppointment.HandleFunc("/appointments", appointmentHandler.GetAllAppointment)
-	//getAllAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
-
-	getAppointmentByAccommodation = router.Methods(http.MethodGet).Subrouter()
-	getAppointmentByAccommodation.HandleFunc("/appointmentsByAccommodation/{id}", appointmentHandler.GetAppointmentsByAccommodation)
-	//getAllAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
-
-	updateAppointment = router.Methods(http.MethodPatch).Subrouter()
-	updateAppointment.HandleFunc("/appointments/{id}", appointmentHandler.UpdateAppointment)
-	updateAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
 	deleteAppointment := router.Methods(http.MethodDelete).Subrouter()
 	deleteAppointment.HandleFunc("/deleteAppointments/{id}", appointmentHandler.DeleteAppointmentsByAccommodationIDs)
