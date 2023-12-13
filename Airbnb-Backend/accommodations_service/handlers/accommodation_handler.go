@@ -12,8 +12,10 @@ import (
 	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -22,10 +24,12 @@ import (
 )
 
 var (
-	jwtKey          = []byte(os.Getenv("SECRET_KEY"))
-	verifier, _     = jwt.NewVerifierHS(jwt.HS256, jwtKey)
-	userServiceHost = os.Getenv("USER_SERVICE_HOST")
-	userServicePort = os.Getenv("USER_SERVICE_PORT")
+	jwtKey                 = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _            = jwt.NewVerifierHS(jwt.HS256, jwtKey)
+	userServiceHost        = os.Getenv("USER_SERVICE_HOST")
+	userServicePort        = os.Getenv("USER_SERVICE_PORT")
+	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
+	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
 )
 
 type KeyProduct struct{}
@@ -214,10 +218,48 @@ func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) 
 	rw.WriteHeader(http.StatusOK)
 }
 
+/*
+func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *http.Request) {
+
+		location := h.URL.Query().Get("location")
+		minGuests := h.URL.Query().Get("minGuests")
+
+		minGuestsInt, err := strconv.Atoi(minGuests)
+		if err != nil {
+			http.Error(rw, "Invalid minGuests parameter", http.StatusBadRequest)
+			return
+		}
+
+		filter := bson.M{}
+		if location != "" {
+			filter["location.country"] = location
+		}
+		if minGuests != "" {
+			// Condition to filter by Guests
+			filter["$and"] = bson.A{
+				bson.M{"minGuest": bson.M{"$lte": minGuestsInt}},
+				bson.M{"maxGuest": bson.M{"$gte": minGuestsInt}},
+			}
+		}
+
+		accommodations, err := s.repo.Search(filter)
+		if err != nil {
+			s.logger.Print("Database exception: ", err)
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(rw).Encode(accommodations)
+		rw.WriteHeader(http.StatusOK)
+	}
+*/
 func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *http.Request) {
 
 	location := h.URL.Query().Get("location")
 	minGuests := h.URL.Query().Get("minGuests")
+	startDate := h.URL.Query().Get("startDate")
+	endDate := h.URL.Query().Get("endDate")
 
 	minGuestsInt, err := strconv.Atoi(minGuests)
 	if err != nil {
@@ -225,28 +267,149 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 		return
 	}
 
-	filter := bson.M{}
-	if location != "" {
-		filter["location.country"] = location
-	}
-	if minGuests != "" {
-		// Condition to filter by Guests
-		filter["$and"] = bson.A{
-			bson.M{"minGuest": bson.M{"$lte": minGuestsInt}},
-			bson.M{"maxGuest": bson.M{"$gte": minGuestsInt}},
+	// Check if both start and end dates are empty
+	if startDate == "" && endDate == "" {
+		// Search without calling reservation service
+		filter := bson.M{}
+		if location != "" {
+			filter["location.country"] = location
 		}
-	}
+		if minGuests != "" {
+			filter["$and"] = bson.A{
+				bson.M{"minGuest": bson.M{"$lte": minGuestsInt}},
+				bson.M{"maxGuest": bson.M{"$gte": minGuestsInt}},
+			}
+		}
 
-	accommodations, err := s.repo.Search(filter)
-	if err != nil {
-		s.logger.Print("Database exception: ", err)
-		rw.WriteHeader(http.StatusBadRequest)
+		accommodations, err := s.repo.Search(filter)
+		if err != nil {
+			s.logger.Print("Database exception: ", err)
+			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(accommodations)
 		return
 	}
 
-	rw.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(rw).Encode(accommodations)
-	rw.WriteHeader(http.StatusOK)
+	appointmentBody := map[string]string{
+		"startDate": startDate,
+		"endDate":   endDate,
+	}
+
+	query := url.Values{}
+	for key, value := range appointmentBody {
+		query.Add(key, value)
+	}
+
+	// Circuit breaker for reservation service
+	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		// Reservation service call
+		reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/appointmentsByDate/?%s", reservationServiceHost, reservationServicePort, query.Encode())
+		reservationServiceRequest, _ := http.NewRequest("GET", reservationServiceEndpoint, nil)
+		reservationServiceResponse, err := http.DefaultClient.Do(reservationServiceRequest)
+
+		if err != nil {
+			log.Println("Error making reservation service request:", err)
+			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+			return nil, fmt.Errorf("ReservationServiceError")
+		}
+		defer reservationServiceResponse.Body.Close()
+
+		if reservationServiceResponse.StatusCode != http.StatusOK {
+			log.Printf("Reservation service responded with status: %d\n", reservationServiceResponse.StatusCode)
+			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+			return nil, StatusError{Code: http.StatusInternalServerError, Err: "ReservationServiceError"}
+		}
+
+		responseBody1, err := ioutil.ReadAll(reservationServiceResponse.Body)
+		if err != nil {
+			log.Println("Error reading reservation service response body:", err)
+			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+			return nil, fmt.Errorf("ReservationServiceError")
+		}
+
+		//log.Printf("Raw Reservation service response body: %s\n", responseBody1)
+
+		var responseBody []struct {
+			AccommodationID string `json:"accommodationId"`
+		}
+		if err := json.Unmarshal(responseBody1, &responseBody); err != nil {
+			log.Println("Error decoding reservation service response:", err)
+			http.Error(rw, "Internal server error", http.StatusInternalServerError)
+			return nil, fmt.Errorf("ReservationServiceError")
+		}
+
+		var availableAccommodationIDs []string
+		for _, entry := range responseBody {
+			availableAccommodationIDs = append(availableAccommodationIDs, entry.AccommodationID)
+		}
+
+		//log.Printf("Available Accommodation IDs: %v\n", availableAccommodationIDs)
+
+		var accommodations []*data.Accommodation
+		for _, id := range availableAccommodationIDs {
+			objectID, err := primitive.ObjectIDFromHex(id)
+			if err != nil {
+				log.Printf("Invalid ObjectID (%s): %v\n", id, err)
+				continue
+			}
+
+			accommodation, err := s.repo.GetByID(objectID)
+			if err != nil {
+				log.Printf("Accommodation not found for ObjectID (%s)\n", id)
+				continue
+			}
+
+			accommodations = append(accommodations, accommodation)
+		}
+
+		//log.Printf("Retrieved Accommodations: %+v\n", accommodations)
+
+		var filteredAccommodations []*data.Accommodation
+		for _, acc := range accommodations {
+			if location != "" && acc.Location.Country != location {
+				continue
+			}
+
+			if minGuests != "" && (acc.MinGuest > minGuestsInt || acc.MaxGuest < minGuestsInt) {
+				continue
+			}
+
+			filteredAccommodations = append(filteredAccommodations, acc)
+		}
+
+		//log.Printf("Filtered Accommodations: %+v\n", filteredAccommodations)
+
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(http.StatusOK)
+		json.NewEncoder(rw).Encode(filteredAccommodations)
+
+		return "ReservationServiceOK", nil
+	})
+	if breakerErr != nil {
+		if statusErr, ok := breakerErr.(StatusError); ok {
+			http.Error(rw, statusErr.Err, statusErr.Code)
+		} else {
+			http.Error(rw, breakerErr.Error(), http.StatusServiceUnavailable)
+		}
+		return
+	}
+
+	if result != nil {
+		fmt.Println("Received meaningful data:", result)
+	}
+}
+
+type StatusError struct {
+	Code int
+	Err  string
+}
+
+func (e StatusError) Error() string {
+	return e.Err
 }
 
 func validateAccommodation(accommodation *data.Accommodation) *ValidationError {

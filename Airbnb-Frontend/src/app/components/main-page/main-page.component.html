@@ -1,15 +1,32 @@
 <app-header></app-header>
-<div  class="search-container">
-  <label for="location">Location:</label>
-  <input type="text" id="location" [(ngModel)]="locationFilter">
+<form [formGroup]="searchForm">
+  <div class="search-container">
+    <label for="location" class="form-label">Location:</label>
+    <input type="text" id="location" formControlName="location" class="form-input">
 
-  <label for="minGuests">Guests:</label>
-  <input type="number" id="minGuests" [(ngModel)]="minGuestsFilter">
+    <label for="minGuests" class="form-label">Guests:</label>
+    <input type="number" id="minGuests" formControlName="minGuests" class="form-input">
 
-  <button type="button" class="btn btn-danger" (click)="searchAccommodations()">Search</button>
-</div>
+    <label for="startDay" class="form-label">Start Day:</label>
+    <mat-form-field appearance="outline" class="form-input">
+      <input matInput [matDatepicker]="startDayPicker" formControlName="startDay" [matDatepickerFilter]="startDateFilter">
+      <mat-datepicker-toggle matSuffix [for]="startDayPicker"></mat-datepicker-toggle>
+      <mat-datepicker #startDayPicker></mat-datepicker>
+    </mat-form-field>
 
-<div *ngFor="let accommodation of accommodations" class="accommodation-card">
+    <label for="endDay" class="form-label">End Day:</label>
+    <mat-form-field appearance="outline" class="form-input">
+      <input matInput [matDatepicker]="endDayPicker" formControlName="endDay" [matDatepickerFilter]="endDateFilter">
+      <mat-datepicker-toggle matSuffix [for]="endDayPicker"></mat-datepicker-toggle>
+      <mat-datepicker #endDayPicker></mat-datepicker>
+    </mat-form-field>
+
+    <button type="button" class="btn btn-danger" (click)="searchAccommodations()">Search</button>
+  </div>
+</form>
+
+
+<div *ngFor="let accommodation of accommodations; let i = index" class="accommodation-card"  [ngClass]="{'new-row': i % 3 === 0 && i !== 0}">
   <h2 class="accommodation-title">{{ accommodation?.name }}</h2>
   <p class="accommodation-description"> {{ accommodation?.description }}</p>
   <div class="accommodation-details">

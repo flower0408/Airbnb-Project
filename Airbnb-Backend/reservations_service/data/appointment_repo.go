@@ -301,6 +301,47 @@ func (rr *AppointmentRepo) GetAppointmentsByAccommodation(id string) (Appointmen
 
 	return appointments, nil
 }
+func (rr *AppointmentRepo) GetAppointmentsByDate(startDate, endDate time.Time) (Appointments, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	appointmentsCollection := rr.getCollection()
+
+	//rr.logger.Printf("startDate: %s, endDate: %s\n", startDate, endDate)
+
+	filter := bson.M{
+		"$and": []bson.M{
+			{"available": bson.M{"$lte": startDate}},
+			{"available": bson.M{"$gte": endDate}},
+		},
+	}
+	fmt.Printf("MongoDB Query: %+v\n", filter)
+
+	cursor, err := appointmentsCollection.Find(ctx, filter)
+	if err != nil {
+		rr.logger.Printf("Error querying MongoDB: %v\n", err)
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var appointments Appointments
+	for cursor.Next(ctx) {
+		var appointment Appointment
+		if err := cursor.Decode(&appointment); err != nil {
+			rr.logger.Printf("Error decoding result: %v\n", err)
+			return nil, err
+		}
+
+		appointments = append(appointments, &appointment)
+	}
+
+	if err := cursor.Err(); err != nil {
+		rr.logger.Printf("Cursor error: %v\n", err)
+		return nil, err
+	}
+
+	return appointments, nil
+}
 
 func (rr *AppointmentRepo) getCollection() *mongo.Collection {
 	appointmentDatabase := rr.cli.Database("MongoDatabase")
