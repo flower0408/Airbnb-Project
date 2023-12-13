@@ -53,7 +53,7 @@
       <p>{{ row }}</p>
     </div>
     <div style="border-bottom: 1px solid gray;" class="container" *ngIf="reservationForm.get('startDay')?.value !== '' && reservationForm.get('endDay')?.value !== ''">
-      <h2 style="color: rgb(67, 67, 67);">Total price: {{sum}}€</h2>
+      <h2 *ngFor="let detail of priceDetails" style="color: rgb(67, 67, 67); ">Total price: {{ detail.numberOfDays }}x{{ detail.price }}€ = {{ detail.numberOfDays * detail.price }}€</h2>
     </div>
 
     <div class="container" style="padding-top: 25px;">

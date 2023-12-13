@@ -63,6 +63,9 @@ func main() {
 	getAppointmentByAccommodation.HandleFunc("/appointmentsByAccommodation/{id}", appointmentHandler.GetAppointmentsByAccommodation)
 	//getAllAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
+	getAppointmentsByDate := router.Methods(http.MethodGet).Subrouter()
+	getAppointmentsByDate.HandleFunc("/appointmentsByDate/", appointmentHandler.GetAppointmentsByDate)
+
 	createAppointment := router.Methods(http.MethodPost).Subrouter()
 	createAppointment.HandleFunc("/appointments", appointmentHandler.CreateAppointment)
 	createAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)

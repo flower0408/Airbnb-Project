@@ -13,3 +13,6 @@ p, Host, /appointmentsByAccommodation/*, GET
 p, Guest, /appointmentsByAccommodation/*, GET
 p, Unauthenticated, /appointmentsByAccommodation/*, GET
 p, Host, /appointments/*, PATCH
+p, Host, /appointmentsByDate/*, GET
+p, Guest, /appointmentsByDate/*, GET
+p, Unauthenticated, /appointmentsByDate/*, GET

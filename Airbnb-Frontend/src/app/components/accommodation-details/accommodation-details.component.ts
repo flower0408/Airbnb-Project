@@ -42,7 +42,6 @@ export class AccommodationDetailsComponent implements OnInit {
 
   accommodation: Accommodation | null = null;
   appointments!: Appointment[];
-  reservationDates: Date[] = [];
   reservationForm!: FormGroup;
   addAppointmentForm!: FormGroup;
   editAppointmentForm!: FormGroup;
@@ -60,7 +59,7 @@ export class AccommodationDetailsComponent implements OnInit {
 
 
   constructor(private dateAdapter: DateAdapter<Date>,private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {
-    this.dateAdapter.setLocale('en-GB'); 
+    this.dateAdapter.setLocale('en-GB');
   }
 
   get f(): { [key: string]: AbstractControl } {
@@ -114,6 +113,11 @@ export class AccommodationDetailsComponent implements OnInit {
     const formattedDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
 
     if (formattedDate >= currentDate) {
+      // Check if there's only one appointment and enable its dates
+      if (this.appointments.length === 1) {
+        return true;
+      }
+
       if (
         this.selectedAppointment !== null &&
         this.appointments[this.selectedAppointment] &&
@@ -138,7 +142,9 @@ export class AccommodationDetailsComponent implements OnInit {
     }
 
     return false;
-  }
+  };
+
+
 
   // Handle datepicker value change
   addEvent(event: MatDatepickerInputEvent<Date>) {
@@ -181,7 +187,6 @@ export class AccommodationDetailsComponent implements OnInit {
 
     this.getAccommodationById();
     this.getAppoitmentsByAccommodation();
-    this.getReservationsByAccommodation();
 
     this.userRole = this.userService.getRoleFromToken();
 
@@ -195,6 +200,10 @@ export class AccommodationDetailsComponent implements OnInit {
     );
 
     this.selectedAppointment = null;
+
+    if (this.appointments && this.appointments.length === 1) {
+      this.selectedAppointment = 0;
+    }
 
   }
 
@@ -232,26 +241,6 @@ export class AccommodationDetailsComponent implements OnInit {
             this.inputGuestPrice = true;
           }
 
-        },
-        (error) => {
-          console.error(error);
-        }
-      );
-    }
-  }
-
-  getReservationsByAccommodation(): void {
-    const accommodationId = this.route.snapshot.paramMap.get('id');
-    if (accommodationId) {
-      this.reservationService.getReservationsByAccommodation(accommodationId).subscribe(
-        (data: any) => {
-          let reservations:Reservation[] = data;
-          reservations?.forEach(r =>{
-            r.period.forEach(d =>{
-              this.reservationDates.push(d);
-            })
-          })
-          console.log(this.reservationDates);
         },
         (error) => {
           console.error(error);
@@ -423,10 +412,10 @@ export class AccommodationDetailsComponent implements OnInit {
         const year = date.getUTCFullYear();
         const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
         const day = date.getUTCDate().toString().padStart(2, '0');
-      
+
         return `${day}/${month}/${year}`;
       }
-      
+
       this.appointments.forEach(appointment => {
         appointment.available.forEach(date => {
           date = new Date(date)
@@ -442,7 +431,7 @@ export class AccommodationDetailsComponent implements OnInit {
                 row = formatDateWithoutTime(reservedDate) + " = " + appointment.pricePerAccommodation + "€";
               }
               this.counterRows.push(row);
-              
+
             }
           });
         });
@@ -451,8 +440,6 @@ export class AccommodationDetailsComponent implements OnInit {
       console.log('Total price:', this.sum);
     }
   }
-
-
 
 }
 

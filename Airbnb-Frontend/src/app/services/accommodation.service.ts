@@ -27,10 +27,24 @@ export class AccommodationService {
     return this.http.get<Accommodation>(url);
   }
 
-  searchAccommodations(location: string, minGuests: number): Observable<Accommodation[]> {
+ /* searchAccommodations(location: string, minGuests: number): Observable<Accommodation[]> {
     const params = new HttpParams()
       .set('location', location)
-      .set('minGuests', minGuests.toString());
+      .set('minGuests', minGuests.toString())
+
+    return this.http.get<Accommodation[]>(`${environment.baseApiUrl}/${this.url}/search`, { params });
+  }*/
+  searchAccommodations(
+    location: string,
+    minGuests: number,
+    startDate: string,
+    endDate: string
+  ): Observable<Accommodation[]> {
+    const params = new HttpParams()
+      .set('location', location)
+      .set('minGuests', minGuests.toString())
+      .set('startDate', startDate)
+      .set('endDate', endDate);
 
     return this.http.get<Accommodation[]>(`${environment.baseApiUrl}/${this.url}/search`, { params });
   }
