@@ -35,6 +35,9 @@ export class AccommodationDetailsComponent implements OnInit {
   inputGuestPrice = false;
   sum: number = 0
   hostId: string | undefined;
+  selectedAppointment: number | null = null;
+  priceDetails: any[] = [];
+
 
   constructor(private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {}
 
@@ -80,10 +83,55 @@ export class AccommodationDetailsComponent implements OnInit {
     );
   };
 
+  dateFilter3 = (date: Date | null): boolean => {
+    if (!date) {
+      return false;
+    }
+
+    const currentDate = new Date();
+    const formattedDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+
+    if (formattedDate >= currentDate) {
+      // Check if there's only one appointment and enable its dates
+      if (this.appointments.length === 1) {
+        return true;
+      }
+
+      if (
+        this.selectedAppointment !== null &&
+        this.appointments[this.selectedAppointment] &&
+        this.appointments[this.selectedAppointment].available.some(
+          (allowedDate) =>
+            new Date(allowedDate).getUTCDate() === formattedDate.getUTCDate() &&
+            new Date(allowedDate).getUTCMonth() === formattedDate.getUTCMonth() &&
+            new Date(allowedDate).getUTCFullYear() === formattedDate.getUTCFullYear()
+        )
+      ) {
+        return true;
+      }
+
+      return !this.appointments.some((appointment) =>
+        appointment.available.some(
+          (allowedDate) =>
+            new Date(allowedDate).getUTCDate() === formattedDate.getUTCDate() &&
+            new Date(allowedDate).getUTCMonth() === formattedDate.getUTCMonth() &&
+            new Date(allowedDate).getUTCFullYear() === formattedDate.getUTCFullYear()
+        )
+      );
+    }
+
+    return false;
+  };
+
+
 
   // Handle datepicker value change
   addEvent(event: MatDatepickerInputEvent<Date>) {
     console.log(event.value);
+  }
+
+  onSelectedAppointmentChange(event: any): void {
+    this.selectedAppointment = parseInt(event.target.value, 10);
   }
 
   ngOnInit(): void {
@@ -129,6 +177,12 @@ export class AccommodationDetailsComponent implements OnInit {
         console.error('Error getting user:', error);
       }
     );
+
+    this.selectedAppointment = null;
+
+    if (this.appointments && this.appointments.length === 1) {
+      this.selectedAppointment = 0;
+    }
 
   }
 
@@ -270,6 +324,7 @@ export class AccommodationDetailsComponent implements OnInit {
 
   onSubmitEditAppointment(){
     if (this.editAppointmentForm.valid) {
+      console.log('Selected Appointment in dateFilter3:', this.selectedAppointment);
 
       const formValues = this.editAppointmentForm.value;
 
@@ -331,16 +386,26 @@ export class AccommodationDetailsComponent implements OnInit {
 
       this.sum = 0;
 
+      const priceDetails: { numberOfDays: number; price: number }[] = [];
+
       this.appointments.forEach(appointment => {
         appointment.available.forEach(date => {
-          date = new Date(date)
+          date = new Date(date);
           datesInRange.forEach(reservedDate => {
-            reservedDate = new Date(reservedDate)
+            reservedDate = new Date(reservedDate);
             if (date.toISOString() === reservedDate.toISOString()) {
-              if (appointment.pricePerGuest !== 0) {
-                this.sum += appointment.pricePerGuest;
+              const price = appointment.pricePerGuest !== 0
+                ? appointment.pricePerGuest
+                : appointment.pricePerAccommodation;
+
+              this.sum += price;
+
+              // Add or update price detail
+              const index = priceDetails.findIndex(detail => detail.price === price);
+              if (index === -1) {
+                priceDetails.push({ numberOfDays: 1, price });
               } else {
-                this.sum += appointment.pricePerAccommodation;
+                priceDetails[index].numberOfDays++;
               }
             }
           });
@@ -348,10 +413,11 @@ export class AccommodationDetailsComponent implements OnInit {
       });
 
       console.log('Total price:', this.sum);
+      console.log('Price details:', priceDetails);
+
+      this.priceDetails = priceDetails;
     }
   }
-
-
 
 }
 

@@ -56,4 +56,27 @@
   align-items: center;
   text-align: center;
   margin-top: 20px;
+  gap: 16px;
+}
+
+.form-label{
+  color:#F88379;
+  font-size: 15px;
+  font-weight: bolder;
+}
+
+.accommodation-card.new-row {
+  clear: both;
+}
+
+.accommodation-card {
+  width: 25%;
+  float: left;
+  margin-left: 100px;
+}
+
+.clearfix::after {
+  content: "";
+  clear: both;
+  display: table;
 }

@@ -69,10 +69,10 @@ services:
       ACCOMMODATIONS_DB_HOST: ${ACCOMMODATIONS_DB_HOST}
       ACCOMMODATIONS_DB_PORT: ${ACCOMMODATIONS_DB_PORT}
       ACCOMMODATIONS_SERVICE_PORT: ${ACCOMMODATIONS_SERVICE_PORT}
-      RESERVATIONS_SERVICE_HOST: ${RESERVATIONS_SERVICE_HOST}
-      RESERVATIONS_SERVICE_PORT: ${RESERVATIONS_SERVICE_PORT}
       USER_SERVICE_HOST: ${USER_SERVICE_HOST}
       USER_SERVICE_PORT: ${USER_SERVICE_PORT}
+      RESERVATIONS_SERVICE_PORT: ${RESERVATIONS_SERVICE_PORT}
+      RESERVATIONS_SERVICE_HOST: ${RESERVATIONS_SERVICE_HOST}
       SECRET_KEY: ${SECRET_KEY}
     depends_on:
       - accommodations_db
@@ -100,6 +100,7 @@ services:
       # depends_on:
       # - reservations_db
     # Pokretanje reservation servisa tek kada je baza uspesno pokrenuta
+      SECRET_KEY: ${SECRET_KEY}
     depends_on:
       reservations_db:
         condition: service_healthy

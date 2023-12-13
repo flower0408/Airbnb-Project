@@ -2,6 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import {AccommodationService} from "../../services/accommodation.service";
 import { Location } from '../../models/location.model';
 import {Router} from "@angular/router";
+import { FormControl, FormGroup, Validators } from '@angular/forms';
+import {MatSnackBar} from "@angular/material/snack-bar";
 
 interface Accommodation {
   id?: string;
@@ -24,11 +26,38 @@ export class MainPageComponent implements OnInit {
   accommodations: Accommodation[] = [];
   locationFilter: string = '';
   minGuestsFilter: number | undefined;
+  searchForm: FormGroup;
 
-  constructor(private accommodationService: AccommodationService, private router: Router,) {}
+  startDateFilter = (date: Date | null): boolean => {
+    return date !== null && date >= new Date();
+  };
+
+  endDateFilter = (date: Date | null): boolean => {
+    return date !== null && date >= new Date();
+  };
+
+
+  constructor(private accommodationService: AccommodationService, private router: Router, private _snackBar: MatSnackBar,) {
+    this.searchForm = new FormGroup({
+      location: new FormControl(''),
+      minGuests: new FormControl(1),
+      startDay: new FormControl('', [Validators.required]),
+      endDay: new FormControl('', [Validators.required]),
+    });
+  }
 
   ngOnInit(): void {
+    this.initForm();
     this.getAccommodations();
+  }
+
+  initForm(): void {
+    this.searchForm = new FormGroup({
+      location: new FormControl(''),
+      minGuests: new FormControl(1),
+      startDay: new FormControl('', [Validators.required]),
+      endDay: new FormControl('', [Validators.required]),
+    });
   }
 
   getAccommodations(): void {
@@ -49,17 +78,27 @@ export class MainPageComponent implements OnInit {
 
   searchAccommodations(): void {
 
-    const minGuests = this.minGuestsFilter !== undefined ? this.minGuestsFilter : 1;
+    const location = this.searchForm.get('location')?.value || '';
+    const minGuests = this.searchForm.get('minGuests')?.value || 1;
+    const startDay = this.searchForm.get('startDay')?.value;
+    const endDay = this.searchForm.get('endDay')?.value;
 
-    if (this.locationFilter || this.minGuestsFilter !== undefined) {
-      this.accommodationService.searchAccommodations(this.locationFilter, minGuests).subscribe(
+    const startDateFormatted = startDay ? startDay.toISOString() : '';
+    const endDateFormatted = endDay ? endDay.toISOString() : '';
+
+    if (location || minGuests !== undefined || startDay || endDay) {
+      this.accommodationService.searchAccommodations(location, minGuests, startDateFormatted, endDateFormatted).subscribe(
         (data: Accommodation[]) => {
           this.accommodations = data;
-          this.locationFilter = '';
-          this.minGuestsFilter = undefined;
         },
         (error) => {
           console.error(error);
+          if (error.status === 503 ) {
+            this.openSnackBar("Reservation service is currently unavailable. Please try again later or try search without dates.", "");
+          }
+          else if (error.status === 502 ) {
+            this.openSnackBar("Reservation service is currently unavailable. Please try again later or try search without dates.", "");
+          }
         }
       );
     } else {
@@ -67,5 +106,11 @@ export class MainPageComponent implements OnInit {
       this.locationFilter = '';
       this.minGuestsFilter = undefined;
     }
+  }
+
+  openSnackBar(message: string, action: string) {
+    this._snackBar.open(message, action,  {
+      duration: 3500
+    });
   }
 }

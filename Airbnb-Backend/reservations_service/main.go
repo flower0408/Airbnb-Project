@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
+	"github.com/casbin/casbin"
+	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -9,6 +12,7 @@ import (
 	"os/signal"
 	"reservations_service/data"
 	"reservations_service/handlers"
+	"strings"
 	"time"
 )
 
@@ -49,28 +53,18 @@ func main() {
 	router := mux.NewRouter()
 	router.Use(MiddlewareContentTypeSet)
 
-	createReservation := router.Methods(http.MethodPost).Subrouter()
-	createReservation.HandleFunc("/reservations", reservationHandler.CreateReservation)
-	createReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+	casbinMiddleware, err := InitializeCasbinMiddleware("./rbac_model.conf", "./policy.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+	router.Use(casbinMiddleware)
 
-	cancelReservation := router.Methods(http.MethodDelete).Subrouter()
-	cancelReservation.HandleFunc("/cancelReservation/{id}", reservationHandler.CancelReservation)
-	//cancelReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+	getAppointmentByAccommodation := router.Methods(http.MethodGet).Subrouter()
+	getAppointmentByAccommodation.HandleFunc("/appointmentsByAccommodation/{id}", appointmentHandler.GetAppointmentsByAccommodation)
+	//getAllAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
-	checkReservation := router.Methods(http.MethodPost).Subrouter()
-	checkReservation.HandleFunc("/check", reservationHandler.CheckReservation)
-	//checkReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
-
-	checkReservationsForHost := router.Methods(http.MethodGet).Subrouter()
-	checkReservationsForHost.HandleFunc("/reservationsByHost/{id}", reservationHandler.CheckHostReservations)
-
-	getReservationByUser := router.Methods(http.MethodGet).Subrouter()
-	getReservationByUser.HandleFunc("/reservationsByUser/{id}", reservationHandler.GetReservationByUser)
-	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
-
-	getReservationByAccommodation := router.Methods(http.MethodGet).Subrouter()
-	getReservationByAccommodation.HandleFunc("/reservationsByAccommodation/{id}", reservationHandler.GetReservationByAccommodation)
-	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+	getAppointmentsByDate := router.Methods(http.MethodGet).Subrouter()
+	getAppointmentsByDate.HandleFunc("/appointmentsByDate/", appointmentHandler.GetAppointmentsByDate)
 
 	createAppointment := router.Methods(http.MethodPost).Subrouter()
 	createAppointment.HandleFunc("/appointments", appointmentHandler.CreateAppointment)
@@ -80,11 +74,51 @@ func main() {
 	getAllAppointment.HandleFunc("/appointments", appointmentHandler.GetAllAppointment)
 	//getAllAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
-	getAppointmentByAccommodation := router.Methods(http.MethodGet).Subrouter()
+	createReservation := router.Methods(http.MethodPost).Subrouter()
+	createReservation.HandleFunc("/reservations", reservationHandler.CreateReservation)
+	createReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
+	getReservationByAccommodation := router.Methods(http.MethodGet).Subrouter()
+	getReservationByAccommodation.HandleFunc("/reservationsByAccommodation/{id}", reservationHandler.GetReservationByAccommodation)
+	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
+	checkReservation := router.Methods(http.MethodPost).Subrouter()
+	checkReservation.HandleFunc("/check", reservationHandler.CheckReservation)
+	//checkReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
+	updateAppointment := router.Methods(http.MethodPatch).Subrouter()
+	updateAppointment.HandleFunc("/appointments/{id}", appointmentHandler.UpdateAppointment)
+	updateAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
+
+	cancelReservation := router.Methods(http.MethodDelete).Subrouter()
+	cancelReservation.HandleFunc("/cancelReservation/{id}", reservationHandler.CancelReservation)
+	//cancelReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
+	checkReservationsForHost := router.Methods(http.MethodGet).Subrouter()
+	checkReservationsForHost.HandleFunc("/reservationsByHost/{id}", reservationHandler.CheckHostReservations)
+
+
+	getReservationByUser := router.Methods(http.MethodGet).Subrouter()
+	getReservationByUser.HandleFunc("/reservationsByUser/{id}", reservationHandler.GetReservationByUser)
+	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
+	getReservationByAccommodation = router.Methods(http.MethodGet).Subrouter()
+	getReservationByAccommodation.HandleFunc("/reservationsByAccommodation/{id}", reservationHandler.GetReservationByAccommodation)
+	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
+	createAppointment = router.Methods(http.MethodPost).Subrouter()
+	createAppointment.HandleFunc("/appointments", appointmentHandler.CreateAppointment)
+	createAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
+
+	getAllAppointment = router.Methods(http.MethodGet).Subrouter()
+	getAllAppointment.HandleFunc("/appointments", appointmentHandler.GetAllAppointment)
+	//getAllAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
+
+	getAppointmentByAccommodation = router.Methods(http.MethodGet).Subrouter()
 	getAppointmentByAccommodation.HandleFunc("/appointmentsByAccommodation/{id}", appointmentHandler.GetAppointmentsByAccommodation)
 	//getAllAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
-	updateAppointment := router.Methods(http.MethodPatch).Subrouter()
+	updateAppointment = router.Methods(http.MethodPatch).Subrouter()
 	updateAppointment.HandleFunc("/appointments/{id}", appointmentHandler.UpdateAppointment)
 	updateAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
@@ -133,4 +167,84 @@ func MiddlewareContentTypeSet(next http.Handler) http.Handler {
 
 		next.ServeHTTP(rw, h)
 	})
+}
+
+var jwtKey = []byte(os.Getenv("SECRET_KEY"))
+
+var verifier, _ = jwt.NewVerifierHS(jwt.HS256, jwtKey)
+
+func parseToken(tokenString string) (*jwt.Token, error) {
+	token, err := jwt.Parse([]byte(tokenString), verifier)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	return token, nil
+}
+
+func extractUserType(r *http.Request) (string, error) {
+	bearer := r.Header.Get("Authorization")
+	if bearer == "" {
+		return "Unauthenticated", nil
+	}
+
+	bearerToken := strings.Split(bearer, "Bearer ")
+	if len(bearerToken) != 2 {
+		return "", errors.New("invalid token format")
+	}
+
+	tokenString := bearerToken[1]
+	token, err := parseToken(tokenString)
+	if err != nil {
+		return "", err
+	}
+
+	claims := extractClaims(token)
+	return claims["userType"], nil
+}
+
+func extractClaims(token *jwt.Token) map[string]string {
+	var claims map[string]string
+
+	err := jwt.ParseClaims(token.Bytes(), verifier, &claims)
+	if err != nil {
+		log.Println(err)
+	}
+
+	return claims
+}
+
+func InitializeCasbinMiddleware(modelPath, policyPath string) (func(http.Handler) http.Handler, error) {
+	e, err := casbin.NewEnforcerSafe(modelPath, policyPath)
+	if err != nil {
+		return nil, err
+	}
+	e.EnableLog(true)
+
+	return func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			userRole, err := extractUserType(r)
+			if err != nil {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			res, err := e.EnforceSafe(userRole, r.URL.Path, r.Method)
+			if err != nil {
+				log.Println("Enforce error:", err)
+				http.Error(w, "Unauthorized user", http.StatusUnauthorized)
+				return
+			}
+
+			if res {
+				log.Println("Redirect")
+				next.ServeHTTP(w, r)
+			} else {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+		}
+
+		return http.HandlerFunc(fn)
+	}, nil
 }

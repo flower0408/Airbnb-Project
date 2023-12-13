@@ -21,7 +21,7 @@ export class AppointmentService {
     return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/appointmentsByAccommodation/${id}`);
   }
 
-  editAppointment(id:string, appointment: Appointment): Observable<any> {
+  editAppointment(id:string, appointment: any): Observable<any> {
 
     return this.http.patch<any>(`${environment.baseApiUrl}/${this.url}/appointments/${id}`, appointment);
   }

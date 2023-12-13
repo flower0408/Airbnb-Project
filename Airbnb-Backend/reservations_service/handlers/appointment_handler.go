@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"reservations_service/data"
+	"time"
 )
 
 type AppointmentHandler struct {
@@ -84,6 +85,54 @@ func (r *AppointmentHandler) GetAppointmentsByAccommodation(rw http.ResponseWrit
 	if err != nil {
 		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
 		r.logger.Fatal("Unable to convert to json")
+		return
+	}
+}
+
+func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *http.Request) {
+	startDateStr := h.URL.Query().Get("startDate")
+	endDateStr := h.URL.Query().Get("endDate")
+
+	// Parse dates with the specified time zone
+	startDate, err := time.Parse(time.RFC3339, startDateStr)
+	if err != nil {
+		http.Error(rw, "Invalid startDate parameter", http.StatusBadRequest)
+		return
+	}
+
+	endDate, err := time.Parse(time.RFC3339, endDateStr)
+	if err != nil {
+		http.Error(rw, "Invalid endDate parameter", http.StatusBadRequest)
+		return
+	}
+
+	appointments, err := r.appointmentRepo.GetAppointmentsByDate(startDate, endDate)
+	if err != nil {
+		r.logger.Print("Database exception")
+		http.Error(rw, "Unable to retrieve appointments", http.StatusInternalServerError)
+		return
+	}
+
+	if len(appointments) == 0 {
+		return
+	}
+
+	accommodationIDs := make(map[string]struct{})
+	for _, appointment := range appointments {
+		accommodationIDs[appointment.AccommodationId] = struct{}{}
+	}
+
+	uniqueAccommodationIDs := make([]string, 0, len(accommodationIDs))
+	for id := range accommodationIDs {
+		uniqueAccommodationIDs = append(uniqueAccommodationIDs, id)
+	}
+
+	fmt.Printf("Unique Accommodation IDs: %+v\n", uniqueAccommodationIDs)
+
+	err = appointments.ToJSON(rw)
+	if err != nil {
+		http.Error(rw, "Unable to convert to JSON", http.StatusInternalServerError)
+		r.logger.Fatal("Unable to convert to JSON")
 		return
 	}
 }
