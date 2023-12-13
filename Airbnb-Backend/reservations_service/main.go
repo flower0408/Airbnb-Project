@@ -95,7 +95,7 @@ func main() {
 	//cancelReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
 
 	getReservationByUser := router.Methods(http.MethodGet).Subrouter()
-	getReservationByUser.HandleFunc("/reservationsByUser/{id}", reservationHandler.GetReservationByUser)
+	getReservationByUser.HandleFunc("/reservationsByUser", reservationHandler.GetReservationByUser)
 	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
 
 	//Initialize the server

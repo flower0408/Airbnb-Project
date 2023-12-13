@@ -4,22 +4,37 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
+	"github.com/sony/gobreaker"
 	"log"
 	"net/http"
+	"os"
+	"reservations_service/authorization"
 	"reservations_service/data"
+	"strings"
 	"time"
 )
 
 type KeyProduct struct{}
 
+var (
+	jwtKey                 = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _            = jwt.NewVerifierHS(jwt.HS256, jwtKey)
+	userServiceHost        = os.Getenv("USER_SERVICE_HOST")
+	userServicePort        = os.Getenv("USER_SERVICE_PORT")
+	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
+	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
+)
+
 type ReservationHandler struct {
 	logger          *log.Logger
 	reservationRepo *data.ReservationRepo
+	cb              *gobreaker.CircuitBreaker
 }
 
 func NewReservationHandler(l *log.Logger, r *data.ReservationRepo) *ReservationHandler {
-	return &ReservationHandler{l, r}
+	return &ReservationHandler{logger: l, reservationRepo: r}
 }
 
 // cassandra
@@ -74,10 +89,80 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 }
 
 func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *http.Request) {
-	vars := mux.Vars(h)
-	id := vars["id"]
+	bearer := h.Header.Get("Authorization")
+	if bearer == "" {
+		log.Println("Authorization header missing")
+		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
-	reservationByUser, err := s.reservationRepo.GetReservationByUser(id)
+	bearerToken := strings.Split(bearer, "Bearer ")
+	if len(bearerToken) != 2 {
+		log.Println("Malformed Authorization header")
+		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tokenString := bearerToken[1]
+	log.Printf("Token: %s\n", tokenString)
+
+	token, err := jwt.Parse([]byte(tokenString), verifier)
+	if err != nil {
+		log.Println("Token parsing error:", err)
+		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	claims := authorization.GetMapClaims(token.Bytes())
+	log.Printf("Token Claims: %+v\n", claims)
+	username := claims["username"]
+
+	/*userID, statusCode, err := s.getUserIDFromUserService(username)
+	if err != nil {
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}*/
+
+	// Circuit breaker for user service
+	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		userID, statusCode, err := s.getUserIDFromUserService(username)
+		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
+	})
+
+	if breakerErr != nil {
+		log.Println("Circuit breaker open:", breakerErr)
+		http.Error(rw, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		log.Println("Internal server error: Unexpected result type")
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	userID, ok := resultMap["userID"].(string)
+	if !ok {
+		log.Println("Internal server error: User ID not found in the response")
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	statusCode, ok := resultMap["statusCode"].(int)
+	if !ok {
+		log.Println("Internal server error: Status code not found in the response")
+		http.Error(rw, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err, ok := resultMap["err"].(error); ok && err != nil {
+		log.Println("Error from user service:", err)
+		http.Error(rw, err.Error(), statusCode)
+		return
+	}
+
+	reservationByUser, err := s.reservationRepo.GetReservationByUser(userID)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 	}
@@ -92,6 +177,32 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 		s.logger.Fatal("Unable to convert to json :", err)
 		return
 	}
+}
+
+func (s *ReservationHandler) getUserIDFromUserService(username interface{}) (string, int, error) {
+	userServiceEndpoint := fmt.Sprintf("http://%s:%s/getOne/%s", userServiceHost, userServicePort, username)
+	userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
+	response, err := http.DefaultClient.Do(userServiceRequest)
+	if err != nil {
+		return "", http.StatusInternalServerError, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return "", response.StatusCode, fmt.Errorf("User not found in database")
+	}
+
+	var user map[string]interface{}
+	if err := json.NewDecoder(response.Body).Decode(&user); err != nil {
+		return "", http.StatusInternalServerError, err
+	}
+
+	userID, ok := user["id"].(string)
+	if !ok {
+		return "", http.StatusInternalServerError, fmt.Errorf("User ID not found in the response")
+	}
+
+	return userID, http.StatusOK, nil
 }
 
 func (s *ReservationHandler) GetReservationByAccommodation(rw http.ResponseWriter, h *http.Request) {

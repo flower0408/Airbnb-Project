@@ -3,17 +3,17 @@ module reservations_service
 go 1.20
 
 require (
+	github.com/casbin/casbin v1.9.1
+	github.com/cristalhq/jwt/v4 v4.0.2
 	github.com/gocql/gocql v1.6.0
 	github.com/gorilla/mux v1.8.0
+	github.com/sony/gobreaker v0.5.0
 	go.mongodb.org/mongo-driver v1.13.0
 )
 
 require (
 	github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible // indirect
-	github.com/casbin/casbin v1.9.1 // indirect
-	github.com/cristalhq/jwt/v4 v4.0.2 // indirect
 	github.com/golang/snappy v0.0.3 // indirect
-	github.com/google/uuid v1.4.0 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
