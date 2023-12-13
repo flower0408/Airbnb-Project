@@ -266,6 +266,43 @@ func (s *ReservationHandler) CheckReservation(rw http.ResponseWriter, h *http.Re
 	}
 }
 
+func (s *ReservationHandler) CheckHostReservations(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	userID := vars["id"]
+
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	hasReservations, err := s.reservationRepo.HasReservationsForHost(userID, authToken)
+	if err != nil {
+		s.logger.Println("Error checking host reservations:", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := json.NewEncoder(rw).Encode(hasReservations); err != nil {
+		s.logger.Println("Error encoding JSON response:", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	rw.WriteHeader(http.StatusOK)
+}
+
+func extractBearerToken(authHeader string) string {
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return ""
+	}
+
+	return parts[1]
+}
+
 func (s *ReservationHandler) MiddlewareReservationDeserialization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
 		reservations := &data.Reservation{}

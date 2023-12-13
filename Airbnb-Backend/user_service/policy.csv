@@ -15,3 +15,6 @@ p, Guest, /getOne/*, GET
 p, Host, /getOne/*, GET
 p, Guest, /profile/*, GET
 p, Host, /profile/*, GET
+p, Unauthenticated, /*, DELETE
+p, Host, /*, DELETE
+p, Guest, /*, DELETE

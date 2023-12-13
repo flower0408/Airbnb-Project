@@ -787,6 +787,23 @@ func responseToType(response io.ReadCloser, any any) error {
 	return nil
 }
 
+func (service *AuthService) DeleteUser(username string) (string, int, error) {
+	existingUser, err := service.store.GetOneUser(username)
+	if err != nil {
+		return "baseErr", http.StatusInternalServerError, err
+	}
+
+	if existingUser == nil {
+		return "notFound", http.StatusNotFound, fmt.Errorf("User not found")
+	}
+
+	if err := service.store.DeleteUser(username); err != nil {
+		return "baseErr", http.StatusInternalServerError, err
+	}
+
+	return "OK", http.StatusOK, nil
+}
+
 func GenerateJWT(user *domain.Credentials) (string, error) {
 
 	key := []byte(os.Getenv("SECRET_KEY"))
@@ -810,6 +827,36 @@ func GenerateJWT(user *domain.Credentials) (string, error) {
 
 	return token.String(), nil
 }
+
+func (service *AuthService) ExtractUsernameFromToken(tokenString string) (string, error) {
+	verifier, _ := jwt.NewVerifierHS(jwt.HS256, []byte(os.Getenv("SECRET_KEY")))
+
+	token, err := jwt.Parse([]byte(tokenString), verifier)
+	if err != nil {
+		return "", fmt.Errorf("Error parsing token: %s", err)
+	}
+
+	claims := token.Claims
+
+	rawMessage := claims()
+
+	byteSlice := []byte(rawMessage)
+
+	var mapa map[string]interface{}
+	err = json.Unmarshal(byteSlice, &mapa)
+	if err != nil {
+		fmt.Println("Greška prilikom dekodiranja JSON-a:", err)
+		return "", fmt.Errorf("Error decoding token")
+	}
+
+	username, ok := mapa["username"].(string)
+	if !ok {
+		return "", fmt.Errorf("Username not found in token claims")
+	}
+
+	return username, nil
+}
+
 func blackListChecking(username string) (bool, error) {
 
 	file, err := os.Open("blacklist.txt")
