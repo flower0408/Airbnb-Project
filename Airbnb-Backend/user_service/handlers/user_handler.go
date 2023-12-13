@@ -23,8 +23,10 @@ import (
 )
 
 var (
-	jwtKey      = []byte(os.Getenv("SECRET_KEY"))
-	verifier, _ = jwt.NewVerifierHS(jwt.HS256, jwtKey)
+	jwtKey                 = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _            = jwt.NewVerifierHS(jwt.HS256, jwtKey)
+	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
+	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
 )
 
 type UserHandler struct {
@@ -51,10 +53,12 @@ func (handler *UserHandler) Init(router *mux.Router) {
 	router.HandleFunc("/", handler.GetAll).Methods("GET")
 	router.HandleFunc("/", handler.Register).Methods("POST")
 	router.HandleFunc("/getOne/{username}", handler.GetOne).Methods("GET")
+	router.HandleFunc("/getId/{username}", handler.GetId).Methods("GET")
 	router.HandleFunc("/profile/", handler.Profile).Methods("GET")
 	router.HandleFunc("/mailExist/{mail}", handler.MailExist).Methods("GET")
 	router.HandleFunc("/changeUsername", handler.ChangeUsername).Methods("POST")
 	router.HandleFunc("/{userID}", handler.UpdateUser).Methods("PATCH")
+	router.HandleFunc("/{id}/delete", handler.DeleteAccount).Methods("DELETE")
 
 	http.Handle("/", router)
 	log.Fatal(http.ListenAndServe(":8002", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
@@ -323,6 +327,44 @@ func (handler *UserHandler) GetOne(writer http.ResponseWriter, request *http.Req
 		writer.WriteHeader(http.StatusNotFound)
 	}
 	jsonResponse(user, writer)
+}
+
+func (handler *UserHandler) GetId(writer http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	username := vars["username"]
+
+	userId, err := handler.service.GetOneUserId(username)
+	if err != nil {
+		log.Println(err)
+		writer.WriteHeader(http.StatusNotFound)
+	}
+	jsonResponse(userId, writer)
+}
+
+func (handler *UserHandler) DeleteAccount(writer http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	userID, err := primitive.ObjectIDFromHex(vars["id"])
+	if err != nil {
+		http.Error(writer, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+	err = handler.service.DeleteAccount(userID)
+	if err != nil {
+		http.Error(writer, "Error deleting account", http.StatusInternalServerError)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
+	writer.Write([]byte("Account deleted successfully"))
+}
+
+func extractBearerToken(authHeader string) string {
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return ""
+	}
+
+	return parts[1]
 }
 
 func (handler *UserHandler) Profile(writer http.ResponseWriter, req *http.Request) {

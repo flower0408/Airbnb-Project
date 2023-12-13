@@ -53,10 +53,13 @@ func main() {
 	searchAccommodations.HandleFunc("/search", accommodationHandler.SearchAccommodations)
 	getAccommodationId := router.Methods(http.MethodGet).Subrouter()
 	getAccommodationId.HandleFunc("/{id}", accommodationHandler.GetByID)
+	getAccommodationsByOwner := router.Methods(http.MethodGet).Subrouter()
+	getAccommodationsByOwner.HandleFunc("/owner/{ownerID}", accommodationHandler.GetAccommodationsByOwner)
 	postAccommodation := router.Methods(http.MethodPost).Subrouter()
 	postAccommodation.HandleFunc("/", accommodationHandler.CreateAccommodation)
 	postAccommodation.Use(accommodationHandler.MiddlewareAccommodationDeserialization)
-
+	deleteAccommodationsByOwner := router.Methods(http.MethodDelete).Subrouter()
+	deleteAccommodationsByOwner.HandleFunc("/delete_accommodations/{ownerID}", accommodationHandler.DeleteAccommodationsByOwnerID)
 	//Initialize the server
 
 	server := http.Server{

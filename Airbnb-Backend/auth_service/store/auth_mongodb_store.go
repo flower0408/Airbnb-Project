@@ -82,6 +82,15 @@ func (store *AuthMongoDBStore) UpdateUser(user *domain.Credentials) error {
 	return nil
 }
 
+func (store *AuthMongoDBStore) DeleteUser(username string) error {
+	filter := bson.M{"username": username}
+	_, err := store.credentials.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (store *AuthMongoDBStore) GetOneUserByID(id primitive.ObjectID) *domain.Credentials {
 	filter := bson.M{"_id": id}
 

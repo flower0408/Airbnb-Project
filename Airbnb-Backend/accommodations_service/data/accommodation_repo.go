@@ -68,7 +68,7 @@ func (rr *AccommodationRepo) Ping() {
 }
 
 func (rr *AccommodationRepo) InsertAccommodation(accommodation *Accommodation) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
 	accommodationCollection := rr.getCollection()
 
@@ -118,6 +118,53 @@ func (rr *AccommodationRepo) getByFilter(filter interface{}) (*Accommodation, er
 
 func (rr *AccommodationRepo) Search(filter interface{}) ([]*Accommodation, error) {
 	return rr.filter(filter)
+}
+
+func (rr *AccommodationRepo) GetAccommodationsByOwner(ownerID string) ([]primitive.ObjectID, error) {
+	filter := bson.D{{"ownerId", ownerID}}
+	return rr.filterIDs(filter)
+}
+
+func (rr *AccommodationRepo) DeleteAccommodationsByOwner(ownerID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+
+	accommodationsCollection := rr.getCollection()
+
+	filter := bson.M{"ownerId": ownerID}
+
+	_, err := accommodationsCollection.DeleteMany(ctx, filter)
+	if err != nil {
+		rr.logger.Println(err)
+		return err
+	}
+
+	return nil
+}
+
+func (rr *AccommodationRepo) filterIDs(filter interface{}) ([]primitive.ObjectID, error) {
+	ctx := context.TODO()
+	accommodationCollection := rr.getCollection()
+	cursor, err := accommodationCollection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var accommodationIDs []primitive.ObjectID
+	for cursor.Next(ctx) {
+		var accommodation Accommodation
+		if err := cursor.Decode(&accommodation); err != nil {
+			return nil, err
+		}
+		accommodationIDs = append(accommodationIDs, accommodation.ID)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return accommodationIDs, nil
 }
 
 func (rr *AccommodationRepo) filter(filter interface{}) ([]*Accommodation, error) {

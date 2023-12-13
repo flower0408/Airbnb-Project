@@ -35,6 +35,15 @@ func (service *UserService) GetOneUser(username string) (*domain.User, error) {
 	return retUser, nil
 }
 
+func (service *UserService) GetOneUserId(username string) (primitive.ObjectID, error) {
+	retUser, err := service.store.GetOneUser(username)
+	if err != nil {
+		log.Println(err)
+		return primitive.NilObjectID, fmt.Errorf("User not found")
+	}
+	return retUser.ID, nil
+}
+
 func (service *UserService) DoesEmailExist(email string) (string, error) {
 	user, err := service.store.GetByEmail(email)
 	if err != nil {
@@ -65,6 +74,15 @@ func (service *UserService) Register(user *domain.User) (*domain.User, error) {
 func (service *UserService) UpdateUser(updateUser *domain.User) (*domain.User, error) {
 
 	return service.store.UpdateUser(updateUser)
+}
+
+func (service *UserService) DeleteAccount(userID primitive.ObjectID) error {
+	err := service.store.DeleteAccount(userID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (service *UserService) ChangeUsername(username domain.UsernameChange) (string, int, error) {

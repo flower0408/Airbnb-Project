@@ -74,7 +74,7 @@ func (rr *AppointmentRepo) Ping() {
 
 // mongo
 func (rr *AppointmentRepo) InsertAppointment(appointment *Appointment) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
 	appointmentsCollection := rr.getCollection()
 
@@ -114,7 +114,7 @@ func (rr *AppointmentRepo) InsertAppointment(appointment *Appointment) error {
 }
 
 func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
 
 	originalAppointment, err := rr.GetAppointmentByID(id)
@@ -231,8 +231,27 @@ func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment
 	return nil
 }
 
+func (rr *AppointmentRepo) DeleteAppointmentsByAccommodationID(accommodationID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+
+	appointmentsCollection := rr.getCollection()
+
+	filter := bson.M{"accommodationId": accommodationID}
+
+	result, err := appointmentsCollection.DeleteMany(ctx, filter)
+	if err != nil {
+		rr.logger.Println(err)
+		return err
+	}
+
+	rr.logger.Printf("Deleted appointments count: ", result.DeletedCount)
+
+	return nil
+}
+
 func (rr *AppointmentRepo) GetAppointmentByID(id string) (*Appointment, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
 
 	appointmentsCollection := rr.getCollection()
@@ -248,7 +267,7 @@ func (rr *AppointmentRepo) GetAppointmentByID(id string) (*Appointment, error) {
 }
 
 func (rr *AppointmentRepo) GetAllAppointment() (*Appointments, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
 
 	appointmentsCollection := rr.getCollection()
@@ -267,7 +286,7 @@ func (rr *AppointmentRepo) GetAllAppointment() (*Appointments, error) {
 }
 
 func (rr *AppointmentRepo) GetAppointmentsByAccommodation(id string) (Appointments, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
 
 	appointmentsCollection := rr.getCollection()
