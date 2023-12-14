@@ -3,7 +3,7 @@ p, Guest, /cancelReservation/*, DELETE
 p, Guest, /check, POST
 p, Host, /check, POST
 p, Unauthenticated, /check, POST
-p, Guest, /reservationsByUser/*, GET
+p, Guest, /reservationsByUser, GET
 p, Guest, /reservationsByAccommodation/*, GET
 p, Host, /reservationsByAccommodation/*, GET
 p, Host, /appointments, POST
@@ -16,8 +16,8 @@ p, Host, /appointments/*, PATCH
 p, Host, /appointmentsByDate/*, GET
 p, Guest, /appointmentsByDate/*, GET
 p, Unauthenticated, /appointmentsByDate/*, GET
-p, Guest, /reservationsByUser/*, GET
-p, Unauthenticated, /reservationsByUser/*, GET
+p, Guest, /reservationsByUser, GET
+p, Unauthenticated, /reservationsByUser, GET
 p, Host, /reservationsByHost/*, GET
 p, Unauthenticated, /reservationsByHost/*, GET
 p, Host, /deleteAppointments/*, DELETE

@@ -13,6 +13,7 @@ import { CreateAccommodationComponent } from './components/create-accommodation/
 import {LoginGuardService} from "./guards/login-guard.service";
 import {RoleGuardService} from "./guards/role-guard.service";
 import {AccommodationDetailsComponent} from "./components/accommodation-details/accommodation-details.component";
+import { UserReservationsComponent } from './components/user-reservations/user-reservations.component';
 
 const routes: Routes = [
   {
@@ -77,6 +78,13 @@ const routes: Routes = [
     component: CreateAccommodationComponent,
     canActivate: [RoleGuardService],
     data: {expectedRoles: 'Host'}
+
+  },
+  {
+    path: 'myReservations',
+    component: UserReservationsComponent,
+    canActivate: [RoleGuardService],
+    data: {expectedRoles: 'Guest'}
 
   }
 ];

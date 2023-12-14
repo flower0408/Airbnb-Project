@@ -90,16 +90,16 @@ func main() {
 	updateAppointment.HandleFunc("/appointments/{id}", appointmentHandler.UpdateAppointment)
 	updateAppointment.Use(appointmentHandler.MiddlewareAppointmentDeserialization)
 
-	cancelReservation := router.Methods(http.MethodDelete).Subrouter()
-	cancelReservation.HandleFunc("/cancelReservation/{id}", reservationHandler.CancelReservation)
-	//cancelReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
-
 	checkReservationsForHost := router.Methods(http.MethodGet).Subrouter()
 	checkReservationsForHost.HandleFunc("/reservationsByHost/{id}", reservationHandler.CheckHostReservations)
 
 	getReservationByUser := router.Methods(http.MethodGet).Subrouter()
 	getReservationByUser.HandleFunc("/reservationsByUser", reservationHandler.GetReservationByUser)
 	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
+
+	cancelReservation := router.Methods(http.MethodDelete).Subrouter()
+	cancelReservation.HandleFunc("/cancelReservation/{id}", reservationHandler.CancelReservation)
+	//cancelReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
 
 	deleteAppointment := router.Methods(http.MethodDelete).Subrouter()
 	deleteAppointment.HandleFunc("/deleteAppointments/{id}", appointmentHandler.DeleteAppointmentsByAccommodationIDs)

@@ -22,4 +22,9 @@ export class ReservationService {
     return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/reservationsByAccommodation/${id}`);
   }
 
+  getReservationsByUser(): Observable<any> {
+
+    return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/reservationsByUser`);
+  }
+
 }

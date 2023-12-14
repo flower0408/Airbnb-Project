@@ -10,6 +10,7 @@
 
     <li class="nav-item">
       <a class="nav-link" *ngIf="isLoggedIn() && loggedUser" aria-pressed="true" routerLink="/My-Profile">Profile</a>
+      <a class="nav-link" *ngIf="isLoggedIn() && loggedUser && loggedUser.userType === 'Guest'" aria-pressed="true" routerLink="/myReservations">My reservations</a>
       <a class="nav-link" *ngIf="isLoggedIn()" aria-pressed="true" routerLink="/Main-Page">Main Page</a>
     </li>
   </ul>

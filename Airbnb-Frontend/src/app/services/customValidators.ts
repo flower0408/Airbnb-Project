@@ -70,20 +70,10 @@ export function endDayValidator(startDayControlName: string): ValidatorFn {
     const endDayValue = new Date(value.toDateString());
     const startDayValue = new Date(startDay.toDateString());
 
-    if (
-      endDayValue.getFullYear() < startDayValue.getFullYear() ||
-      (endDayValue.getFullYear() === startDayValue.getFullYear() &&
-        endDayValue.getMonth() < startDayValue.getMonth()) ||
-      (endDayValue.getFullYear() === startDayValue.getFullYear() &&
-        endDayValue.getMonth() === startDayValue.getMonth() &&
-        endDayValue.getDate() <= startDayValue.getDate())
-    ) {
+    if (endDayValue < startDayValue) {
       return { validator: true };
     }
 
     return null;
   };
 }
-
-
-

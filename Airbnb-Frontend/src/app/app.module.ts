@@ -34,6 +34,7 @@ import {AccommodationDetailsComponent} from "./components/accommodation-details/
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatInputModule } from '@angular/material/input';
 import { MatNativeDateModule } from '@angular/material/core';
+import { UserReservationsComponent } from './components/user-reservations/user-reservations.component';
 
 @NgModule({
   declarations: [
@@ -50,6 +51,7 @@ import { MatNativeDateModule } from '@angular/material/core';
     ChangePasswordComponent,
     CreateAccommodationComponent,
     AccommodationDetailsComponent,
+    UserReservationsComponent,
   ],
   imports: [
     BrowserModule,

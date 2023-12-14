@@ -97,6 +97,8 @@ services:
       ACCOMMODATIONS_SERVICE_PORT: ${ACCOMMODATIONS_SERVICE_PORT}
       APPOINTMENTS_DB_HOST: ${APPOINTMENTS_DB_HOST}
       APPOINTMENTS_DB_PORT: ${APPOINTMENTS_DB_PORT}
+      USER_SERVICE_HOST: ${USER_SERVICE_HOST}
+      USER_SERVICE_PORT: ${USER_SERVICE_PORT}
       # depends_on:
       # - reservations_db
     # Pokretanje reservation servisa tek kada je baza uspesno pokrenuta

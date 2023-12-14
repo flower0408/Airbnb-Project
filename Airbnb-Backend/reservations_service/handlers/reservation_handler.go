@@ -19,12 +19,10 @@ import (
 type KeyProduct struct{}
 
 var (
-	jwtKey                 = []byte(os.Getenv("SECRET_KEY"))
-	verifier, _            = jwt.NewVerifierHS(jwt.HS256, jwtKey)
-	userServiceHost        = os.Getenv("USER_SERVICE_HOST")
-	userServicePort        = os.Getenv("USER_SERVICE_PORT")
-	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
-	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
+	jwtKey          = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _     = jwt.NewVerifierHS(jwt.HS256, jwtKey)
+	userServiceHost = os.Getenv("USER_SERVICE_HOST")
+	userServicePort = os.Getenv("USER_SERVICE_PORT")
 )
 
 type ReservationHandler struct {
@@ -34,7 +32,11 @@ type ReservationHandler struct {
 }
 
 func NewReservationHandler(l *log.Logger, r *data.ReservationRepo) *ReservationHandler {
-	return &ReservationHandler{logger: l, reservationRepo: r}
+	return &ReservationHandler{
+		logger:          l,
+		reservationRepo: r,
+		cb:              CircuitBreaker("reservationService"),
+	}
 }
 
 // cassandra
@@ -117,13 +119,8 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 	log.Printf("Token Claims: %+v\n", claims)
 	username := claims["username"]
 
-	/*userID, statusCode, err := s.getUserIDFromUserService(username)
-	if err != nil {
-		http.Error(writer, err.Error(), statusCode)
-		return
-	}*/
-
 	// Circuit breaker for user service
+	log.Printf("Circuit Breaker: %+v\n", s.cb)
 	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
 		userID, statusCode, err := s.getUserIDFromUserService(username)
 		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
@@ -165,9 +162,12 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 	reservationByUser, err := s.reservationRepo.GetReservationByUser(userID)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
+		http.Error(rw, "Error getting reservations", http.StatusInternalServerError)
+		return
 	}
 
 	if reservationByUser == nil {
+		http.Error(rw, "Reservations not found", http.StatusNotFound)
 		return
 	}
 
@@ -182,6 +182,8 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 func (s *ReservationHandler) getUserIDFromUserService(username interface{}) (string, int, error) {
 	userServiceEndpoint := fmt.Sprintf("http://%s:%s/getOne/%s", userServiceHost, userServicePort, username)
 	userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
+	log.Printf("Host: %s, Port: %s, Username: %s\n", userServiceHost, userServicePort, username)
+
 	response, err := http.DefaultClient.Do(userServiceRequest)
 	if err != nil {
 		return "", http.StatusInternalServerError, err
@@ -316,4 +318,28 @@ func (s *ReservationHandler) MiddlewareReservationDeserialization(next http.Hand
 		h = h.WithContext(ctx)
 		next.ServeHTTP(rw, h)
 	})
+}
+func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
+	return gobreaker.NewCircuitBreaker(
+		gobreaker.Settings{
+			Name:        name,
+			MaxRequests: 1,
+			Timeout:     10 * time.Second,
+			Interval:    0,
+			ReadyToTrip: func(counts gobreaker.Counts) bool {
+				return counts.ConsecutiveFailures > 2
+			},
+			OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
+				log.Printf("Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
+			},
+
+			IsSuccessful: func(err error) bool {
+				if err == nil {
+					return true
+				}
+				errResp, ok := err.(data.ErrResp)
+				return ok && errResp.StatusCode >= 400 && errResp.StatusCode < 500
+			},
+		},
+	)
 }
