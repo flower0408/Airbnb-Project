@@ -146,7 +146,7 @@ func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.R
 	err := r.appointmentRepo.UpdateAppointment(id, appointment)
 	if err != nil {
 		if err.Error() == "Reservation exists for the appointment." {
-			rw.WriteHeader(http.StatusBadRequest)
+			rw.WriteHeader(http.StatusMethodNotAllowed)
 			rw.Write([]byte("Reservation exists for the appointment. Update not allowed."))
 		} else if err.Error() == "Error editing appointment. Date already exists. " {
 			r.logger.Print("Error editing appointment. Date already exists. ")

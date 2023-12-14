@@ -42,6 +42,7 @@ export class AccommodationDetailsComponent implements OnInit {
 
   accommodation: Accommodation | null = null;
   appointments!: Appointment[];
+  reservations!: Reservation[];
   reservationForm!: FormGroup;
   addAppointmentForm!: FormGroup;
   editAppointmentForm!: FormGroup;
@@ -188,6 +189,7 @@ export class AccommodationDetailsComponent implements OnInit {
 
     this.getAccommodationById();
     this.getAppoitmentsByAccommodation();
+    this.getReservationsByAccommodation();
 
     this.userRole = this.userService.getRoleFromToken();
 
@@ -221,27 +223,31 @@ export class AccommodationDetailsComponent implements OnInit {
       );
     }
   }
-
+  
   getAppoitmentsByAccommodation(): void {
     const accommodationId = this.route.snapshot.paramMap.get('id');
     if (accommodationId) {
       this.appointmentService.getAppointmentsByAccommodation(accommodationId).subscribe(
         (data: any) => {
-          this.appointments = data;
-          this.appointments?.forEach(a =>{
-            a.available.forEach(d =>{
-              this.allDates.push(d);
-            })
-          })
-          console.log(this.appointments);
-          console.log(this.allDates);
+          if (data && data.length > 0) {
+            this.appointments = data;
+            this.appointments?.forEach(a => {
+              a.available.forEach(d => {
+                this.allDates.push(d);
+              });
+            });
 
-          if(this.appointments[0].pricePerAccommodation !== 0){
-            this.inputAccommodationPrice = true;
-          }else{
-            this.inputGuestPrice = true;
+            console.log(this.appointments);
+            console.log(this.allDates);
+
+            if (this.appointments[0].pricePerAccommodation !== 0) {
+              this.inputAccommodationPrice = true;
+            } else {
+              this.inputGuestPrice = true;
+            }
+          } else {
+            console.log('No appointments for this accommodation.');
           }
-
         },
         (error) => {
           console.error(error);
@@ -249,6 +255,39 @@ export class AccommodationDetailsComponent implements OnInit {
       );
     }
   }
+
+
+  getReservationsByAccommodation(): void {
+    const accommodationId = this.route.snapshot.paramMap.get('id');
+    if (accommodationId) {
+      this.reservationService.getReservationsByAccommodation(accommodationId).subscribe(
+        (reservationsData: any) => {
+          this.reservations = reservationsData;
+
+          if (this.reservations && this.reservations.length > 0) {
+            const reservedDates = this.reservations.flatMap(reservation =>
+              reservation.period.map(reservedDate => new Date(reservedDate)));
+
+            console.log(this.reservations);
+            console.log(reservedDates);
+            console.log(this.allDates);
+
+            const allDatesAsDate = this.allDates.map(date => date instanceof Date ? date : new Date(date));
+
+            this.allDates = allDatesAsDate.filter(date => !reservedDates.some(rd => rd.toISOString() === date.toISOString()));
+
+            console.log(this.allDates);
+          } else {
+            console.log('No reservations for this accommodation.');
+          }
+        },
+        (error) => {
+          console.error(error);
+        }
+      );
+    }
+  }
+
 
   onSubmit(){
     this.submitted = true;
@@ -292,6 +331,9 @@ export class AccommodationDetailsComponent implements OnInit {
 
             },
       (error) => {
+        if (error.status === 405) {
+          this.openSnackBar('Reservation already exists for the specified dates and accommodation!', "");
+        }
           console.error('Error creating reservation:', error);
         }
       );
@@ -378,7 +420,10 @@ export class AccommodationDetailsComponent implements OnInit {
 
         },
         (error) => {
-          this.openSnackBar("Error editing appointment!", "")
+          if (error.status === 405) {
+            this.openSnackBar('Reservation exists for this appointment so you cannot change it!', "");
+          }
+          //this.openSnackBar("Error editing appointment!", "")
           console.error('Error editing appointment:', error);
           setTimeout(() => {
             window.location.reload();

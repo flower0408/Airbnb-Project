@@ -101,8 +101,15 @@ export class MainPageComponent implements OnInit {
     const startDay = this.searchForm.get('startDay')?.value;
     const endDay = this.searchForm.get('endDay')?.value;
 
-    const startDateFormatted = startDay ? startDay.toISOString() : '';
-    const endDateFormatted = endDay ? endDay.toISOString() : '';
+    const startDate = startDay ? new Date(startDay.getTime() + 24 * 60 * 60 * 1000) : null;
+
+    const endDate = endDay ? new Date(endDay.getTime() + 24 * 60 * 60 * 1000) : null;
+
+    const startDateFormatted = startDate ? startDate.toISOString() : '';
+    const endDateFormatted = endDate ? endDate.toISOString() : '';
+
+    console.log('Formatted Start Date:', startDateFormatted);
+    console.log('Formatted End Date:', endDateFormatted);
 
     if (location || minGuests !== undefined || startDay || endDay) {
       this.accommodationService.searchAccommodations(location, minGuests, startDateFormatted, endDateFormatted).subscribe(
