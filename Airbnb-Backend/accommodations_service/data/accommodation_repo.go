@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"log"
+	"net/http"
 	"os"
 	"time"
 )
@@ -17,6 +18,7 @@ import (
 type AccommodationRepo struct {
 	cli    *mongo.Client
 	logger *log.Logger
+	client *http.Client
 }
 
 func New(ctx context.Context, logger *log.Logger) (*AccommodationRepo, error) {
@@ -32,10 +34,19 @@ func New(ctx context.Context, logger *log.Logger) (*AccommodationRepo, error) {
 		return nil, err
 	}
 
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        10,
+			MaxIdleConnsPerHost: 10,
+			MaxConnsPerHost:     10,
+		},
+	}
+
 	// Return repository with logger and DB client
 	return &AccommodationRepo{
 		cli:    client,
 		logger: logger,
+		client: httpClient,
 	}, nil
 }
 

@@ -33,11 +33,11 @@
   <form *ngIf="userRole === 'Guest'" [formGroup]="reservationForm" (ngSubmit)="onSubmit()">
     <label>Start day</label>
     <mat-form-field appearance="outline">
-    <input matInput formControlName="startDay"
-           [matDatepickerFilter]="dateFilter"
-           [matDatepicker]="releasedAtPicker1">
-    <mat-datepicker-toggle matSuffix [for]="releasedAtPicker1"></mat-datepicker-toggle>
-    <mat-datepicker #releasedAtPicker1></mat-datepicker>
+      <input matInput formControlName="startDay"
+             [matDatepickerFilter]="dateFilter"
+             [matDatepicker]="releasedAtPicker1">
+      <mat-datepicker-toggle matSuffix [for]="releasedAtPicker1"></mat-datepicker-toggle>
+      <mat-datepicker #releasedAtPicker1></mat-datepicker>
     </mat-form-field>
 
     <label>End day</label>

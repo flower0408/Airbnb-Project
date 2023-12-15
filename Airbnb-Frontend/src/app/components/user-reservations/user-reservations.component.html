@@ -1,4 +1,9 @@
 <app-header></app-header>
+<div *ngIf="userReservations.length === 0; else reservationSection" class="accommodation-details-empty">
+  <p>~ You have no created reservations yet ~</p>
+</div>
+
+<ng-template #reservationSection>
 <div *ngFor="let reservation of userReservations" class="accommodation-details">
     <h2 class="accommodation-title">Accommodation name:</h2>
     <div class="detail benefits">
@@ -6,7 +11,7 @@
             {{ reservation.accommodation?.name }}
         </span>
     </div>
-  
+
     <div class="detail benefits">
         <span class="detail-label">Accommodation description:</span>
         <p>{{ reservation.accommodation?.description }}</p>
@@ -26,7 +31,7 @@
       <span class="detail-label">Period:</span>
       <p>{{ reservation.period[0] | date:'mediumDate':'UTC' }} - {{ reservation.period[reservation.period.length - 1] | date:'mediumDate':'UTC' }}</p>
     </div>
-  
+
     <div class="detail benefits">
         <span class="detail-label">Price:</span>
         <p>{{ reservation.price }}€</p>
@@ -37,4 +42,4 @@
     </div>
 
 </div>
-
+</ng-template>

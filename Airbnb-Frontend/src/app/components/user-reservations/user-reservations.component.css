@@ -11,25 +11,25 @@
     flex-direction: column;
     align-items: center;
   }
-  
+
   .accommodation-title {
     color: #9d4141c7;
     font-size: 24px;
     margin-bottom: 10px;
   }
-  
+
   .accommodation-description {
     color: #666;
     font-size: 18px;
     margin-bottom: 20px;
   }
-  
+
   .detail {
     margin-bottom: 15px;
     text-align: center;
     width: 100%;
   }
-  
+
   .formbold-btn {
     text-align: center;
     font-size: 16px;
@@ -51,43 +51,50 @@
     justify-content: center;
     align-items: center;
   }
-  
+
   .detail-label {
     font-weight: bold;
     color: #9d4141c7;
     display: block;
     font-size: 16px;
   }
-  
+
   .detail-value {
     color: #555;
     font-size: 16px;
     margin-top: 5px;
   }
-  
+
   .detail.location {
     display: flex;
     flex-direction: column;
     align-items: center;
   }
-  
+
   .detail.location .detail-label {
     margin-bottom: 5px;
   }
-  
+
   .detail.benefits {
     text-align: center;
   }
-  
+
   .detail.benefits ul {
     list-style-type: none;
     padding: 0;
     text-align: center;
   }
-  
+
   .detail.benefits li {
     color: #555;
     font-size: 16px;
     margin-bottom: 5px;
   }
-  
+
+/* Add this style for the message when there are no reservations */
+.accommodation-details-empty {
+  color: #F88379;
+  font-size: 22px;
+  text-align: center;
+  margin-top: 30px;
+}

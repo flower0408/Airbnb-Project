@@ -154,9 +154,15 @@ export class MyProfileComponent implements OnInit {
 
       },
       (error) => {
-        this.openSnackBar("" + error.error + "", "")
-        console.error('Error deleting user account:', error);
-        
+        if (error.status === 503) {
+          this.openSnackBar("Service is currently unavailable. Please try again later.", "");
+        }
+        else if (error.status === 502) {
+          this.openSnackBar("Service is currently unavailable. Please try again later.", "");
+        }else {
+          this.openSnackBar("" + error.error + "", "")
+          console.error('Error deleting user account:', error);
+        }
       }
     );
   }

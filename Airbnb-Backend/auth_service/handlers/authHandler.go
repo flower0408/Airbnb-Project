@@ -647,9 +647,24 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 		return
 	}
 
-	userID, err := handler.getUserIDByUsername(username, tokenString)
-	if err != nil {
-		fmt.Println("Error getting userId by username:", err)
+	var userID string
+	var userIDErr error
+
+	// Circuit breaker for getting user ID by username
+	_, breakerErr := handler.cb.Execute(func() (interface{}, error) {
+		userID, userIDErr = handler.getUserIDByUsername(username, tokenString)
+		return nil, userIDErr
+	})
+
+	if breakerErr != nil {
+		log.Println("Circuit breaker open:", breakerErr)
+		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	if userIDErr != nil {
+		fmt.Println("Error getting userId by username:", userIDErr)
+		http.Error(writer, "Error getting user ID", http.StatusInternalServerError)
 		return
 	}
 
@@ -658,7 +673,6 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 	userType := claims["userType"]
 
 	var hasReservations bool
-	var breakerErr error
 	var ok bool
 
 	if userType == "Host" {

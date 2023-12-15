@@ -22,6 +22,7 @@ import (
 type AppointmentRepo struct {
 	cli    *mongo.Client
 	logger *log.Logger
+	client *http.Client
 }
 
 func NewAppointmentRepo(ctx context.Context, logger *log.Logger) (*AppointmentRepo, error) {
@@ -37,10 +38,19 @@ func NewAppointmentRepo(ctx context.Context, logger *log.Logger) (*AppointmentRe
 		return nil, err
 	}
 
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        10,
+			MaxIdleConnsPerHost: 10,
+			MaxConnsPerHost:     10,
+		},
+	}
+
 	// Return repository with logger and DB client
 	return &AppointmentRepo{
 		logger: logger,
 		cli:    client,
+		client: httpClient,
 	}, nil
 }
 

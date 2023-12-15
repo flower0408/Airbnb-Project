@@ -99,7 +99,7 @@ export class RegisterComponent implements OnInit {
           } else if (error.status === 405) {
             this.openSnackBar('User with that email already exists!', "");
           } else if (error.status === 503) {
-            this.openSnackBar("User service is currently unavailable. Please try again later.", "");
+            this.openSnackBar("Service is currently unavailable. Please try again later.", "");
           } else {
             // console.log(error);
           }

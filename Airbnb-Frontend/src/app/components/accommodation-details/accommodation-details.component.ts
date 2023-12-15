@@ -85,6 +85,23 @@ export class AccommodationDetailsComponent implements OnInit {
       new Date(allowedDate).getUTCFullYear() === formattedDate.getUTCFullYear()
     );
   };
+  /*dateFilter = (date: Date | null): boolean => {
+    if (!date) {
+      return false;
+    }
+
+    const formattedDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+
+    //console.log(formattedDate);
+    //console.log(this.allDates);
+
+    return this.allDates.some(allowedDate =>
+      new Date(allowedDate).getUTCDate() === formattedDate.getUTCDate() &&
+      new Date(allowedDate).getUTCMonth() === formattedDate.getUTCMonth() &&
+      new Date(allowedDate).getUTCFullYear() === formattedDate.getUTCFullYear()
+    );
+  };*/
+
 
   dateFilter2 = (date: Date | null): boolean => {
     if (!date) {
@@ -230,30 +247,23 @@ export class AccommodationDetailsComponent implements OnInit {
     if (accommodationId) {
       this.appointmentService.getAppointmentsByAccommodation(accommodationId).subscribe(
         (data: any) => {
-          if (data && data.length > 0) {
-            this.appointments = data;
-            this.appointments?.forEach(a => {
-              a.available.forEach(d => {
-                this.allDates.push(d);
-              });
-            });
+          this.appointments = data;
+          this.appointments.forEach(a =>{
+            a.available.forEach(d =>{
+              this.allDates.push(d);
+            })
+          })
+          console.log(this.appointments);
+          console.log(this.allDates);
 
-            console.log(this.appointments);
-            console.log(this.allDates);
-
-            if (this.appointments[0].pricePerAccommodation !== 0) {
-              this.inputAccommodationPrice = true;
-            } else {
-              this.inputGuestPrice = true;
-            }
-          } else {
-            console.log('No appointments for this accommodation.');
+          if(this.appointments[0].pricePerAccommodation !== 0){
+            this.inputAccommodationPrice = true;
+          }else{
+            this.inputGuestPrice = true;
           }
+
         },
         (error) => {
-          if (error.status === 502) {
-            this.openSnackBar('Service is not currently available, please try later!', "");
-          }
           console.error(error);
         }
       );

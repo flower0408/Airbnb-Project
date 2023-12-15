@@ -25,6 +25,7 @@ var (
 type ReservationRepo struct {
 	session *gocql.Session
 	logger  *log.Logger
+	client  *http.Client
 }
 
 func NewReservationRepo(logger *log.Logger) (*ReservationRepo, error) {
@@ -61,10 +62,19 @@ func NewReservationRepo(logger *log.Logger) (*ReservationRepo, error) {
 		return nil, err
 	}
 
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        10,
+			MaxIdleConnsPerHost: 10,
+			MaxConnsPerHost:     10,
+		},
+	}
+
 	// Return repository with logger and DB session
 	return &ReservationRepo{
 		session: session,
 		logger:  logger,
+		client:  httpClient,
 	}, nil
 }
 

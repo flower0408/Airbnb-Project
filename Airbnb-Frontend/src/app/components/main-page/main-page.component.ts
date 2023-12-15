@@ -119,10 +119,10 @@ export class MainPageComponent implements OnInit {
         (error) => {
           console.error(error);
           if (error.status === 503 ) {
-            this.openSnackBar("Reservation service is currently unavailable. Please try again later or try search without dates.", "");
+            this.openSnackBar("We have no search results for these dates, please try again with a different entry or without an interval.", "");
           }
           else if (error.status === 502 ) {
-            this.openSnackBar("Reservation service is currently unavailable. Please try again later or try search without dates.", "");
+            this.openSnackBar("We have no search results for these dates, please try again with a different entry or without an interval.", "");
           }
         }
       );
