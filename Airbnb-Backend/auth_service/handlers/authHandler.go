@@ -725,7 +725,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 	} else if userType == "Guest" {
 		// Circuit breaker for checking guest reservations
 		hasReservationsResult, breakerErr := handler.cb.Execute(func() (interface{}, error) {
-			return handler.hasGuestReservations(userID, tokenString)
+			return handler.hasGuestReservations(tokenString)
 		})
 
 		if breakerErr != nil {

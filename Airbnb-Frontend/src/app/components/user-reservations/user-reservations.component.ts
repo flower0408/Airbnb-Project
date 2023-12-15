@@ -4,6 +4,7 @@ import { MatSnackBar, MatSnackBarRef, SimpleSnackBar } from '@angular/material/s
 import { ActivatedRoute, Router } from '@angular/router';
 import { Observable } from 'rxjs';
 import { Reservation } from 'src/app/models/reservation.model';
+import { AccommodationService } from 'src/app/services/accommodation.service';
 import { ReservationService } from 'src/app/services/reservation.service';
 import { UserService } from 'src/app/services/user.service';
 
@@ -16,7 +17,7 @@ export class UserReservationsComponent implements OnInit {
 
   userReservations: Reservation[] = [];
 
-  constructor(private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private fb: FormBuilder,private route: ActivatedRoute) {
+  constructor(private accommodationService:AccommodationService,private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private fb: FormBuilder,private route: ActivatedRoute) {
   }
 
   ngOnInit(): void {
@@ -28,6 +29,17 @@ export class UserReservationsComponent implements OnInit {
         (data: any) => {
           this.userReservations = data;
           console.log(this.userReservations);
+          this.userReservations.forEach(reservation => {
+            this.accommodationService.getAccommodationById(reservation.accommodationId!).subscribe(
+              (data: any) => {
+                reservation.accommodation = data;
+                console.log(reservation.accommodation)                   
+              },
+              (error) => {
+                console.error(error);
+              }
+          );
+          });
 
         },
         (error) => {

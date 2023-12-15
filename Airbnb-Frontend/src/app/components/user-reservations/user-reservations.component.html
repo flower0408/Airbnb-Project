@@ -1,7 +1,27 @@
 <app-header></app-header>
 <div *ngFor="let reservation of userReservations" class="accommodation-details">
-    <h2 class="accommodation-title">Accommodation: {{ reservation.accommodationId }}</h2>
+    <h2 class="accommodation-title">Accommodation name:</h2>
+    <div class="detail benefits">
+        <span class="detail-value">
+            {{ reservation.accommodation?.name }}
+        </span>
+    </div>
   
+    <div class="detail benefits">
+        <span class="detail-label">Accommodation description:</span>
+        <p>{{ reservation.accommodation?.description }}</p>
+    </div>
+
+    <div class="detail benefits">
+        <span class="detail-label">Accommodation location:</span>
+        <span class="detail-value">
+            {{ reservation.accommodation?.location?.street }},
+            {{ reservation.accommodation?.location?.number }},
+            {{ reservation.accommodation?.location?.city }},
+            {{ reservation.accommodation?.location?.country }}
+        </span>
+    </div>
+
     <div class="detail benefits">
       <span class="detail-label">Period:</span>
       <p>{{ reservation.period[0] | date:'mediumDate':'UTC' }} - {{ reservation.period[reservation.period.length - 1] | date:'mediumDate':'UTC' }}</p>
@@ -9,7 +29,7 @@
   
     <div class="detail benefits">
         <span class="detail-label">Price:</span>
-        <p>{{ reservation.price }}</p>
+        <p>{{ reservation.price }}€</p>
     </div>
 
     <div class="container">
