@@ -18,16 +18,12 @@ import { UserReservationsComponent } from './components/user-reservations/user-r
 const routes: Routes = [
   {
     path: 'Main-Page',
-    component: MainPageComponent,
-    canActivate: [RoleGuardService],
-    data: {expectedRoles: 'Host|Guest'}
+    component: MainPageComponent
   },
 
   {
     path: 'AccommodationDetails/:id',
-    component: AccommodationDetailsComponent,
-    canActivate: [RoleGuardService],
-    data: { expectedRoles: 'Host|Guest' }
+    component: AccommodationDetailsComponent
   },
 
   {

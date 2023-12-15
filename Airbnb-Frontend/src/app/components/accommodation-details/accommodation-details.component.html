@@ -49,12 +49,16 @@
       <mat-datepicker #releasedAtPicker2></mat-datepicker>
     </mat-form-field>
 
-    <div *ngFor="let row of counterRows" class="container">
-      <p style="font-size: 13px;">{{ row }}</p>
-    </div>
     <div style="border-bottom: 1px solid gray;" class="container" *ngIf="reservationForm.get('startDay')?.value !== '' && reservationForm.get('endDay')?.value !== ''">
-      <h2 style="color: rgb(67, 67, 67); ">Total price: {{sum}}€</h2>
+      <h2 *ngFor="let detail of priceDetails" style="color: rgb(67, 67, 67); ">
+        Price per {{ detail.type }}
+        per night is {{ detail.price }}€
+        <br>
+        Total price: {{ detail.numberOfDays }}x{{ detail.price }}€ = {{ detail.numberOfDays * detail.price }}€
+      </h2>
     </div>
+
+
 
     <div class="container" style="padding-top: 25px;">
       <button type="submit" class="formbold-btn">Create reservation</button>

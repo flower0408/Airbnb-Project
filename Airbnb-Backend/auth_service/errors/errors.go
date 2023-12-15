@@ -16,4 +16,5 @@ const (
 	BlackList                 = "Password is in the blacklist"
 	InvalidPasswordFormat     = "Invalid password format"
 	EmptyPassword             = "New password is empty"
+	ErrorDeleteAccommodation  = "Error deleting accommodations"
 )

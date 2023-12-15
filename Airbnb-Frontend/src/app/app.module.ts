@@ -18,6 +18,7 @@ import { AppComponent } from './app.component';
 import { MainPageComponent } from './components/main-page/main-page.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { HeaderComponent } from './components/header/header.component';
+import { NavigationComponent } from './components/navigation/navigation.component';
 import { RegisterComponent } from './components/register/register.component';
 import { LoginComponent } from './components/login/login.component';
 import { AuthInterceptor } from './services/auth.interceptor';
@@ -41,6 +42,7 @@ import { UserReservationsComponent } from './components/user-reservations/user-r
     AppComponent,
     MainPageComponent,
     HeaderComponent,
+    NavigationComponent,
     RegisterComponent,
     LoginComponent,
     AccountConfirmationComponent,
