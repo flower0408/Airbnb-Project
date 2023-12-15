@@ -5,6 +5,10 @@
     </li>
 
     <li class="nav-item">
+    <a class="nav-link" *ngIf="!isLoggedIn()" aria-pressed="true" routerLink="/">Login</a>
+    </li>
+
+    <li class="nav-item">
       <a class="nav-link" *ngIf="isLoggedIn() && loggedUser && loggedUser.userType === 'Host'" aria-pressed="true" routerLink="/createAccommodation">Create accommodation</a>
     </li>
 

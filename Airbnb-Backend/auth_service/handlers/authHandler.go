@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"github.com/casbin/casbin"
 	"github.com/gorilla/mux"
+	"github.com/sony/gobreaker"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"io"
@@ -30,6 +31,7 @@ const EmailServiceUnavailableStatusCode = 55
 type AuthHandler struct {
 	service *application.AuthService
 	store   *store.AuthMongoDBStore
+	cb      *gobreaker.CircuitBreaker
 }
 
 var (
@@ -44,6 +46,7 @@ var (
 func NewAuthHandler(service *application.AuthService) *AuthHandler {
 	return &AuthHandler{
 		service: service,
+		cb:      CircuitBreaker("accommodationService"),
 	}
 }
 
@@ -525,6 +528,109 @@ func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request)
 	writer.Write([]byte(token))
 }
 
+/*
+	func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Request) {
+		tokenString, err := extractTokenFromHeader(req)
+		if err != nil {
+			writer.WriteHeader(http.StatusBadRequest)
+			writer.Write([]byte("No token found"))
+			return
+		}
+
+		username, err := handler.service.ExtractUsernameFromToken(tokenString)
+		if err != nil {
+			fmt.Println("Error extracting username:", err)
+			writer.WriteHeader(http.StatusBadRequest)
+			writer.Write([]byte("Error parsing token"))
+			return
+		}
+
+		userID, err := handler.getUserIDByUsername(username, tokenString)
+		if err != nil {
+			fmt.Println("Error getting userId by username:", err)
+			return
+		}
+
+		parsedToken := authorization.GetToken(tokenString)
+		claims := authorization.GetMapClaims(parsedToken.Bytes())
+		userType := claims["userType"]
+
+		if userType == "Host" {
+			hasReservations, err := handler.hasHostReservations(userID, tokenString)
+			if err != nil {
+				http.Error(writer, "Error checking host reservations", http.StatusInternalServerError)
+				return
+			}
+			if hasReservations {
+				http.Error(writer, "Host has reservations, cannot delete account", http.StatusForbidden)
+				return
+			} else {
+				deleteAccommodationsEndpoint := fmt.Sprintf("http://%s:%s/delete_accommodations/%s", accommodationServiceHost, accommodationServicePort, userID)
+				deleteAccommodationsRequest, err := http.NewRequest("DELETE", deleteAccommodationsEndpoint, nil)
+				deleteAccommodationsRequest.Header.Set("Authorization", "Bearer "+tokenString)
+				if err != nil {
+					log.Println("Error creating deleteAccommodationsRequest:", err)
+					http.Error(writer, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				deleteAccommodationsResponse, err := http.DefaultClient.Do(deleteAccommodationsRequest)
+				if err != nil {
+					log.Println("Error sending deleteAccommodationsRequest:", err)
+					http.Error(writer, "Internal server error", http.StatusInternalServerError)
+					return
+				}
+				defer deleteAccommodationsResponse.Body.Close()
+
+				if deleteAccommodationsResponse.StatusCode != http.StatusOK {
+					log.Println("Error deleting accommodations:", deleteAccommodationsResponse.Status)
+					http.Error(writer, "Error deleting accommodations", http.StatusInternalServerError)
+					return
+				}
+			}
+
+		} else if userType == "Guest" {
+			hasReservations, err := handler.hasGuestReservations(userID, tokenString)
+			if err != nil {
+				http.Error(writer, "Error checking guest reservations", http.StatusInternalServerError)
+				return
+			}
+			if hasReservations {
+				http.Error(writer, "Guest has reservations, cannot delete account", http.StatusForbidden)
+				return
+			}
+		}
+
+		err = handler.userServiceDeleteUser(userID, tokenString)
+		if err != nil {
+			log.Println(err)
+			http.Error(writer, "Error deleting user in user service", http.StatusInternalServerError)
+			return
+		}
+
+		status, statusCode, err := handler.service.DeleteUser(username)
+
+		if err != nil {
+			var errorMessage string
+
+			switch status {
+			case "baseErr":
+				errorMessage = "Internal server error"
+			case "UserServiceError":
+				errorMessage = "User service is currently unavailable. Please try again later."
+			default:
+				errorMessage = "An error occurred"
+			}
+
+			http.Error(writer, errorMessage, statusCode)
+			return
+		}
+
+		writer.WriteHeader(http.StatusOK)
+		writer.Write([]byte("User deleted successfully"))
+	}
+*/
+
 func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Request) {
 	tokenString, err := extractTokenFromHeader(req)
 	if err != nil {
@@ -551,61 +657,114 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 	claims := authorization.GetMapClaims(parsedToken.Bytes())
 	userType := claims["userType"]
 
+	var hasReservations bool
+	var breakerErr error
+	var ok bool
+
 	if userType == "Host" {
-		hasReservations, err := handler.hasHostReservations(userID, tokenString)
-		if err != nil {
-			http.Error(writer, "Error checking host reservations", http.StatusInternalServerError)
+		// Circuit breaker for checking host reservations
+		hasReservationsResult, breakerErr := handler.cb.Execute(func() (interface{}, error) {
+			return handler.hasHostReservations(userID, tokenString)
+		})
+
+		if breakerErr != nil {
+			log.Println("Circuit breaker open:", breakerErr)
+			http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 			return
 		}
+
+		hasReservations, ok = hasReservationsResult.(bool)
+		if !ok {
+			log.Println("Internal server error: Unexpected result type")
+			http.Error(writer, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
 		if hasReservations {
 			http.Error(writer, "Host has reservations, cannot delete account", http.StatusForbidden)
 			return
 		} else {
-			deleteAccommodationsEndpoint := fmt.Sprintf("http://%s:%s/delete_accommodations/%s", accommodationServiceHost, accommodationServicePort, userID)
-			deleteAccommodationsRequest, err := http.NewRequest("DELETE", deleteAccommodationsEndpoint, nil)
-			deleteAccommodationsRequest.Header.Set("Authorization", "Bearer "+tokenString)
-			if err != nil {
-				log.Println("Error creating deleteAccommodationsRequest:", err)
-				http.Error(writer, "Internal server error", http.StatusInternalServerError)
+			// Circuit breaker for deleting accommodations
+			deleteAccommodationsResult, breakerErr := handler.cb.Execute(func() (interface{}, error) {
+				deleteAccommodationsEndpoint := fmt.Sprintf("http://%s:%s/delete_accommodations/%s", accommodationServiceHost, accommodationServicePort, userID)
+				deleteAccommodationsRequest, err := http.NewRequest("DELETE", deleteAccommodationsEndpoint, nil)
+				deleteAccommodationsRequest.Header.Set("Authorization", "Bearer "+tokenString)
+				if err != nil {
+					log.Println("Error creating deleteAccommodationsRequest:", err)
+					return nil, err
+				}
+
+				deleteAccommodationsResponse, err := http.DefaultClient.Do(deleteAccommodationsRequest)
+				if err != nil {
+					log.Println("Error sending deleteAccommodationsRequest:", err)
+					return nil, err
+				}
+				defer deleteAccommodationsResponse.Body.Close()
+
+				if deleteAccommodationsResponse.StatusCode != http.StatusOK {
+					log.Println("Error deleting accommodations:", deleteAccommodationsResponse.Status)
+					//return nil, errors.New("Error deleting accommodations")
+					return nil, fmt.Errorf("Error deleting accommodations: %s", err)
+
+				}
+
+				return nil, nil
+			})
+
+			if breakerErr != nil {
+				log.Println("Circuit breaker open:", breakerErr)
+				http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 				return
 			}
 
-			deleteAccommodationsResponse, err := http.DefaultClient.Do(deleteAccommodationsRequest)
-			if err != nil {
-				log.Println("Error sending deleteAccommodationsRequest:", err)
-				http.Error(writer, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-			defer deleteAccommodationsResponse.Body.Close()
-
-			if deleteAccommodationsResponse.StatusCode != http.StatusOK {
-				log.Println("Error deleting accommodations:", deleteAccommodationsResponse.Status)
+			if _, ok := deleteAccommodationsResult.(error); ok {
 				http.Error(writer, "Error deleting accommodations", http.StatusInternalServerError)
 				return
 			}
 		}
-
 	} else if userType == "Guest" {
-		hasReservations, err := handler.hasGuestReservations(tokenString)
-		if err != nil {
-			http.Error(writer, "Error checking guest reservations", http.StatusInternalServerError)
+		// Circuit breaker for checking guest reservations
+		hasReservationsResult, breakerErr := handler.cb.Execute(func() (interface{}, error) {
+			return handler.hasGuestReservations(userID, tokenString)
+		})
+
+		if breakerErr != nil {
+			log.Println("Circuit breaker open:", breakerErr)
+			http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 			return
 		}
-		if hasReservations {
-			http.Error(writer, "Guest has reservations, cannot delete account", http.StatusForbidden)
+
+		hasReservations, ok = hasReservationsResult.(bool)
+		if !ok {
+			log.Println("Internal server error: Unexpected result type")
+			http.Error(writer, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 	}
 
-	err = handler.userServiceDeleteUser(userID, tokenString)
-	if err != nil {
-		log.Println(err)
-		http.Error(writer, "Error deleting user in user service", http.StatusInternalServerError)
+	if hasReservations {
+		http.Error(writer, "User has reservations, cannot delete account", http.StatusForbidden)
+		return
+	}
+
+	// Circuit breaker for deleting user in user service
+	deleteUserErrResult, breakerErr := handler.cb.Execute(func() (interface{}, error) {
+		return nil, handler.userServiceDeleteUser(userID, tokenString)
+	})
+
+	if breakerErr != nil {
+		log.Println("Circuit breaker open:", breakerErr)
+		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	if _, ok := deleteUserErrResult.(error); ok {
+		log.Println("User not found in user service")
+		http.Error(writer, "User not found", http.StatusNotFound)
 		return
 	}
 
 	status, statusCode, err := handler.service.DeleteUser(username)
-
 	if err != nil {
 		var errorMessage string
 
@@ -786,4 +945,31 @@ func ExtractTraceInfoMiddleware(next http.Handler) http.Handler {
 		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
+	return gobreaker.NewCircuitBreaker(
+		gobreaker.Settings{
+			Name:        name,
+			MaxRequests: 1,
+			Timeout:     10 * time.Second,
+			Interval:    0,
+			ReadyToTrip: func(counts gobreaker.Counts) bool {
+				return counts.ConsecutiveFailures > 2
+			},
+			OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
+				//fmt.Printf("DEBUG: Before Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
+				log.Printf("Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
+				//fmt.Printf("DEBUG: After Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
+			},
+
+			IsSuccessful: func(err error) bool {
+				if err == nil {
+					return true
+				}
+				errResp, ok := err.(domain.ErrResp)
+				return ok && errResp.StatusCode >= 400 && errResp.StatusCode < 500
+			},
+		},
+	)
 }

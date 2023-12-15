@@ -65,10 +65,10 @@ export class CreateAccommodationComponent implements OnInit{
 
   onSubmit() {
     this.submitted = true;
-  
+
     if (this.accommodationForm.valid) {
       const formValues = this.accommodationForm.value;
-  
+
       const newAccommodation: Accommodation = {
         name: formValues.name,
         description: formValues.description,
@@ -84,7 +84,7 @@ export class CreateAccommodationComponent implements OnInit{
         maxGuest: formValues.Maxguest,
         ownerId: '',
       };
-  
+
       this.accommodationService.createAccommodation(newAccommodation).subscribe(
         (id:any) => {
           this.responseId = id;
@@ -94,12 +94,12 @@ export class CreateAccommodationComponent implements OnInit{
             dateRange = elements[i].textContent;
             console.log(dateRange);
           }
-  
+
           let [start, end] = dateRange!.split(" - ");
-  
+
           let datesInRange: Date[] = getDatesInRange(start, end);
           console.log(datesInRange);
-  
+
           const newAppointment: Appointment = {
             id: "",
             available: datesInRange,
@@ -107,16 +107,16 @@ export class CreateAccommodationComponent implements OnInit{
             pricePerGuest: 0,
             pricePerAccommodation: 0
           };
-  
+
           let selectedRadio = getSelectedRadio();
           console.log(selectedRadio);
-  
+
           if (selectedRadio === 'Guest price') {
             newAppointment.pricePerGuest = formValues.price;
           } else {
             newAppointment.pricePerAccommodation = formValues.price;
           }
-  
+
           this.appointmentService.createAppointment(newAppointment).subscribe(
             () => {
               this.openSnackBar("Accommodation created successfully!", "");
@@ -131,13 +131,13 @@ export class CreateAccommodationComponent implements OnInit{
         },
         (error) => {
           console.error('Error creating accommodation:', error);
-  
+
           if (error instanceof HttpErrorResponse) {
             if (error.status === 503) {
-              this.openSnackBar("User service is currently unavailable. Please try again later.", "");
+              this.openSnackBar("Service is currently unavailable. Please try again later.", "");
             }
             else if (error.status === 502) {
-              this.openSnackBar("User service is currently unavailable. Please try again later.", "");
+              this.openSnackBar("Service is currently unavailable. Please try again later.", "");
             }
             else {
               this.openSnackBar(`Error creating accommodation: ${error.message}`, "");
@@ -150,7 +150,7 @@ export class CreateAccommodationComponent implements OnInit{
       );
     }
   }
-  
+
   openSnackBar(message: string, action: string) {
     this._snackBar.open(message, action,  {
       duration: 3500

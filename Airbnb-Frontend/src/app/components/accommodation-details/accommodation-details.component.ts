@@ -42,6 +42,7 @@ export class AccommodationDetailsComponent implements OnInit {
 
   accommodation: Accommodation | null = null;
   appointments!: Appointment[];
+  reservations!: Reservation[];
   reservationForm!: FormGroup;
   addAppointmentForm!: FormGroup;
   editAppointmentForm!: FormGroup;
@@ -56,6 +57,7 @@ export class AccommodationDetailsComponent implements OnInit {
   selectedAppointment: number | null = null;
   counter:string = "";
   counterRows: string[] = [];
+  priceDetails: any[] = [];
 
 
   constructor(private dateAdapter: DateAdapter<Date>,private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {
@@ -188,6 +190,7 @@ export class AccommodationDetailsComponent implements OnInit {
 
     this.getAccommodationById();
     this.getAppoitmentsByAccommodation();
+    this.getReservationsByAccommodation();
 
     this.userRole = this.userService.getRoleFromToken();
 
@@ -227,28 +230,71 @@ export class AccommodationDetailsComponent implements OnInit {
     if (accommodationId) {
       this.appointmentService.getAppointmentsByAccommodation(accommodationId).subscribe(
         (data: any) => {
-          this.appointments = data;
-          this.appointments?.forEach(a =>{
-            a.available.forEach(d =>{
-              this.allDates.push(d);
-            })
-          })
-          console.log(this.appointments);
-          console.log(this.allDates);
+          if (data && data.length > 0) {
+            this.appointments = data;
+            this.appointments?.forEach(a => {
+              a.available.forEach(d => {
+                this.allDates.push(d);
+              });
+            });
 
-          if(this.appointments[0].pricePerAccommodation !== 0){
-            this.inputAccommodationPrice = true;
-          }else{
-            this.inputGuestPrice = true;
+            console.log(this.appointments);
+            console.log(this.allDates);
+
+            if (this.appointments[0].pricePerAccommodation !== 0) {
+              this.inputAccommodationPrice = true;
+            } else {
+              this.inputGuestPrice = true;
+            }
+          } else {
+            console.log('No appointments for this accommodation.');
           }
-
         },
         (error) => {
+          if (error.status === 502) {
+            this.openSnackBar('Service is not currently available, please try later!', "");
+          }
           console.error(error);
         }
       );
     }
   }
+
+
+  getReservationsByAccommodation(): void {
+    const accommodationId = this.route.snapshot.paramMap.get('id');
+    if (accommodationId) {
+      this.reservationService.getReservationsByAccommodation(accommodationId).subscribe(
+        (reservationsData: any) => {
+          this.reservations = reservationsData;
+
+          if (this.reservations && this.reservations.length > 0) {
+            const reservedDates = this.reservations.flatMap(reservation =>
+              reservation.period.map(reservedDate => new Date(reservedDate)));
+
+            console.log(this.reservations);
+            console.log(reservedDates);
+            console.log(this.allDates);
+
+            const allDatesAsDate = this.allDates.map(date => date instanceof Date ? date : new Date(date));
+
+            this.allDates = allDatesAsDate.filter(date => !reservedDates.some(rd => rd.toISOString() === date.toISOString()));
+
+            console.log(this.allDates);
+          } else {
+            console.log('No reservations for this accommodation.');
+          }
+        },
+        (error) => {
+          if (error.status === 502) {
+            this.openSnackBar('Service is not currently available, please try later!', "");
+          }
+          console.error(error);
+        }
+      );
+    }
+  }
+
 
   onSubmit(){
     this.submitted = true;
@@ -292,6 +338,12 @@ export class AccommodationDetailsComponent implements OnInit {
 
             },
       (error) => {
+        if (error.status === 405) {
+          this.openSnackBar('Reservation already exists for the specified dates and accommodation!', "");
+        }
+        if (error.status === 502) {
+          this.openSnackBar('Service is not currently available, please try later!', "");
+        }
           console.error('Error creating reservation:', error);
         }
       );
@@ -336,7 +388,10 @@ export class AccommodationDetailsComponent implements OnInit {
 
         },
         (error) => {
-          this.openSnackBar("Error creating appointment!", "")
+          if (error.status === 502) {
+            this.openSnackBar('Service is not currently available, please try later!', "");
+          }
+          //this.openSnackBar("Error creating appointment!", "")
           console.error('Error creating appointment:', error);
         }
       );
@@ -378,8 +433,14 @@ export class AccommodationDetailsComponent implements OnInit {
 
         },
         (error) => {
-          this.openSnackBar("Error editing appointment!", "")
-          console.error('Error editing appointment:', error);
+          if (error.status === 405) {
+            this.openSnackBar('Reservation exists for this appointment so you cannot change it!', "");
+          }
+          if (error.status === 502) {
+            this.openSnackBar('Service is not currently available, please try later!', "");
+          }
+          //this.openSnackBar("Error editing appointment!", "")
+          //console.error('Error editing appointment:', error);
           setTimeout(() => {
             window.location.reload();
           }, 2000);
@@ -407,41 +468,39 @@ export class AccommodationDetailsComponent implements OnInit {
       const datesInRange: Date[] = getDatesInRange(startDayValue, endDayValue);
 
       this.sum = 0;
-      this.counter = "";
-      this.counterRows = [];
 
-      function formatDateWithoutTime(date: Date): string {
-        const year = date.getUTCFullYear();
-        const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-        const day = date.getUTCDate().toString().padStart(2, '0');
-
-        return `${day}/${month}/${year}`;
-      }
+      const priceDetails: { numberOfDays: number; price: number; type: string }[] = [];
 
       this.appointments.forEach(appointment => {
         appointment.available.forEach(date => {
-          date = new Date(date)
+          date = new Date(date);
           datesInRange.forEach(reservedDate => {
-            reservedDate = new Date(reservedDate)
+            reservedDate = new Date(reservedDate);
             if (date.toISOString() === reservedDate.toISOString()) {
-              let row = '';
-              if (appointment.pricePerGuest !== 0) {
-                this.sum += appointment.pricePerGuest;
-                row = formatDateWithoutTime(reservedDate) + " = " + appointment.pricePerGuest + "€";
-              } else {
-                this.sum += appointment.pricePerAccommodation;
-                row = formatDateWithoutTime(reservedDate) + " = " + appointment.pricePerAccommodation + "€";
-              }
-              this.counterRows.push(row);
+              const price = appointment.pricePerGuest !== 0
+                ? appointment.pricePerGuest
+                : appointment.pricePerAccommodation;
 
+              this.sum += price;
+
+              const index = priceDetails.findIndex(detail => detail.price === price);
+              if (index === -1) {
+                priceDetails.push({ numberOfDays: 1, price, type: appointment.pricePerGuest !== 0 ? 'person' : 'accommodation' });
+              } else {
+                priceDetails[index].numberOfDays++;
+              }
             }
           });
         });
       });
 
       console.log('Total price:', this.sum);
+      console.log('Price details:', priceDetails);
+
+      this.priceDetails = priceDetails;
     }
   }
+
 
 }
 

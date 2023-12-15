@@ -46,7 +46,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 	if err != nil {
 		if err.Error() == "Reservation already exists for the specified dates and accommodation." {
 			s.logger.Print("No one else can book accommodation for the reserved dates. ")
-			rw.WriteHeader(http.StatusBadRequest)
+			rw.WriteHeader(http.StatusMethodNotAllowed)
 			rw.Write([]byte("No one else can book accommodation for the reserved dates"))
 		} else if err.Error() == "Can not reserve a date that does not exist in appointments." {
 			s.logger.Print("Can not reserve a date that does not exist in appointments.")
