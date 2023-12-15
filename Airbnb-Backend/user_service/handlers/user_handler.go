@@ -355,7 +355,6 @@ func (handler *UserHandler) DeleteAccount(writer http.ResponseWriter, req *http.
 	}
 
 	writer.WriteHeader(http.StatusOK)
-	writer.Write([]byte("Account deleted successfully"))
 }
 
 func extractBearerToken(authHeader string) string {

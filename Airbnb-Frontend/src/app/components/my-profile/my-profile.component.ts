@@ -4,8 +4,8 @@ import {User} from "../../models/user.model";
 import {UserService} from "../../services/user.service";
 import {FormBuilder, FormGroup, Validators} from "@angular/forms";
 import {AuthService} from "../../services/auth.service";
-import {MatSnackBar} from "@angular/material/snack-bar";
-import {tap} from "rxjs";
+import {MatSnackBar, MatSnackBarRef, SimpleSnackBar} from "@angular/material/snack-bar";
+import {Observable, tap} from "rxjs";
 
 @Component({
   selector: 'app-my-profile',
@@ -19,7 +19,8 @@ export class MyProfileComponent implements OnInit {
               private authService: AuthService,
               private fb: FormBuilder,
               private _snackBar: MatSnackBar,
-              private cdRef: ChangeDetectorRef,){
+              private cdRef: ChangeDetectorRef,
+              ){
     this.usernameForm = this.fb.group({
       newUsername: [this.user.username, [Validators.required, Validators.minLength(4), Validators.maxLength(30), Validators.pattern('[-_a-zA-Z0-9]*')]],
     });
@@ -131,6 +132,41 @@ export class MyProfileComponent implements OnInit {
           }
         );
     }
+  }
+
+  deleteAccount(){
+    this.openSnackBar2("Are you sure you want to delete account?", "Yes")
+    .subscribe(() => {
+      this.deleteAccountLogic();
+    });
+
+  }
+
+  deleteAccountLogic() {
+    this.authService.deleteAccount().subscribe(
+      () => {
+        this.openSnackBar2("User account deleted successfully!", "")
+        console.log('User account deleted successfully!');
+        setTimeout(() => {
+          localStorage.clear();
+          this.router.navigate(['']);
+        }, 2000);
+
+      },
+      (error) => {
+        this.openSnackBar("" + error.error + "", "")
+        console.error('Error deleting user account:', error);
+        
+      }
+    );
+  }
+
+  openSnackBar2(message: string, action: string): Observable<void> {
+    const snackBarRef: MatSnackBarRef<SimpleSnackBar> = this._snackBar.open(message, action, {
+      duration: 3500
+    });
+
+    return snackBarRef.onAction();
   }
 
   openSnackBar(message: string, action: string) {

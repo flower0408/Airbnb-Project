@@ -87,7 +87,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 
 	rw.WriteHeader(http.StatusOK)
 	s.logger.Print("Reservation cancelled succesfully")
-	rw.Write([]byte("Reservation cancelled successfully."))
+
 }
 
 func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *http.Request) {

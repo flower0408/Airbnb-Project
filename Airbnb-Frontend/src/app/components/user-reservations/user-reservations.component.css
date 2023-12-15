@@ -1,0 +1,93 @@
+.accommodation-details {
+    width: 70%;
+    border: 1px solid #9d4141c7;
+    border-radius: 8px;
+    margin: 2% auto;
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    background-color: #FFF5EE;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .accommodation-title {
+    color: #9d4141c7;
+    font-size: 24px;
+    margin-bottom: 10px;
+  }
+  
+  .accommodation-description {
+    color: #666;
+    font-size: 18px;
+    margin-bottom: 20px;
+  }
+  
+  .detail {
+    margin-bottom: 15px;
+    text-align: center;
+    width: 100%;
+  }
+  
+  .formbold-btn {
+    text-align: center;
+    font-size: 16px;
+    border-radius: 6px;
+    padding: 14px 32px;
+    border: none;
+    font-weight: 400;
+    background-color: #9d4141c7;
+    color: white;
+    width: 50%;
+    cursor: pointer;
+  }
+  .formbold-btn:hover {
+    background-color: #F3CFC6;
+    color: black;
+  }
+  .container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .detail-label {
+    font-weight: bold;
+    color: #9d4141c7;
+    display: block;
+    font-size: 16px;
+  }
+  
+  .detail-value {
+    color: #555;
+    font-size: 16px;
+    margin-top: 5px;
+  }
+  
+  .detail.location {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .detail.location .detail-label {
+    margin-bottom: 5px;
+  }
+  
+  .detail.benefits {
+    text-align: center;
+  }
+  
+  .detail.benefits ul {
+    list-style-type: none;
+    padding: 0;
+    text-align: center;
+  }
+  
+  .detail.benefits li {
+    color: #555;
+    font-size: 16px;
+    margin-bottom: 5px;
+  }
+  

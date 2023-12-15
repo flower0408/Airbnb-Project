@@ -27,4 +27,9 @@ export class ReservationService {
     return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/reservationsByUser`);
   }
 
+  cancelReservation(id: any): Observable<any> {
+
+    return this.http.delete<any>(`${environment.baseApiUrl}/${this.url}/cancelReservation/${id}`);
+  }
+
 }

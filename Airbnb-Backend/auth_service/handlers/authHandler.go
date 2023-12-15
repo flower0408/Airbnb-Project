@@ -586,7 +586,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 		}
 
 	} else if userType == "Guest" {
-		hasReservations, err := handler.hasGuestReservations(userID, tokenString)
+		hasReservations, err := handler.hasGuestReservations(tokenString)
 		if err != nil {
 			http.Error(writer, "Error checking guest reservations", http.StatusInternalServerError)
 			return
@@ -623,7 +623,6 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 	}
 
 	writer.WriteHeader(http.StatusOK)
-	writer.Write([]byte("User deleted successfully"))
 }
 
 func (handler *AuthHandler) hasHostReservations(userID string, authToken string) (bool, error) {
@@ -662,8 +661,8 @@ func (handler *AuthHandler) hasHostReservations(userID string, authToken string)
 	return hasReservations, nil
 }
 
-func (handler *AuthHandler) hasGuestReservations(userID string, authToken string) (bool, error) {
-	reservationEndpoint := fmt.Sprintf("http://%s:%s/reservationsByUser/%s", reservationServiceHost, reservationServicePort, userID)
+func (handler *AuthHandler) hasGuestReservations(authToken string) (bool, error) {
+	reservationEndpoint := fmt.Sprintf("http://%s:%s/reservationsByUser", reservationServiceHost, reservationServicePort)
 
 	reservationRequest, err := http.NewRequest("GET", reservationEndpoint, nil)
 	if err != nil {

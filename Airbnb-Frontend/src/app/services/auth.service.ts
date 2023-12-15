@@ -83,5 +83,9 @@ export class AuthService {
     return true;
   }
 
+  deleteAccount(): Observable<any> {
+    return this.http.delete(`${environment.baseApiUrl}/${this.url}/deleteUser`);
+  }
+
 
 }
