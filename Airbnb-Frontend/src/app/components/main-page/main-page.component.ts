@@ -6,7 +6,7 @@ import { FormControl, FormGroup, Validators } from '@angular/forms';
 import {MatSnackBar} from "@angular/material/snack-bar";
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 
-export const MY_DATE_FORMATS = {
+/*export const MY_DATE_FORMATS = {
   parse: {
     dateInput: 'LL',
   },
@@ -16,7 +16,7 @@ export const MY_DATE_FORMATS = {
     dateA11yLabel: 'LL',
     monthYearA11yLabel: 'MMMM YYYY',
   },
-};
+};*/
 
 
 interface Accommodation {
@@ -35,9 +35,9 @@ interface Accommodation {
   selector: 'app-main-page',
   templateUrl: './main-page.component.html',
   styleUrls: ['./main-page.component.css'],
-  providers: [
+ /* providers: [
     { provide: MAT_DATE_FORMATS, useValue: MY_DATE_FORMATS },
-  ]
+  ]*/
 })
 export class MainPageComponent implements OnInit {
   accommodations: Accommodation[] = [];
@@ -46,22 +46,41 @@ export class MainPageComponent implements OnInit {
   searchForm: FormGroup;
 
   startDateFilter = (date: Date | null): boolean => {
-    return date !== null && date >= new Date();
+    if (!date) {
+      return false;
+    }
+
+    // Get the current date without the time component
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Compare only the date part
+    return date >= today;
   };
 
   endDateFilter = (date: Date | null): boolean => {
-    return date !== null && date >= new Date();
+    if (!date) {
+      return false;
+    }
+
+    // Get the current date without the time component
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Compare only the date part
+    return date >= today;
   };
 
 
-  constructor(private dateAdapter: DateAdapter<Date>,private accommodationService: AccommodationService, private router: Router, private _snackBar: MatSnackBar,) {
+
+  constructor(/*private dateAdapter: DateAdapter<Date>,*/private accommodationService: AccommodationService, private router: Router, private _snackBar: MatSnackBar,) {
     this.searchForm = new FormGroup({
       location: new FormControl(''),
       minGuests: new FormControl(1),
       startDay: new FormControl('', [Validators.required]),
       endDay: new FormControl('', [Validators.required]),
     });
-    this.dateAdapter.setLocale('en-GB');
+    //this.dateAdapter.setLocale('en-GB');
   }
 
   ngOnInit(): void {

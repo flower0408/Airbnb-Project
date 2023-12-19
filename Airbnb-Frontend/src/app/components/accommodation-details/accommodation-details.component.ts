@@ -16,7 +16,7 @@ import { UserService } from 'src/app/services/user.service';
 import { User } from 'src/app/models/user.model';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 
-export const MY_DATE_FORMATS = {
+/*export const MY_DATE_FORMATS = {
   parse: {
     dateInput: 'LL',
   },
@@ -26,16 +26,16 @@ export const MY_DATE_FORMATS = {
     dateA11yLabel: 'LL',
     monthYearA11yLabel: 'MMMM YYYY',
   },
-};
+};*/
 
 
 @Component({
   selector: 'app-accommodation-details',
   templateUrl: './accommodation-details.component.html',
   styleUrls: ['./accommodation-details.component.css'],
-  providers: [
+  /*providers: [
     { provide: MAT_DATE_FORMATS, useValue: MY_DATE_FORMATS },
-  ]
+  ]*/
 })
 
 export class AccommodationDetailsComponent implements OnInit {
@@ -60,8 +60,8 @@ export class AccommodationDetailsComponent implements OnInit {
   priceDetails: any[] = [];
 
 
-  constructor(private dateAdapter: DateAdapter<Date>,private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {
-    this.dateAdapter.setLocale('en-GB');
+  constructor(/*private dateAdapter: DateAdapter<Date>,*/private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {
+   // this.dateAdapter.setLocale('en-GB');
   }
 
   get f(): { [key: string]: AbstractControl } {
@@ -73,18 +73,23 @@ export class AccommodationDetailsComponent implements OnInit {
       return false;
     }
 
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0); // Set the time component to midnight for comparison
+
     const formattedDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
 
-    //console.log(formattedDate);
-    //console.log(this.allDates);
-
-    return this.allDates.some(allowedDate =>
-      new Date(allowedDate).getUTCDate() >= new Date().getUTCDate() &&
-      new Date(allowedDate).getUTCDate() === formattedDate.getUTCDate() &&
-      new Date(allowedDate).getUTCMonth() === formattedDate.getUTCMonth() &&
-      new Date(allowedDate).getUTCFullYear() === formattedDate.getUTCFullYear()
+    // Check if the date is in the future
+    return (
+      formattedDate >= currentDate &&
+      this.allDates.some(
+        (allowedDate) =>
+          new Date(allowedDate).getUTCDate() === formattedDate.getUTCDate() &&
+          new Date(allowedDate).getUTCMonth() === formattedDate.getUTCMonth() &&
+          new Date(allowedDate).getUTCFullYear() === formattedDate.getUTCFullYear()
+      )
     );
   };
+
   /*dateFilter = (date: Date | null): boolean => {
     if (!date) {
       return false;
@@ -247,28 +252,36 @@ export class AccommodationDetailsComponent implements OnInit {
     if (accommodationId) {
       this.appointmentService.getAppointmentsByAccommodation(accommodationId).subscribe(
         (data: any) => {
-          this.appointments = data;
-          this.appointments.forEach(a =>{
-            a.available.forEach(d =>{
-              this.allDates.push(d);
-            })
-          })
-          console.log(this.appointments);
-          console.log(this.allDates);
+          if (data && data.length > 0) {
+            this.appointments = data;
+            this.appointments?.forEach(a => {
+              a.available.forEach(d => {
+                this.allDates.push(d);
+              });
+            });
 
-          if(this.appointments[0].pricePerAccommodation !== 0){
-            this.inputAccommodationPrice = true;
-          }else{
-            this.inputGuestPrice = true;
+            console.log(this.appointments);
+            console.log(this.allDates);
+
+            if (this.appointments[0].pricePerAccommodation !== 0) {
+              this.inputAccommodationPrice = true;
+            } else {
+              this.inputGuestPrice = true;
+            }
+          } else {
+            console.log('No appointments for this accommodation.');
           }
-
         },
         (error) => {
+          if (error.status === 502) {
+            this.openSnackBar('Service is not currently available, please try later!', "");
+          }
           console.error(error);
         }
       );
     }
   }
+
 
 
   getReservationsByAccommodation(): void {
