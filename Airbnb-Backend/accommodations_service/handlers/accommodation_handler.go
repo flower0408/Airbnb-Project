@@ -260,6 +260,108 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	writer.WriteHeader(http.StatusOK)
 }
 
+func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req *http.Request) {
+	bearer := req.Header.Get("Authorization")
+	if bearer == "" {
+		log.Println("Authorization header missing")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	bearerToken := strings.Split(bearer, "Bearer ")
+	if len(bearerToken) != 2 {
+		log.Println("Malformed Authorization header")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tokenString := bearerToken[1]
+	log.Printf("Token: %s\n", tokenString)
+
+	token, err := jwt.Parse([]byte(tokenString), verifier)
+	if err != nil {
+		log.Println("Token parsing error:", err)
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	claims := authorization.GetMapClaims(token.Bytes())
+	log.Printf("Token Claims: %+v\n", claims)
+	username := claims["username"]
+
+	// Circuit breaker for user service
+	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		userID, statusCode, err := s.getUserIDFromUserService(username)
+		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
+	})
+
+	if breakerErr != nil {
+		log.Println("Circuit breaker open:", breakerErr)
+		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		log.Println("Internal server error: Unexpected result type")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	userID, ok := resultMap["userID"].(string)
+	if !ok {
+		log.Println("Internal server error: User ID not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	statusCode, ok := resultMap["statusCode"].(int)
+	if !ok {
+		log.Println("Internal server error: Status code not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err, ok := resultMap["err"].(error); ok && err != nil {
+		log.Println("Error from user service:", err)
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}
+
+	rate := req.Context().Value(KeyProduct{}).(*data.Rate)
+
+	rate.ByGuestId = userID
+
+	// Get the current time in UTC
+	utcTime := time.Now().UTC()
+
+	// Set the desired time zone (CET)
+	cetLocation, err := time.LoadLocation("Europe/Belgrade")
+	if err != nil {
+		fmt.Println("Error loading location:", err)
+		return
+	}
+
+	// Convert to CET
+	cetTime := utcTime.In(cetLocation)
+
+	rate.CreatedAt = cetTime.Format(time.RFC3339)
+
+	if err := validateRate(rate); err != nil {
+		http.Error(writer, err.Message, http.StatusUnprocessableEntity)
+		return
+	}
+
+	_, err = s.repo.InsertRateForHost(rate)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
+}
+
 func extractBearerToken(authHeader string) string {
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {

@@ -112,6 +112,20 @@ func (rr *AccommodationRepo) InsertRateForAccommodation(rate *Rate) (string, err
 	return "", nil
 }
 
+func (rr *AccommodationRepo) InsertRateForHost(rate *Rate) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+	rateCollection := rr.getRateCollection()
+
+	_, err := rateCollection.InsertOne(ctx, rate)
+	if err != nil {
+		rr.logger.Println(err)
+		return "", err
+	}
+
+	return "", nil
+}
+
 func (rr *AccommodationRepo) getCollection() *mongo.Collection {
 	accommodationDatabase := rr.cli.Database("MongoDatabase")
 	accommodationCollection := accommodationDatabase.Collection("accommodations")

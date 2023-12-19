@@ -65,6 +65,9 @@ func main() {
 	postRateForAccommodation := router.Methods(http.MethodPost).Subrouter()
 	postRateForAccommodation.HandleFunc("/createRateForAccommodation", accommodationHandler.CreateRateForAccommodation)
 	postRateForAccommodation.Use(accommodationHandler.MiddlewareRateDeserialization)
+	postRateForHost := router.Methods(http.MethodPost).Subrouter()
+	postRateForHost.HandleFunc("/createRateForHost", accommodationHandler.CreateRateForHost)
+	postRateForHost.Use(accommodationHandler.MiddlewareRateDeserialization)
 	deleteAccommodationsByOwner := router.Methods(http.MethodDelete).Subrouter()
 	deleteAccommodationsByOwner.HandleFunc("/delete_accommodations/{ownerID}", accommodationHandler.DeleteAccommodationsByOwnerID)
 
