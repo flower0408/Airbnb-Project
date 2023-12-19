@@ -70,6 +70,7 @@ export class CreateAccommodationComponent implements OnInit{
       const formValues = this.accommodationForm.value;
 
       const newAccommodation: Accommodation = {
+        id: '',
         name: formValues.name,
         description: formValues.description,
         images: formValues.images,

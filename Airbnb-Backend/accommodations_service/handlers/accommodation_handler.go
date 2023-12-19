@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	_ "time/tzdata"
 )
 
 var (
@@ -156,6 +157,107 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	if err != nil {
 		s.logger.Print("Error writing response:", err)
 	}
+}
+
+func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWriter, req *http.Request) {
+	bearer := req.Header.Get("Authorization")
+	if bearer == "" {
+		log.Println("Authorization header missing")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	bearerToken := strings.Split(bearer, "Bearer ")
+	if len(bearerToken) != 2 {
+		log.Println("Malformed Authorization header")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tokenString := bearerToken[1]
+	log.Printf("Token: %s\n", tokenString)
+
+	token, err := jwt.Parse([]byte(tokenString), verifier)
+	if err != nil {
+		log.Println("Token parsing error:", err)
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	claims := authorization.GetMapClaims(token.Bytes())
+	log.Printf("Token Claims: %+v\n", claims)
+	username := claims["username"]
+
+	// Circuit breaker for user service
+	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		userID, statusCode, err := s.getUserIDFromUserService(username)
+		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
+	})
+
+	if breakerErr != nil {
+		log.Println("Circuit breaker open:", breakerErr)
+		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		log.Println("Internal server error: Unexpected result type")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	userID, ok := resultMap["userID"].(string)
+	if !ok {
+		log.Println("Internal server error: User ID not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	statusCode, ok := resultMap["statusCode"].(int)
+	if !ok {
+		log.Println("Internal server error: Status code not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err, ok := resultMap["err"].(error); ok && err != nil {
+		log.Println("Error from user service:", err)
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}
+	rate := req.Context().Value(KeyProduct{}).(*data.Rate)
+
+	rate.ByGuestId = userID
+
+	// Get the current time in UTC
+	utcTime := time.Now().UTC()
+
+	// Set the desired time zone (CET)
+	cetLocation, err := time.LoadLocation("Europe/Belgrade")
+	if err != nil {
+		fmt.Println("Error loading location:", err)
+		return
+	}
+
+	// Convert to CET
+	cetTime := utcTime.In(cetLocation)
+
+	rate.CreatedAt = cetTime.Format(time.RFC3339)
+
+	if err := validateRate(rate); err != nil {
+		http.Error(writer, err.Message, http.StatusUnprocessableEntity)
+		return
+	}
+
+	_, err = s.repo.InsertRateForAccommodation(rate)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
 }
 
 func extractBearerToken(authHeader string) string {
@@ -298,6 +400,20 @@ func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
 
+func (s *AccommodationHandler) GetAllRate(rw http.ResponseWriter, h *http.Request) {
+
+	rates, err := s.repo.GetAllRate()
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(rates)
+	rw.WriteHeader(http.StatusOK)
+}
+
 func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	id, err := primitive.ObjectIDFromHex(vars["id"])
@@ -315,6 +431,22 @@ func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) 
 
 	rw.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(rw).Encode(accommodation)
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) GetRatesByAccommodation(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	id := vars["id"]
+
+	rates, err := s.repo.GetRatesByAccommodation(id)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(rates)
 	rw.WriteHeader(http.StatusOK)
 }
 
@@ -571,6 +703,18 @@ func validateAccommodation(accommodation *data.Accommodation) *ValidationError {
 	return nil
 }
 
+func validateRate(rate *data.Rate) *ValidationError {
+
+	if rate.Rate == 0 {
+		return &ValidationError{Message: "Rate cannot be 0"}
+	}
+	if rate.Rate > 5 || rate.Rate < 1 {
+		return &ValidationError{Message: "Rate can be only from 1 to 5"}
+	}
+
+	return nil
+}
+
 func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
 		accommodations := &data.Accommodation{}
@@ -581,6 +725,21 @@ func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.
 			return
 		}
 		ctx := context.WithValue(h.Context(), KeyProduct{}, accommodations)
+		h = h.WithContext(ctx)
+		next.ServeHTTP(rw, h)
+	})
+}
+
+func (s *AccommodationHandler) MiddlewareRateDeserialization(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
+		rates := &data.Rate{}
+		err := rates.FromJSON(h.Body)
+		if err != nil {
+			http.Error(rw, "Unable to decode json", http.StatusBadRequest)
+			s.logger.Fatal(err)
+			return
+		}
+		ctx := context.WithValue(h.Context(), KeyProduct{}, rates)
 		h = h.WithContext(ctx)
 		next.ServeHTTP(rw, h)
 	})

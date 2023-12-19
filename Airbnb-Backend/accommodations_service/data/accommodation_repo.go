@@ -98,10 +98,30 @@ func (rr *AccommodationRepo) InsertAccommodation(accommodation *Accommodation) (
 	return insertedID.Hex(), nil
 }
 
+func (rr *AccommodationRepo) InsertRateForAccommodation(rate *Rate) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+	rateCollection := rr.getRateCollection()
+
+	_, err := rateCollection.InsertOne(ctx, rate)
+	if err != nil {
+		rr.logger.Println(err)
+		return "", err
+	}
+
+	return "", nil
+}
+
 func (rr *AccommodationRepo) getCollection() *mongo.Collection {
-	appointmentDatabase := rr.cli.Database("MongoDatabase")
-	appointmentsCollection := appointmentDatabase.Collection("accommodations")
-	return appointmentsCollection
+	accommodationDatabase := rr.cli.Database("MongoDatabase")
+	accommodationCollection := accommodationDatabase.Collection("accommodations")
+	return accommodationCollection
+}
+
+func (rr *AccommodationRepo) getRateCollection() *mongo.Collection {
+	rateDatabase := rr.cli.Database("MongoDatabase")
+	rateCollection := rateDatabase.Collection("rates")
+	return rateCollection
 }
 
 func (rr *AccommodationRepo) GetAll() ([]*Accommodation, error) {
@@ -109,9 +129,19 @@ func (rr *AccommodationRepo) GetAll() ([]*Accommodation, error) {
 	return rr.filter(filter)
 }
 
+func (rr *AccommodationRepo) GetAllRate() ([]*Rate, error) {
+	filter := bson.D{{}}
+	return rr.filterRate(filter)
+}
+
 func (rr *AccommodationRepo) GetByID(id primitive.ObjectID) (*Accommodation, error) {
 	filter := bson.D{{"_id", id}}
 	return rr.getByFilter(filter)
+}
+
+func (rr *AccommodationRepo) GetRatesByAccommodation(id string) ([]*Rate, error) {
+	filter := bson.D{{"forAccommodationId", id}}
+	return rr.filterRate(filter)
 }
 
 func (rr *AccommodationRepo) getByFilter(filter interface{}) (*Accommodation, error) {
@@ -190,6 +220,18 @@ func (rr *AccommodationRepo) filter(filter interface{}) ([]*Accommodation, error
 	return decode(cursor)
 }
 
+func (rr *AccommodationRepo) filterRate(filter interface{}) ([]*Rate, error) {
+	ctx := context.TODO()
+	rateCollection := rr.getRateCollection()
+	cursor, err := rateCollection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	return decodeRate(cursor)
+}
+
 func decode(cursor *mongo.Cursor) (users []*Accommodation, err error) {
 	for cursor.Next(context.TODO()) {
 		var user Accommodation
@@ -198,6 +240,19 @@ func decode(cursor *mongo.Cursor) (users []*Accommodation, err error) {
 			return
 		}
 		users = append(users, &user)
+	}
+	err = cursor.Err()
+	return
+}
+
+func decodeRate(cursor *mongo.Cursor) (rates []*Rate, err error) {
+	for cursor.Next(context.TODO()) {
+		var rate Rate
+		err = cursor.Decode(&rate)
+		if err != nil {
+			return
+		}
+		rates = append(rates, &rate)
 	}
 	err = cursor.Err()
 	return

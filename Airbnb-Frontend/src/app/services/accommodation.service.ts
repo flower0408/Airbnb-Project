@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { Accommodation } from '../models/accommodation.model';
 import { environment } from 'src/environments/environment';
 import {catchError, Observable} from 'rxjs';
+import { Rate } from '../models/rate.model';
 
 @Injectable({
   providedIn: 'root'
@@ -48,4 +49,15 @@ export class AccommodationService {
 
     return this.http.get<Accommodation[]>(`${environment.baseApiUrl}/${this.url}/search`, { params });
   }
+
+  getRatesByAccommodation(id: string): Observable<any> {
+    const url = `${environment.baseApiUrl}/${this.url}/getRatesByAccommodation/${id}`;
+    return this.http.get<any>(url);
+  }
+
+  createRate(rate:any): Observable<any> {
+    return this.http.post<any>(`${environment.baseApiUrl}/${this.url}/createRateForAccommodation`, rate);
+  }
+
+
 }

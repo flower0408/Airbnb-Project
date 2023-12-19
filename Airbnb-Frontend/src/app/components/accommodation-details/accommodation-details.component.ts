@@ -15,6 +15,7 @@ import { Reservation } from 'src/app/models/reservation.model';
 import { UserService } from 'src/app/services/user.service';
 import { User } from 'src/app/models/user.model';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
+import { Rate } from 'src/app/models/rate.model';
 
 export const MY_DATE_FORMATS = {
   parse: {
@@ -40,10 +41,11 @@ export const MY_DATE_FORMATS = {
 
 export class AccommodationDetailsComponent implements OnInit {
 
-  accommodation: Accommodation | null = null;
+  accommodation!: Accommodation;
   appointments!: Appointment[];
   reservations!: Reservation[];
   reservationForm!: FormGroup;
+  addRateForm!: FormGroup;
   addAppointmentForm!: FormGroup;
   editAppointmentForm!: FormGroup;
   allDates: Date[] = [];
@@ -58,6 +60,8 @@ export class AccommodationDetailsComponent implements OnInit {
   counter:string = "";
   counterRows: string[] = [];
   priceDetails: any[] = [];
+  rates: Rate[] = [];
+  rateSum: number = 0;
 
 
   constructor(private dateAdapter: DateAdapter<Date>,private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {
@@ -182,6 +186,10 @@ export class AccommodationDetailsComponent implements OnInit {
       endDay: ['', [Validators.required, endDayValidator('startDay')]]
     });
 
+    this.addRateForm = this.fb.group({
+      rate: [1, [Validators.required]]
+    });
+
     this.reservationForm.get('startDay')?.valueChanges.subscribe(startDayValue => {
       this.handleFormChanges();
     });
@@ -208,6 +216,7 @@ export class AccommodationDetailsComponent implements OnInit {
     this.getAccommodationById();
     this.getAppoitmentsByAccommodation();
     this.getReservationsByAccommodation();
+    this.getRatesByAccommodation();
 
     this.userRole = this.userService.getRoleFromToken();
 
@@ -226,6 +235,35 @@ export class AccommodationDetailsComponent implements OnInit {
       this.selectedAppointment = 0;
     }
 
+  }
+
+  getRatesByAccommodation(): void {
+    const accommodationId = this.route.snapshot.paramMap.get('id');
+    if (accommodationId) {
+      this.accommodationService.getRatesByAccommodation(accommodationId).subscribe(
+        (data: Rate[]) => {
+
+          if(data.length > 0){
+            this.rates = data;
+            this.rates.forEach(rate => {
+              this.userService.getUserById(rate.byGuestId).subscribe(
+                (user: User) => {
+                  rate.byGuestId = user.username;
+                  this.rateSum = this.rateSum + rate.rate
+                },
+                (error) => {
+                  console.error('Error getting user:', error);
+                }
+              );
+            });
+          }
+          
+        },
+        (error) => {
+          console.error(error);
+        }
+      );
+    }
   }
 
   getAccommodationById(): void {
@@ -458,6 +496,39 @@ export class AccommodationDetailsComponent implements OnInit {
       );
 
     }
+  }
+
+  onSubmitAddRate(){
+
+    if (this.addRateForm.valid) {
+
+      const formValues = this.addRateForm.value;
+
+      const newRate: any = {
+        forAccommodationId: this.accommodation.id,
+        rate: Number(formValues.rate) 
+      };
+
+      this.accommodationService.createRate(newRate).subscribe(
+        () => {
+
+          this.openSnackBar("Rate created successfully!", "")
+          console.log('Rate created successfully!');
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+
+        },
+        (error) => {
+          if (error.status === 502) {
+            this.openSnackBar('Service is not currently available, please try later!', "");
+          }
+          console.error('Error creating rate:', error);
+        }
+      );
+
+    }
+
   }
 
   moreOptions(){

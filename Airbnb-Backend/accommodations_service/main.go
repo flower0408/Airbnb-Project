@@ -49,6 +49,10 @@ func main() {
 
 	getAccommodation := router.Methods(http.MethodGet).Subrouter()
 	getAccommodation.HandleFunc("/", accommodationHandler.GetAll)
+	getAllRate := router.Methods(http.MethodGet).Subrouter()
+	getAllRate.HandleFunc("/getAllRate", accommodationHandler.GetAllRate)
+	getRatesByAccommodation := router.Methods(http.MethodGet).Subrouter()
+	getRatesByAccommodation.HandleFunc("/getRatesByAccommodation/{id}", accommodationHandler.GetRatesByAccommodation)
 	searchAccommodations := router.Methods(http.MethodGet).Subrouter()
 	searchAccommodations.HandleFunc("/search", accommodationHandler.SearchAccommodations)
 	getAccommodationId := router.Methods(http.MethodGet).Subrouter()
@@ -58,10 +62,13 @@ func main() {
 	postAccommodation := router.Methods(http.MethodPost).Subrouter()
 	postAccommodation.HandleFunc("/", accommodationHandler.CreateAccommodation)
 	postAccommodation.Use(accommodationHandler.MiddlewareAccommodationDeserialization)
+	postRateForAccommodation := router.Methods(http.MethodPost).Subrouter()
+	postRateForAccommodation.HandleFunc("/createRateForAccommodation", accommodationHandler.CreateRateForAccommodation)
+	postRateForAccommodation.Use(accommodationHandler.MiddlewareRateDeserialization)
 	deleteAccommodationsByOwner := router.Methods(http.MethodDelete).Subrouter()
 	deleteAccommodationsByOwner.HandleFunc("/delete_accommodations/{ownerID}", accommodationHandler.DeleteAccommodationsByOwnerID)
-	//Initialize the server
 
+	//Initialize the server
 	server := http.Server{
 		Addr:         ":" + port,
 		Handler:      router,

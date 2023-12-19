@@ -79,4 +79,8 @@ export class UserService {
     return this.http.patch(`${environment.baseApiUrl}/${this.url}/${userId}`, updatedData);
   }
 
+  getUserById(id:string): Observable<any> {
+
+    return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/${id}`);
+  }
 }

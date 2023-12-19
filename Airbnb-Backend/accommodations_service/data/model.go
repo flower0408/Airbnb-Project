@@ -25,12 +25,32 @@ type Location struct {
 	Number  int    `bson:"number,omitempty" json:"number"`
 }
 
+type Rate struct {
+	ID                 primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	ByGuestId          string             `bson:"byGuestId,omitempty" json:"byGuestId"`
+	ForHostId          string             `bson:"forHostId,omitempty" json:"forHostId"`
+	ForAccommodationId string             `bson:"forAccommodationId,omitempty" json:"forAccommodationId"`
+	CreatedAt          string             `bson:"createdAt,omitempty" json:"createdAt"`
+	UpdatedAt          string             `bson:"updatedAt,omitempty" json:"updatedAt"`
+	Rate               int                `bson:"rate,omitempty" json:"rate"`
+}
+
 func (o *Accommodation) ToJSON(w io.Writer) error {
 	e := json.NewEncoder(w)
 	return e.Encode(o)
 }
 
 func (o *Accommodation) FromJSON(r io.Reader) error {
+	d := json.NewDecoder(r)
+	return d.Decode(o)
+}
+
+func (o *Rate) ToJSON(w io.Writer) error {
+	e := json.NewEncoder(w)
+	return e.Encode(o)
+}
+
+func (o *Rate) FromJSON(r io.Reader) error {
 	d := json.NewDecoder(r)
 	return d.Decode(o)
 }

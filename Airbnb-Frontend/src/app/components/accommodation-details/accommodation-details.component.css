@@ -52,6 +52,10 @@
   align-items: center;
 }
 
+.container2 {
+  padding-left: 25vw;
+}
+
 .detail-label {
   font-weight: bold;
   color: #F88379;
@@ -90,3 +94,85 @@
   font-size: 16px;
   margin-bottom: 5px;
 }
+.accommodation-card {
+  width: 50%;
+  border-radius: 8px;
+  margin: 2% auto;
+  padding: 15px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background-color: #FFF5EE;
+  text-align: center;
+}
+
+.accommodation-title {
+  color: #F88379;
+}
+
+.accommodation-description {
+  color: #666;
+  font-size: 16px;
+}
+
+.accommodation-details {
+  margin-top: 10px;
+}
+
+.detail {
+  margin-bottom: 8px;
+}
+
+.detail-label {
+  font-weight: bold;
+  color: #F88379;
+}
+
+.detail-value {
+  color: #555;
+}
+.btn-danger {
+  padding: 10px 10px;
+  margin-top: 10px;
+  font-size: 15px;
+  color: #fff;
+  background-color: #F88379;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.btn-danger:hover {
+  background-color: #F3CFC6;
+  color: black;
+}
+.search-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  margin-top: 20px;
+  gap: 16px;
+}
+
+.form-label{
+  color:#F88379;
+  font-size: 15px;
+  font-weight: bolder;
+}
+
+.accommodation-card.new-row {
+  clear: both;
+}
+
+.accommodation-card {
+  width: 20%;
+  float: left;
+  
+}
+
+.clearfix::after {
+  content: "";
+  clear: both;
+  display: table;
+}
+

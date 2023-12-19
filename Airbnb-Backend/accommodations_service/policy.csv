@@ -7,3 +7,6 @@ p, Guest, /*, GET
 p, Unauthenticated, /*, GET
 p, Host, /*, DELETE
 p, Guest, /*, DELETE
+p, Guest, /createRateForAccommodation, POST
+p, Guest, /getAllRate, GET
+p, Guest, /getRatesByAccommodation/*, GET
