@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/bson"
@@ -330,6 +331,58 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	rate := req.Context().Value(KeyProduct{}).(*data.Rate)
 
 	rate.ByGuestId = userID
+
+	// Circuit breaker for reservation service
+	resultR, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/checkUserPastReservations/%s/%s", reservationServiceHost, reservationServicePort, userID, rate.ForHostId)
+		reservationServiceRequest, _ := http.NewRequest(http.MethodGet, reservationServiceEndpoint, nil)
+		reservationServiceRequest.Header.Set("Authorization", "Bearer "+tokenString)
+		response, err := http.DefaultClient.Do(reservationServiceRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Error communicating with reservation service")
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("Error getting user reservations in reservation service")
+		}
+
+		var hasPastReservations bool
+		if err := json.NewDecoder(response.Body).Decode(&hasPastReservations); err != nil {
+			return nil, fmt.Errorf("Error decoding past reservations response: %v", err)
+		}
+
+		return hasPastReservations, nil
+	})
+
+	if breakerErr != nil {
+		http.Error(writer, breakerErr.Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	hasPastReservations, ok := resultR.(bool)
+	if !ok {
+		log.Println("Error parsing result from reservation service: Unexpected result type")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if !hasPastReservations {
+		http.Error(writer, "User don't have past reservations in host's accommodations", http.StatusForbidden)
+		return
+	}
+
+	hasRated, err := s.repo.HasUserRatedHost(userID, rate.ForHostId)
+	if err != nil {
+		log.Println("Error checking if user has already rated the host:", err)
+		http.Error(writer, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if hasRated {
+		http.Error(writer, "User has already rated the host", http.StatusForbidden)
+		return
+	}
 
 	// Get the current time in UTC
 	utcTime := time.Now().UTC()
