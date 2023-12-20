@@ -126,6 +126,28 @@ func (rr *AccommodationRepo) InsertRateForHost(rate *Rate) (string, error) {
 	return "", nil
 }
 
+func (rr *AccommodationRepo) DeleteRateForHost(rateID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+
+	objID, err := primitive.ObjectIDFromHex(rateID)
+	if err != nil {
+		rr.logger.Println(err)
+		return err
+	}
+
+	rateCollection := rr.getRateCollection()
+
+	filter := bson.M{"_id": objID}
+
+	_, err2 := rateCollection.DeleteOne(ctx, filter)
+	if err2 != nil {
+		rr.logger.Println(err2)
+		return err2
+	}
+
+	return nil
+}
 func (rr *AccommodationRepo) UpdateRateForHost(rateID string, rate *Rate) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
@@ -248,6 +270,23 @@ func (rr *AccommodationRepo) DeleteAccommodationsByOwner(ownerID string) error {
 	}
 
 	return nil
+}
+
+func (rr *AccommodationRepo) HasUserRatedHost(userID string, hostID string) (bool, error) {
+	ctx := context.TODO()
+	rateCollection := rr.getRateCollection()
+
+	filter := bson.D{
+		{"byGuestId", userID},
+		{"forHostId", hostID},
+	}
+
+	count, err := rateCollection.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }
 
 func (rr *AccommodationRepo) filterIDs(filter interface{}) ([]primitive.ObjectID, error) {

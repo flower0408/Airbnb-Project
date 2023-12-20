@@ -75,6 +75,8 @@ func main() {
 	updateRateForHost.Use(accommodationHandler.MiddlewareRateDeserialization)
 	deleteAccommodationsByOwner := router.Methods(http.MethodDelete).Subrouter()
 	deleteAccommodationsByOwner.HandleFunc("/delete_accommodations/{ownerID}", accommodationHandler.DeleteAccommodationsByOwnerID)
+	deleteRateForHost := router.Methods(http.MethodDelete).Subrouter()
+	deleteRateForHost.HandleFunc("/delete_rate/{rateID}", accommodationHandler.DeleteRateForHost)
 
 	//Initialize the server
 	server := http.Server{

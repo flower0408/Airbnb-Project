@@ -13,3 +13,5 @@ p, Guest, /getRatesByAccommodation/*, GET
 p, Guest, /createRateForHost, POST
 p, Guest, /getRatesByHost/*, GET
 p, Guest, /updateRate/*, PATCH
+p, Guest, /deleteRateForHost/*, DELETE
+
