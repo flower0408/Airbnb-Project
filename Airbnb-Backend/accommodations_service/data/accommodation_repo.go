@@ -126,6 +126,29 @@ func (rr *AccommodationRepo) InsertRateForHost(rate *Rate) (string, error) {
 	return "", nil
 }
 
+func (rr *AccommodationRepo) DeleteRateForHost(rateID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+
+	objID, err := primitive.ObjectIDFromHex(rateID)
+	if err != nil {
+		rr.logger.Println(err)
+		return err
+	}
+
+	rateCollection := rr.getRateCollection()
+
+	filter := bson.M{"_id": objID}
+
+	_, err2 := rateCollection.DeleteOne(ctx, filter)
+	if err2 != nil {
+		rr.logger.Println(err2)
+		return err2
+	}
+
+	return nil
+}
+
 func (rr *AccommodationRepo) getCollection() *mongo.Collection {
 	accommodationDatabase := rr.cli.Database("MongoDatabase")
 	accommodationCollection := accommodationDatabase.Collection("accommodations")

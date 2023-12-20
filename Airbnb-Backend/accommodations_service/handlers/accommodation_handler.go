@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/bson"
@@ -460,6 +459,28 @@ func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWri
 
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte("Accommodations deleted successfully"))
+}
+
+func (s *AccommodationHandler) DeleteRateForHost(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	rateID := vars["rateID"]
+
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	err := s.repo.DeleteRateForHost(rateID)
+	if err != nil {
+		http.Error(rw, "Error deleting rate for host", http.StatusInternalServerError)
+	}
+
+	rw.WriteHeader(http.StatusOK)
+	rw.Write([]byte("Rate deleted successfully"))
 }
 
 func (s *AccommodationHandler) getUserIDFromUserService(username interface{}) (string, int, error) {
