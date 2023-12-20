@@ -83,4 +83,8 @@ export class UserService {
 
     return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/${id}`);
   }
+
+  getUserByUsername(username:string): Observable<any> {
+    return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/getOne/` + username);
+  }
 }

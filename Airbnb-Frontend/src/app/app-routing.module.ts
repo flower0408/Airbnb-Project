@@ -14,6 +14,7 @@ import {LoginGuardService} from "./guards/login-guard.service";
 import {RoleGuardService} from "./guards/role-guard.service";
 import {AccommodationDetailsComponent} from "./components/accommodation-details/accommodation-details.component";
 import { UserReservationsComponent } from './components/user-reservations/user-reservations.component';
+import { HostProfileComponent } from './components/host-profile/host-profile.component';
 
 const routes: Routes = [
   {
@@ -79,6 +80,14 @@ const routes: Routes = [
   {
     path: 'myReservations',
     component: UserReservationsComponent,
+    canActivate: [RoleGuardService],
+    data: {expectedRoles: 'Guest'}
+
+  }
+  ,
+  {
+    path: 'hostProfile/:username',
+    component: HostProfileComponent,
     canActivate: [RoleGuardService],
     data: {expectedRoles: 'Guest'}
 

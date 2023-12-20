@@ -126,6 +126,36 @@ func (rr *AccommodationRepo) InsertRateForHost(rate *Rate) (string, error) {
 	return "", nil
 }
 
+func (rr *AccommodationRepo) UpdateRateForHost(rateID string, rate *Rate) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+
+	rateId, err := primitive.ObjectIDFromHex(rateID)
+	if err != nil {
+		fmt.Println("Error converting ID to ObjectID:", err)
+		return err
+	}
+
+	if rate.Rate <= 0 || rate.Rate > 5 {
+		return fmt.Errorf("Invalid rate value: %v. Rate must be between 0 and 5", rate.Rate)
+	}
+
+	filter := bson.M{"_id": rateId}
+	update := bson.M{"$set": bson.M{"rate": rate.Rate}}
+
+	result, err := rr.getRateCollection().UpdateOne(ctx, filter, update)
+
+	if err != nil {
+		rr.logger.Println("Error updating rate:", err)
+		return err
+	}
+
+	rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
+	rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
+
+	return nil
+}
+
 func (rr *AccommodationRepo) getCollection() *mongo.Collection {
 	accommodationDatabase := rr.cli.Database("MongoDatabase")
 	accommodationCollection := accommodationDatabase.Collection("accommodations")
@@ -148,6 +178,11 @@ func (rr *AccommodationRepo) GetAllRate() ([]*Rate, error) {
 	return rr.filterRate(filter)
 }
 
+func (rr *AccommodationRepo) GetRateById(id primitive.ObjectID) (*Rate, error) {
+	filter := bson.D{{"_id", id}}
+	return rr.getRateByFilter(filter)
+}
+
 func (rr *AccommodationRepo) GetByID(id primitive.ObjectID) (*Accommodation, error) {
 	filter := bson.D{{"_id", id}}
 	return rr.getByFilter(filter)
@@ -155,6 +190,11 @@ func (rr *AccommodationRepo) GetByID(id primitive.ObjectID) (*Accommodation, err
 
 func (rr *AccommodationRepo) GetRatesByAccommodation(id string) ([]*Rate, error) {
 	filter := bson.D{{"forAccommodationId", id}}
+	return rr.filterRate(filter)
+}
+
+func (rr *AccommodationRepo) GetRatesByHost(id string) ([]*Rate, error) {
+	filter := bson.D{{"forHostId", id}}
 	return rr.filterRate(filter)
 }
 
@@ -169,6 +209,19 @@ func (rr *AccommodationRepo) getByFilter(filter interface{}) (*Accommodation, er
 	}
 
 	return &accommodation, nil
+}
+
+func (rr *AccommodationRepo) getRateByFilter(filter interface{}) (*Rate, error) {
+	ctx := context.TODO()
+	rateCollection := rr.getRateCollection()
+
+	var rate Rate
+	err := rateCollection.FindOne(ctx, filter).Decode(&rate)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rate, nil
 }
 
 func (rr *AccommodationRepo) Search(filter interface{}) ([]*Accommodation, error) {

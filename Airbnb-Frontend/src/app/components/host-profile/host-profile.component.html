@@ -1,0 +1,99 @@
+<app-header></app-header>
+<div class="card" class="container" style="height: 30%;">                            
+    <div class="d-flex">
+      <img width="120px" height="120px" src="assets\host.png" class="rounded-circle"/>
+      <div class="ms-2">
+        <h3>{{host?.firstName}} {{host?.lastName}} <img width="15px" height="15px" src="assets\verified.png" class="rounded-circle" /></h3>
+        <p class="text-muted mb-0">Username: {{host?.username}}</p>
+        <p class="text-muted mb-0">Email: {{host?.email}}</p>
+        <p class="text-muted mb-0">Lives in: {{host?.residence}}</p>
+        <p>Host</p>
+      </div>                  
+    </div>                          
+</div>
+
+<div class="container">
+    <h1 style="font-family: Arial, Helvetica, sans-serif; color: rgb(23, 23, 85);">Host reviews</h1>
+</div>
+
+<div *ngIf="rateSum !== 0" style="width: 100%; text-align: center; padding-top: 50px; padding-bottom: 50px;">
+    <h1 style="font-size: 50px; font-family: Arial, Helvetica, sans-serif;">
+      {{ (rateSum / rates.length) | number:'1.1-1' }}
+    </h1>
+    <img width="200px" height="30px" src="assets\frame.jpg">
+    <p style="font-family: Arial, Helvetica, sans-serif;">Average rating</p>
+    <p style="font-family: Arial, Helvetica, sans-serif;">{{rates.length}} Reviews</p>
+</div>
+  
+<form [formGroup]="addRateForm" (ngSubmit)="onSubmitAddRate()">
+  
+    <div class="formbold-mb-5" class="container" style="padding-bottom: 20px;">
+      <img  width="20px" height="20px" src="assets\star.webp" style="margin-right: 5px;"> 
+      <select class="form-select" aria-label="Default select example" style="width: 5%;" formControlName="rate">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+    </div>
+  
+    <div class="container">
+      <button type="submit" class="btn btn-outline-primary">Rate it</button>
+    </div>
+  
+</form>
+  
+<div class="container2" style="padding-top: 50px;">
+    
+<div *ngFor="let rate of rates; let i = index" class="accommodation-card" [ngClass]="{'new-row': i % 3 === 0 && i !== 0}">
+    
+    <div class="card" style="padding-bottom: 10px;">                            
+          <div class="d-flex">
+            <img width="32px" height="32px" src="assets\user.jpg" class="rounded-circle" />
+            <div class="ms-2">
+              <p class="text-muted mb-0">{{rate?.byGuestId}}</p>
+            </div>                  
+          </div>                          
+    </div>
+  
+      <div *ngIf="rate?.rate === 5" style="text-align: left;">
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+      </div>
+  
+      <div *ngIf="rate?.rate === 4" style="text-align: left;">
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+      </div>
+  
+      <div *ngIf="rate?.rate === 3" style="text-align: left;">
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+      </div>
+  
+      <div *ngIf="rate?.rate === 2" style="text-align: left;">
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+      </div>
+  
+      <div *ngIf="rate?.rate === 1" style="text-align: left;">
+        <img  width="13px" height="13px" src="assets\star.webp"> 
+      </div>
+    
+    <div style="padding-top: 10px;">
+      <div style="text-align: left;">
+        <span style="color: #6773ab;">Created at:</span>
+        <span> {{ rate?.createdAt | date: 'mediumDate' }} {{ rate?.createdAt | date: 'shortTime' }} </span>
+      </div>
+    </div>
+    
+</div>
+</div>
+  

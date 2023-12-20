@@ -62,6 +62,7 @@ export class AccommodationDetailsComponent implements OnInit {
   priceDetails: any[] = [];
   rates: Rate[] = [];
   rateSum: number = 0;
+  host!: User | undefined;
 
 
   constructor(private dateAdapter: DateAdapter<Date>,private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {
@@ -272,6 +273,14 @@ export class AccommodationDetailsComponent implements OnInit {
       this.accommodationService.getAccommodationById(accommodationId).subscribe(
         (data: Accommodation) => {
           this.accommodation = data;
+          this.userService.getUserById(this.accommodation.ownerId).subscribe(
+            (user: User) => {
+              this.host = user;
+            },
+            (error) => {
+              console.error('Error getting user:', error);
+            }
+          );
         },
         (error) => {
           console.error(error);
@@ -509,7 +518,7 @@ export class AccommodationDetailsComponent implements OnInit {
         rate: Number(formValues.rate) 
       };
 
-      this.accommodationService.createRate(newRate).subscribe(
+      this.accommodationService.createRateAccommodation(newRate).subscribe(
         () => {
 
           this.openSnackBar("Rate created successfully!", "")

@@ -55,9 +55,21 @@ export class AccommodationService {
     return this.http.get<any>(url);
   }
 
-  createRate(rate:any): Observable<any> {
+  getRatesByHost(id: any): Observable<any> {
+    const url = `${environment.baseApiUrl}/${this.url}/getRatesByHost/${id}`;
+    return this.http.get<any>(url);
+  }
+
+  createRateAccommodation(rate:any): Observable<any> {
     return this.http.post<any>(`${environment.baseApiUrl}/${this.url}/createRateForAccommodation`, rate);
   }
 
+  createRateHost(rate:any): Observable<any> {
+    return this.http.post<any>(`${environment.baseApiUrl}/${this.url}/createRateForHost`, rate);
+  }
+
+  updateRate(rateID:string,rate:any): Observable<any> {
+    return this.http.patch<any>(`${environment.baseApiUrl}/${this.url}/updateRate/${rateID}`, rate);
+  }
 
 }

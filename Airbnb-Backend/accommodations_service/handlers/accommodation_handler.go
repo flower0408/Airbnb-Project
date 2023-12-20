@@ -371,6 +371,23 @@ func extractBearerToken(authHeader string) string {
 	return parts[1]
 }
 
+func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http.Request) {
+	// Dohvatanje parametra iz URL-a
+	vars := mux.Vars(h)
+	rateID := vars["rateID"]
+
+	rate := h.Context().Value(KeyProduct{}).(*data.Rate)
+
+	err := s.repo.UpdateRateForHost(rateID, rate)
+	if err != nil {
+		s.logger.Println("Error updating rate for host:", err)
+		http.Error(rw, "Error updating rate for host", http.StatusInternalServerError)
+		return
+	}
+
+	rw.WriteHeader(http.StatusOK)
+}
+
 /*func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	ownerID := vars["ownerID"]
@@ -541,6 +558,22 @@ func (s *AccommodationHandler) GetRatesByAccommodation(rw http.ResponseWriter, h
 	id := vars["id"]
 
 	rates, err := s.repo.GetRatesByAccommodation(id)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(rates)
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) GetRatesByHost(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	id := vars["id"]
+
+	rates, err := s.repo.GetRatesByHost(id)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		rw.WriteHeader(http.StatusNotFound)

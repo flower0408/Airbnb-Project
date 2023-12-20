@@ -186,6 +186,16 @@
 
 </div>
 
+<div class="card" style="padding-bottom: 10px;" class="container" style="padding-top: 30px; padding-bottom: 100px;">                            
+  <div class="d-flex">
+    <img width="52px" height="52px" src="assets\host.png" class="rounded-circle" [routerLink]="['/hostProfile', host?.username]" />
+    <div class="ms-2">
+      <h3>Hosted by {{host?.firstName}} {{host?.lastName}} <img width="15px" height="15px" src="assets\verified.png" class="rounded-circle" /></h3>
+      <p class="text-muted mb-0">Username: {{host?.username}}</p>
+      <p class="text-muted mb-0">Email: {{host?.email}}</p>
+    </div>                  
+  </div>                          
+</div>
 
 <div *ngIf="userRole === 'Guest' && rateSum !== 0" style="width: 100%; text-align: center; padding-top: 50px; padding-bottom: 50px;">
   <h1 style="font-size: 50px; font-family: Arial, Helvetica, sans-serif;">
@@ -193,6 +203,7 @@
   </h1>
   <img width="200px" height="30px" src="assets\frame.jpg">
   <p style="font-family: Arial, Helvetica, sans-serif;">Average rating</p>
+  <p style="font-family: Arial, Helvetica, sans-serif;">{{rates.length}} Reviews</p>
 </div>
 
 <form *ngIf="userRole === 'Guest'"  [formGroup]="addRateForm" (ngSubmit)="onSubmitAddRate()">
@@ -220,7 +231,7 @@
   
   <div class="card" style="padding-bottom: 10px;">                            
         <div class="d-flex">
-          <img width="32px" height="32px" src="assets\user-6380868_1920.png" class="rounded-circle" />
+          <img width="32px" height="32px" src="assets\user.jpg" class="rounded-circle" />
           <div class="ms-2">
             <p class="text-muted mb-0">{{rate?.byGuestId}}</p>
           </div>                  
