@@ -277,6 +277,61 @@ func (sr *ReservationRepo) HasReservationsForAccommodation(accommodationID primi
 	return count > 0, nil
 }
 
+func (sr *ReservationRepo) CheckUserPastReservations(userID string, hostID string, token string) (bool, error) {
+
+	accommodationEndpoint := fmt.Sprintf("http://%s:%s/owner/%s", accommodationServiceHost, accommodationServicePort, hostID)
+	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
+	if err != nil {
+		sr.logger.Println("Error creating accommodation request:", err)
+		return false, err
+	}
+
+	accommodationRequest.Header.Set("Authorization", "Bearer "+token)
+
+	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
+	if err != nil {
+		sr.logger.Println("Error sending accommodation request:", err)
+		return false, err
+	}
+
+	if accommodationResponse.StatusCode != http.StatusOK {
+		sr.logger.Println("Accommodation service returned an error:", accommodationResponse.Status)
+		return false, errors.New("Accommodation service returned an error")
+	}
+
+	var accommodations []primitive.ObjectID
+
+	err = json.NewDecoder(accommodationResponse.Body).Decode(&accommodations)
+	if err != nil {
+		sr.logger.Println("Error decoding accommodation response:", err)
+		return false, err
+	}
+
+	defer accommodationResponse.Body.Close()
+
+	reservations, err := sr.GetReservationByUser(userID)
+	if err != nil {
+		sr.logger.Println(err)
+		return false, err
+	}
+
+	currentTime := time.Now()
+
+	for _, reservation := range reservations {
+		for _, accommodationId := range accommodations {
+			if reservation.AccommodationId == accommodationId.Hex() {
+				for _, reservationDate := range reservation.Period {
+					if reservationDate.Before(currentTime) {
+						return true, nil
+					}
+				}
+			}
+		}
+	}
+
+	return false, nil
+}
+
 func (sr *ReservationRepo) CancelReservation(reservationID string) error {
 
 	reservation, err := sr.GetReservationByID(reservationID)
