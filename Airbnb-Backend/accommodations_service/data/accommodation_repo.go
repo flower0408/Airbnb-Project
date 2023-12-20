@@ -148,6 +148,35 @@ func (rr *AccommodationRepo) DeleteRateForHost(rateID string) error {
 
 	return nil
 }
+func (rr *AccommodationRepo) UpdateRateForHost(rateID string, rate *Rate) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+
+	rateId, err := primitive.ObjectIDFromHex(rateID)
+	if err != nil {
+		fmt.Println("Error converting ID to ObjectID:", err)
+		return err
+	}
+
+	if rate.Rate <= 0 || rate.Rate > 5 {
+		return fmt.Errorf("Invalid rate value: %v. Rate must be between 0 and 5", rate.Rate)
+	}
+
+	filter := bson.M{"_id": rateId}
+	update := bson.M{"$set": bson.M{"rate": rate.Rate}}
+
+	result, err := rr.getRateCollection().UpdateOne(ctx, filter, update)
+
+	if err != nil {
+		rr.logger.Println("Error updating rate:", err)
+		return err
+	}
+
+	rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
+	rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
+
+	return nil
+}
 
 func (rr *AccommodationRepo) getCollection() *mongo.Collection {
 	accommodationDatabase := rr.cli.Database("MongoDatabase")

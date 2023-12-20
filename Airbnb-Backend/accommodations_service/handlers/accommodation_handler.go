@@ -482,6 +482,22 @@ func (s *AccommodationHandler) DeleteRateForHost(rw http.ResponseWriter, h *http
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte("Rate deleted successfully"))
 }
+func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http.Request) {
+	// Dohvatanje parametra iz URL-a
+	vars := mux.Vars(h)
+	rateID := vars["rateID"]
+
+	rate := h.Context().Value(KeyProduct{}).(*data.Rate)
+
+	err := s.repo.UpdateRateForHost(rateID, rate)
+	if err != nil {
+		s.logger.Println("Error updating rate for host:", err)
+		http.Error(rw, "Error updating rate for host", http.StatusInternalServerError)
+		return
+	}
+
+	rw.WriteHeader(http.StatusOK)
+}
 
 func (s *AccommodationHandler) getUserIDFromUserService(username interface{}) (string, int, error) {
 	userServiceEndpoint := fmt.Sprintf("http://%s:%s/getOne/%s", userServiceHost, userServicePort, username)
