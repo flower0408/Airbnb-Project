@@ -64,9 +64,9 @@ func NewReservationRepo(logger *log.Logger) (*ReservationRepo, error) {
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			MaxIdleConns:        10,
-			MaxIdleConnsPerHost: 10,
-			MaxConnsPerHost:     10,
+			MaxIdleConns:        30,
+			MaxIdleConnsPerHost: 30,
+			MaxConnsPerHost:     30,
 		},
 	}
 
@@ -107,21 +107,21 @@ func (sr *ReservationRepo) CreateTables() {
 }
 
 // cassandra
-func (sr *ReservationRepo) InsertReservation(reservation *Reservation) error {
+func (sr *ReservationRepo) InsertReservation(reservation *Reservation) (*Reservation, error) {
 
 	exists, err := sr.ReservationExistsForAppointment(reservation.AccommodationId, reservation.Period)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if exists {
-		return errors.New("Reservation already exists for the specified dates and accommodation.")
+		return nil, errors.New("Reservation already exists for the specified dates and accommodation.")
 	}
 
 	reservationId, _ := gocql.RandomUUID()
 
 	appointments, err := getAppointmentsByAccommodation(reservation.AccommodationId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, reservedDate := range reservation.Period {
@@ -137,13 +137,13 @@ func (sr *ReservationRepo) InsertReservation(reservation *Reservation) error {
 		}
 
 		if !dateFound {
-			return errors.New("Can not reserve a date that does not exist in appointments.")
+			return nil, errors.New("Can not reserve a date that does not exist in appointments.")
 		}
 	}
 
 	for _, newReservation := range reservation.Period {
 		if time.Now().After(newReservation) {
-			return errors.New("Error creating reservation. Cannot create reservation in the past.")
+			return nil, errors.New("Error creating reservation. Cannot create reservation in the past.")
 		}
 	}
 
@@ -172,7 +172,7 @@ func (sr *ReservationRepo) InsertReservation(reservation *Reservation) error {
 		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price).Exec()
 	if err != nil {
 		sr.logger.Println(err)
-		return err
+		return nil, err
 	}
 
 	err = sr.session.Query(
@@ -181,10 +181,18 @@ func (sr *ReservationRepo) InsertReservation(reservation *Reservation) error {
 		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price).Exec()
 	if err != nil {
 		sr.logger.Println(err)
-		return err
+		return nil, err
 	}
 
-	return nil
+	createdReservation := &Reservation{
+		ID:              reservationId,
+		ByUserId:        reservation.ByUserId,
+		Period:          reservation.Period,
+		AccommodationId: reservation.AccommodationId,
+		Price:           reservation.Price,
+	}
+
+	return createdReservation, nil
 }
 
 func (sr *ReservationRepo) ReservationExistsForAppointment(accommodationID string, available []time.Time) (bool, error) {

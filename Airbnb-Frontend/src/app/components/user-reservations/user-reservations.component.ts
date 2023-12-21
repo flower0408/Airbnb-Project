@@ -33,7 +33,7 @@ export class UserReservationsComponent implements OnInit {
             this.accommodationService.getAccommodationById(reservation.accommodationId!).subscribe(
               (data: any) => {
                 reservation.accommodation = data;
-                console.log(reservation.accommodation)                   
+                console.log(reservation.accommodation)
               },
               (error) => {
                 console.error(error);
@@ -49,7 +49,7 @@ export class UserReservationsComponent implements OnInit {
   }
 
   cancelReservation(id:any){
-    
+
     this.openSnackBar2("Are you sure you want to cancel the reservation?", "Yes")
     .subscribe(() => {
       this.cancelReservationLogic(id);
@@ -72,7 +72,7 @@ export class UserReservationsComponent implements OnInit {
         console.error('Error canceling reservation:', error);
         setTimeout(() => {
           window.location.reload();
-        }, 3000);
+        }, 2000);
       }
     );
   }
