@@ -230,6 +230,58 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 	rate.ByGuestId = userID
 
+	// Circuit breaker for reservation service
+	resultR, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/checkUserPastReservationsInAccommodation/%s/%s", reservationServiceHost, reservationServicePort, userID, rate.ForAccommodationId)
+		reservationServiceRequest, _ := http.NewRequest(http.MethodGet, reservationServiceEndpoint, nil)
+		reservationServiceRequest.Header.Set("Authorization", "Bearer "+tokenString)
+		response, err := http.DefaultClient.Do(reservationServiceRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Error communicating with reservation service")
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("Error getting user reservations in reservation service")
+		}
+
+		var hasPastReservations bool
+		if err := json.NewDecoder(response.Body).Decode(&hasPastReservations); err != nil {
+			return nil, fmt.Errorf("Error decoding past reservations response: %v", err)
+		}
+
+		return hasPastReservations, nil
+	})
+
+	if breakerErr != nil {
+		http.Error(writer, breakerErr.Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	hasPastReservations, ok := resultR.(bool)
+	if !ok {
+		log.Println("Error parsing result from reservation service: Unexpected result type")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if !hasPastReservations {
+		http.Error(writer, "User don't have past reservations in host's accommodations", http.StatusForbidden)
+		return
+	}
+
+	hasRated, err := s.repo.HasUserRatedHost(userID, rate.ForHostId)
+	if err != nil {
+		log.Println("Error checking if user has already rated the host:", err)
+		http.Error(writer, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if hasRated {
+		http.Error(writer, "User has already rated the host", http.StatusForbidden)
+		return
+	}
+
 	// Get the current time in UTC
 	utcTime := time.Now().UTC()
 
@@ -423,23 +475,6 @@ func extractBearerToken(authHeader string) string {
 	return parts[1]
 }
 
-func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http.Request) {
-	// Dohvatanje parametra iz URL-a
-	vars := mux.Vars(h)
-	rateID := vars["rateID"]
-
-	rate := h.Context().Value(KeyProduct{}).(*data.Rate)
-
-	err := s.repo.UpdateRateForHost(rateID, rate)
-	if err != nil {
-		s.logger.Println("Error updating rate for host:", err)
-		http.Error(rw, "Error updating rate for host", http.StatusInternalServerError)
-		return
-	}
-
-	rw.WriteHeader(http.StatusOK)
-}
-
 /*func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	ownerID := vars["ownerID"]
@@ -550,7 +585,6 @@ func (s *AccommodationHandler) DeleteRateForHost(rw http.ResponseWriter, h *http
 	}
 
 	rw.WriteHeader(http.StatusOK)
-	rw.Write([]byte("Rate deleted successfully"))
 }
 func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http.Request) {
 	// Dohvatanje parametra iz URL-a
@@ -559,7 +593,22 @@ func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http
 
 	rate := h.Context().Value(KeyProduct{}).(*data.Rate)
 
-	err := s.repo.UpdateRateForHost(rateID, rate)
+	// Get the current time in UTC
+	utcTime := time.Now().UTC()
+
+	// Set the desired time zone (CET)
+	cetLocation, err := time.LoadLocation("Europe/Belgrade")
+	if err != nil {
+		fmt.Println("Error loading location:", err)
+		return
+	}
+
+	// Convert to CET
+	cetTime := utcTime.In(cetLocation)
+
+	rate.UpdatedAt = cetTime.Format(time.RFC3339)
+
+	err = s.repo.UpdateRateForHost(rateID, rate)
 	if err != nil {
 		s.logger.Println("Error updating rate for host:", err)
 		http.Error(rw, "Error updating rate for host", http.StatusInternalServerError)

@@ -100,6 +100,9 @@ func main() {
 	checkUserPastReservations := router.Methods(http.MethodGet).Subrouter()
 	checkUserPastReservations.HandleFunc("/checkUserPastReservations/{id}/{hostId}", reservationHandler.CheckUserPastReservations)
 
+	checkUserPastReservationsInAccommodation := router.Methods(http.MethodGet).Subrouter()
+	checkUserPastReservationsInAccommodation.HandleFunc("/checkUserPastReservationsInAccommodation/{id}/{accommodationId}", reservationHandler.CheckUserPastReservationsInAccommodation)
+
 	cancelReservation := router.Methods(http.MethodDelete).Subrouter()
 	cancelReservation.HandleFunc("/cancelReservation/{id}", reservationHandler.CancelReservation)
 	//cancelReservation.Use(reservationHandler.MiddlewareReservationDeserialization)

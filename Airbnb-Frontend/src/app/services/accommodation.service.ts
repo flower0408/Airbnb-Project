@@ -72,4 +72,7 @@ export class AccommodationService {
     return this.http.patch<any>(`${environment.baseApiUrl}/${this.url}/updateRate/${rateID}`, rate);
   }
 
+  deleteRate(rateID:string): Observable<any> {
+    return this.http.delete<any>(`${environment.baseApiUrl}/${this.url}/deleteRate/${rateID}`);
+  }
 }

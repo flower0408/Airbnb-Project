@@ -323,6 +323,33 @@ func (rh *ReservationHandler) CheckUserPastReservations(w http.ResponseWriter, r
 	json.NewEncoder(w).Encode(hasPastReservations)
 }
 
+func (rh *ReservationHandler) CheckUserPastReservationsInAccommodation(w http.ResponseWriter, r *http.Request) {
+	userID := mux.Vars(r)["id"]
+	accommodationID := mux.Vars(r)["accommodationId"]
+
+	authHeader := r.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		rh.logger.Println("Error extracting Bearer token")
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	hasPastReservations, err := rh.reservationRepo.CheckUserPastReservationsInAccommodation(userID, accommodationID)
+	if err != nil {
+		log.Println("Error checking user past reservations:", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Println(hasPastReservations)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(hasPastReservations)
+}
+
 func extractBearerToken(authHeader string) string {
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {

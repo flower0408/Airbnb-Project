@@ -163,7 +163,7 @@ func (rr *AccommodationRepo) UpdateRateForHost(rateID string, rate *Rate) error 
 	}
 
 	filter := bson.M{"_id": rateId}
-	update := bson.M{"$set": bson.M{"rate": rate.Rate}}
+	update := bson.M{"$set": bson.M{"rate": rate.Rate, "updatedAt": rate.UpdatedAt}}
 
 	result, err := rr.getRateCollection().UpdateOne(ctx, filter, update)
 

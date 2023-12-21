@@ -1,3 +1,5 @@
+import { User } from "./user.model"
+
 export interface Rate {
     id:                 string
 	byGuestId:          string             
@@ -5,5 +7,6 @@ export interface Rate {
 	forAccommodationId: string           
 	createdAt:          string         
 	updatedAt:          string             
-	rate:               number              
+	rate:               number     
+	user: User         
 }

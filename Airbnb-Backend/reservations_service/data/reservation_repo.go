@@ -332,6 +332,29 @@ func (sr *ReservationRepo) CheckUserPastReservations(userID string, hostID strin
 	return false, nil
 }
 
+func (sr *ReservationRepo) CheckUserPastReservationsInAccommodation(userID string, accommodationID string) (bool, error) {
+
+	reservations, err := sr.GetReservationByAccommodation(accommodationID)
+	if err != nil {
+		sr.logger.Println(err)
+		return false, err
+	}
+
+	currentTime := time.Now()
+
+	for _, reservation := range reservations {
+		if reservation.ByUserId == userID {
+			for _, reservationDate := range reservation.Period {
+				if reservationDate.Before(currentTime) {
+					return true, nil
+				}
+			}
+		}
+	}
+
+	return false, nil
+}
+
 func (sr *ReservationRepo) CancelReservation(reservationID string) error {
 
 	reservation, err := sr.GetReservationByID(reservationID)

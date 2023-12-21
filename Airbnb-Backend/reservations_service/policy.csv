@@ -24,3 +24,4 @@ p, Host, /deleteAppointments/*, DELETE
 p, Guest, /deleteAppointments/*, DELETE
 p, Unauthenticated, /deleteAppointments/*, DELETE
 p, Guest, /checkUserPastReservations/*/*, GET
+p, Guest, /checkUserPastReservationsInAccommodation/*/*, GET

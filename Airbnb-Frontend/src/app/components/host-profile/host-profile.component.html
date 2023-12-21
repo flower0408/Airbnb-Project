@@ -52,7 +52,7 @@
           <div class="d-flex">
             <img width="32px" height="32px" src="assets\user.jpg" class="rounded-circle" />
             <div class="ms-2">
-              <p class="text-muted mb-0">{{rate?.byGuestId}}</p>
+              <p class="text-muted mb-0">{{rate?.user?.username}}</p>
             </div>                  
           </div>                          
     </div>
@@ -88,12 +88,31 @@
       </div>
     
     <div style="padding-top: 10px;">
-      <div style="text-align: left;">
-        <span style="color: #6773ab;">Created at:</span>
-        <span> {{ rate?.createdAt | date: 'mediumDate' }} {{ rate?.createdAt | date: 'shortTime' }} </span>
+        <div style="text-align: left;" *ngIf="!rate?.updatedAt">
+          <span style="color: #6773ab;">Created at:</span>
+          <span> {{ rate?.createdAt | date: 'mediumDate' }} {{ rate?.createdAt | date: 'shortTime' }} </span>
+        </div>
+        <div style="text-align: left;" *ngIf="rate?.updatedAt">
+          <span style="color: #6773ab;">Updated at:</span>
+          <span> {{ rate?.updatedAt | date: 'mediumDate' }} {{ rate?.updatedAt | date: 'shortTime' }} </span>
+        </div>
+    </div>
+    <div style="text-align: left; padding-top: 10px;" *ngIf="loggedUser === rate?.byGuestId">
+      <img width="15px" height="15px" src="assets\edit.jpg" (click)="showEditRate()"/>
+      <img width="15px" height="15px" src="assets\delete.png" style="margin-left: 15px;" (click)="deleteRate(rate?.id)"/>
+      <div *ngIf="showEditRateBool" style="padding-top: 10px;">
+        <form [formGroup]="editRateForm" (ngSubmit)="onSubmitEditRate(rate?.id)">
+          <select class="form-select" aria-label="Default select example" style="width: 30%;" formControlName="editedRate">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+          <button  type="submit" class="btn btn-outline-secondary" style="margin-top: 15px;">Change rate</button>
+        </form>
       </div>
     </div>
-    
 </div>
 </div>
   
