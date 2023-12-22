@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sony/gobreaker"
 	"gopkg.in/gomail.v2"
 	"io/ioutil"
 	"log"
@@ -25,11 +26,13 @@ var (
 
 type NotificationService struct {
 	store domain.NotificationStore
+	cb    *gobreaker.CircuitBreaker
 }
 
 func NewNotificationService(store domain.NotificationStore) *NotificationService {
 	return &NotificationService{
 		store: store,
+		cb:    CircuitBreaker("notificationService"),
 	}
 }
 
@@ -55,9 +58,18 @@ func (service *NotificationService) CreateNotification(notification *domain.Noti
 		return err
 	}
 
-	userDetails, err := getUserDetails(notification.ForHostId)
-	if err != nil {
-		return fmt.Errorf("UserServiceError: %v", err)
+	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
+		userDetails, err := getUserDetails(notification.ForHostId)
+		return userDetails, err
+	})
+
+	if breakerErr != nil {
+		return breakerErr
+	}
+
+	userDetails, ok := result.(*UserDetails)
+	if !ok {
+		return fmt.Errorf("Internal server error: Unexpected result type")
 	}
 
 	log.Printf("User details response: %+v", userDetails)
@@ -132,4 +144,29 @@ func sendValidationMail(Description, email string) error {
 	}
 
 	return nil
+}
+
+func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
+	return gobreaker.NewCircuitBreaker(
+		gobreaker.Settings{
+			Name:        name,
+			MaxRequests: 1,
+			Timeout:     10 * time.Second,
+			Interval:    0,
+			ReadyToTrip: func(counts gobreaker.Counts) bool {
+				return counts.ConsecutiveFailures > 2
+			},
+			OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
+				log.Printf("Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
+			},
+
+			IsSuccessful: func(err error) bool {
+				if err == nil {
+					return true
+				}
+				errResp, ok := err.(domain.ErrResp)
+				return ok && errResp.StatusCode >= 400 && errResp.StatusCode < 500
+			},
+		},
+	)
 }

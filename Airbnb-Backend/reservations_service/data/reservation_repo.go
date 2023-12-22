@@ -317,6 +317,32 @@ func (sr *ReservationRepo) CancelReservation(reservationID string) error {
 	return nil
 }
 
+func (sr *ReservationRepo) DeleteReservation(reservationID string) error {
+
+	reservation, err := sr.GetReservationByID(reservationID)
+	if err != nil {
+		sr.logger.Println(err)
+		return err
+	}
+
+	err = sr.session.Query(
+		`DELETE FROM reservation_by_user WHERE reservation_id = ? AND by_userid = ?`,
+		reservation.ID, reservation.ByUserId).Exec()
+	if err != nil {
+		sr.logger.Println(err)
+		return err
+	}
+	err = sr.session.Query(
+		`DELETE FROM reservation_by_accommodation WHERE reservation_id = ? AND accommodation_id = ?`,
+		reservation.ID, reservation.AccommodationId).Exec()
+	if err != nil {
+		sr.logger.Println(err)
+		return err
+	}
+
+	return nil
+}
+
 func (sr *ReservationRepo) GetReservationByID(reservationID string) (*Reservation, error) {
 
 	parsedUUID, err := gocql.ParseUUID(reservationID)

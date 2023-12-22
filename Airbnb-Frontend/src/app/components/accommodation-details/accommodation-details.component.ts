@@ -372,8 +372,22 @@ export class AccommodationDetailsComponent implements OnInit {
 
                 },
                 (error) => {
+                  if (error.status === 405) {
+                    this.openSnackBar('Reservation already exists for the specified dates and accommodation!', "");
+                  }
+                  else if (error.status === 502) {
+                    this.openSnackBar('Service is not currently available, please try later!', "");
+                  }
+                  else if (error.status === 503) {
+                    this.openSnackBar('Service is not currently available, please try later!', "");
+                  }
+                  else if (error.status === 500) {
+                    this.openSnackBar('Service is not currently available, please try later!', "");
+                  }
+                  else{
                   this.openSnackBar("Error creating reservation!", "")
                   console.error('Error creating reservation:', error);
+                  }
                   /*if (error.headers) {
                     console.log('Error Response Headers:', error.headers);
                     error.headers.keys().forEach((key: string) => {
@@ -401,6 +415,7 @@ export class AccommodationDetailsComponent implements OnInit {
                   }
                 }
 
+
               );
 
             },
@@ -408,7 +423,13 @@ export class AccommodationDetailsComponent implements OnInit {
         if (error.status === 405) {
           this.openSnackBar('Reservation already exists for the specified dates and accommodation!', "");
         }
-        if (error.status === 502) {
+        else if (error.status === 502) {
+          this.openSnackBar('Service is not currently available, please try later!', "");
+        }
+        else if (error.status === 503) {
+          this.openSnackBar('Service is not currently available, please try later!', "");
+        }
+        else if (error.status === 500) {
           this.openSnackBar('Service is not currently available, please try later!', "");
         }
           console.error('Error creating reservation:', error);
@@ -523,7 +544,7 @@ export class AccommodationDetailsComponent implements OnInit {
 
   openSnackBar(message: string, action: string) {
     this._snackBar.open(message, action,  {
-      duration: 3500
+      duration: 2500
     });
   }
 
