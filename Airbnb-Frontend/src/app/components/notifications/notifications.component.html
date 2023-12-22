@@ -1,0 +1,11 @@
+<app-header></app-header>
+<div class="text">
+  <p>~ Notifications ~</p>
+</div>
+<br>
+<div *ngFor="let notification of notifications" class="notification-container">
+  <div class="notification-description">{{ notification.description }}</div>
+  <div class="notification-created-at">
+   {{ notification.createdAt | date: 'MMM d, y, h:mm a' }}
+  </div>
+</div>

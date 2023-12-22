@@ -16,6 +16,7 @@
       <a class="nav-link" *ngIf="isLoggedIn() && loggedUser" aria-pressed="true" routerLink="/My-Profile">Profile</a>
       <a class="nav-link" *ngIf="isLoggedIn() && loggedUser && loggedUser.userType === 'Guest'" aria-pressed="true" routerLink="/myReservations">My reservations</a>
       <a class="nav-link" *ngIf="isLoggedIn()" aria-pressed="true" routerLink="/Main-Page">Main Page</a>
+      <a class="nav-link" *ngIf="isLoggedIn() && loggedUser && loggedUser.userType === 'Host'" aria-pressed="true" routerLink="/Notifications">Notifications</a>
     </li>
   </ul>
 </nav>

@@ -245,9 +245,7 @@ export class AccommodationDetailsComponent implements OnInit {
         }
       );
     }
-  }
-
-  getAppoitmentsByAccommodation(): void {
+  }  getAppoitmentsByAccommodation(): void {
     const accommodationId = this.route.snapshot.paramMap.get('id');
     if (accommodationId) {
       this.appointmentService.getAppointmentsByAccommodation(accommodationId).subscribe(
@@ -281,6 +279,8 @@ export class AccommodationDetailsComponent implements OnInit {
       );
     }
   }
+
+
 
 
 
@@ -344,19 +344,78 @@ export class AccommodationDetailsComponent implements OnInit {
               newReservation.period = datesInRange
 
               this.reservationService.createReservation(newReservation).subscribe(
-                () => {
+                (response) => {
 
                   this.openSnackBar("Reservation created successfully!", "")
                   console.log('Reservation created successfully!');
+                  // Log the full response
+                  console.log('Response:', response);
+                  // Check if headers exist before accessing them
+                  if (response && response.headers) {
+                    const headers = response.headers;
+                    console.log('Response Headers:', headers);
+                    // Access individual header values
+                    const contentLength = headers.get('content-length');
+                    const contentType = headers.get('content-type');
+
+                    // Display or use these values as needed
+                    console.log('Content-Length:', contentLength);
+                    console.log('Content-Type:', contentType);
+                  }
+
+                  // Log response headers
+                 /* const headers = response.headers;
+                  console.log('Response Headers:', headers);*/
                   setTimeout(() => {
                     window.location.reload();
                   }, 2000);
 
                 },
                 (error) => {
+                  if (error.status === 405) {
+                    this.openSnackBar('Reservation already exists for the specified dates and accommodation!', "");
+                  }
+                  else if (error.status === 502) {
+                    this.openSnackBar('Service is not currently available, please try later!', "");
+                  }
+                  else if (error.status === 503) {
+                    this.openSnackBar('Service is not currently available, please try later!', "");
+                  }
+                  else if (error.status === 500) {
+                    this.openSnackBar('Service is not currently available, please try later!', "");
+                  }
+                  else{
                   this.openSnackBar("Error creating reservation!", "")
                   console.error('Error creating reservation:', error);
+                  }
+                  /*if (error.headers) {
+                    console.log('Error Response Headers:', error.headers);
+                    error.headers.keys().forEach((key: string) => {
+                      const values = error.headers.getAll(key);
+                      console.log(`${key}: ${values.join(', ')}`);
+                    });
+                  }*/
+                  // Check if headers exist before accessing them
+                  if (error && error.headers) {
+                    const headers = error.headers;
+                    console.log('Error Response Headers:', headers);
+
+                    // Access individual error header values
+                    const errorContentLength = headers.get('content-length');
+                    const errorContentType = headers.get('content-type');
+
+                    // Display or use these values as needed
+                    console.log('Error Content-Length:', errorContentLength);
+                    console.log('Error Content-Type:', errorContentType);
+                    // Log individual headers
+                    error.headers.keys().forEach((key: string) => {
+                      const values = error.headers.getAll(key);
+                      console.log(`${key}: ${values.join(', ')}`);
+                    });
+                  }
                 }
+
+
               );
 
             },
@@ -364,7 +423,13 @@ export class AccommodationDetailsComponent implements OnInit {
         if (error.status === 405) {
           this.openSnackBar('Reservation already exists for the specified dates and accommodation!', "");
         }
-        if (error.status === 502) {
+        else if (error.status === 502) {
+          this.openSnackBar('Service is not currently available, please try later!', "");
+        }
+        else if (error.status === 503) {
+          this.openSnackBar('Service is not currently available, please try later!', "");
+        }
+        else if (error.status === 500) {
           this.openSnackBar('Service is not currently available, please try later!', "");
         }
           console.error('Error creating reservation:', error);
@@ -479,7 +544,7 @@ export class AccommodationDetailsComponent implements OnInit {
 
   openSnackBar(message: string, action: string) {
     this._snackBar.open(message, action,  {
-      duration: 3500
+      duration: 2500
     });
   }
 

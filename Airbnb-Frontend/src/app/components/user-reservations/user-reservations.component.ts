@@ -33,7 +33,7 @@ export class UserReservationsComponent implements OnInit {
             this.accommodationService.getAccommodationById(reservation.accommodationId!).subscribe(
               (data: any) => {
                 reservation.accommodation = data;
-                console.log(reservation.accommodation)                   
+                console.log(reservation.accommodation)
               },
               (error) => {
                 console.error(error);
@@ -49,7 +49,7 @@ export class UserReservationsComponent implements OnInit {
   }
 
   cancelReservation(id:any){
-    
+
     this.openSnackBar2("Are you sure you want to cancel the reservation?", "Yes")
     .subscribe(() => {
       this.cancelReservationLogic(id);
@@ -68,11 +68,31 @@ export class UserReservationsComponent implements OnInit {
 
       },
       (error) => {
-        this.openSnackBar("" + error.error + "", "")
-        console.error('Error canceling reservation:', error);
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
+        if (error.status === 502) {
+          this.openSnackBar('Service is not currently available, please try later!', "");
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+        else if (error.status === 503) {
+          this.openSnackBar('Service is not currently available, please try later!', "");
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+        else if (error.status === 500) {
+          this.openSnackBar('Service is not currently available, please try later!', "");
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+        else{
+          this.openSnackBar("" + error.error + "", "")
+          console.error('Error canceling reservation:', error);
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
       }
     );
   }
