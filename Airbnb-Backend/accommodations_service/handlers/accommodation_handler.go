@@ -270,7 +270,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 		return
 	}
 
-	hasRated, err := s.repo.HasUserRatedHost(userID, rate.ForHostId)
+	hasRated, err := s.repo.HasUserRatedAccommodation(userID, rate.ForAccommodationId)
 	if err != nil {
 		log.Println("Error checking if user has already rated the host:", err)
 		http.Error(writer, "Internal Server Error", http.StatusInternalServerError)
@@ -278,7 +278,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	}
 
 	if hasRated {
-		http.Error(writer, "User has already rated the host", http.StatusForbidden)
+		http.Error(writer, "User has already rated the accommodation", http.StatusForbidden)
 		return
 	}
 

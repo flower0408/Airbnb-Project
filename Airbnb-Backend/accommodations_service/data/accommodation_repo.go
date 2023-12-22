@@ -289,6 +289,23 @@ func (rr *AccommodationRepo) HasUserRatedHost(userID string, hostID string) (boo
 	return count > 0, nil
 }
 
+func (rr *AccommodationRepo) HasUserRatedAccommodation(userID string, accommodationId string) (bool, error) {
+	ctx := context.TODO()
+	rateCollection := rr.getRateCollection()
+
+	filter := bson.D{
+		{"byGuestId", userID},
+		{"forAccommodationId", accommodationId},
+	}
+
+	count, err := rateCollection.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
 func (rr *AccommodationRepo) filterIDs(filter interface{}) ([]primitive.ObjectID, error) {
 	ctx := context.TODO()
 	accommodationCollection := rr.getCollection()
