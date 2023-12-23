@@ -78,6 +78,9 @@ func main() {
 	createReservation.HandleFunc("/reservations", reservationHandler.CreateReservation)
 	createReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
 
+	/*getReservationById := router.Methods(http.MethodGet).Subrouter()
+	getReservationById.HandleFunc("/reservationById/{id}", reservationHandler.GetReservationById)*/
+
 	getReservationByAccommodation := router.Methods(http.MethodGet).Subrouter()
 	getReservationByAccommodation.HandleFunc("/reservationsByAccommodation/{id}", reservationHandler.GetReservationByAccommodation)
 	//getAllReservation.Use(reservationHandler.MiddlewareReservationDeserialization)
@@ -115,8 +118,8 @@ func main() {
 		Addr:         ":" + port,
 		Handler:      router,
 		IdleTimeout:  120 * time.Second,
-		ReadTimeout:  1 * time.Second,
-		WriteTimeout: 1 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 
 	logger.Println("Server listening on port", port)

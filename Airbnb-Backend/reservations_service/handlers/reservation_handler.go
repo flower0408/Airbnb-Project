@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"github.com/sony/gobreaker"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -19,16 +22,19 @@ import (
 type KeyProduct struct{}
 
 var (
-	jwtKey          = []byte(os.Getenv("SECRET_KEY"))
-	verifier, _     = jwt.NewVerifierHS(jwt.HS256, jwtKey)
-	userServiceHost = os.Getenv("USER_SERVICE_HOST")
-	userServicePort = os.Getenv("USER_SERVICE_PORT")
+	jwtKey                  = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _             = jwt.NewVerifierHS(jwt.HS256, jwtKey)
+	userServiceHost         = os.Getenv("USER_SERVICE_HOST")
+	userServicePort         = os.Getenv("USER_SERVICE_PORT")
+	notificationServiceHost = os.Getenv("NOTIFICATION_SERVICE_HOST")
+	notificationServicePort = os.Getenv("NOTIFICATION_SERVICE_PORT")
 )
 
 type ReservationHandler struct {
 	logger          *log.Logger
 	reservationRepo *data.ReservationRepo
 	cb              *gobreaker.CircuitBreaker
+	cb2             *gobreaker.CircuitBreaker
 }
 
 func NewReservationHandler(l *log.Logger, r *data.ReservationRepo) *ReservationHandler {
@@ -36,13 +42,18 @@ func NewReservationHandler(l *log.Logger, r *data.ReservationRepo) *ReservationH
 		logger:          l,
 		reservationRepo: r,
 		cb:              CircuitBreaker("reservationService"),
+		cb2:             CircuitBreaker("reservationService2"),
 	}
 }
 
-// cassandra
 func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.Request) {
+
+	var (
+		createdReservationID string
+	)
+
 	reservation := h.Context().Value(KeyProduct{}).(*data.Reservation)
-	err := s.reservationRepo.InsertReservation(reservation)
+	createdReservation, err := s.reservationRepo.InsertReservation(reservation)
 	if err != nil {
 		if err.Error() == "Reservation already exists for the specified dates and accommodation." {
 			s.logger.Print("No one else can book accommodation for the reserved dates. ")
@@ -63,15 +74,255 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 		}
 		return
 	}
+
+	createdReservationID = createdReservation.ID.String()
+	s.logger.Print("Reservation created successfully: ", createdReservation)
+
+	s.logger.Print("AccommodationId: ", createdReservation.AccommodationId)
+
+	// Circuit breaker for accommodation service
+	resultAccommodation, breakerErrAccommodation := s.cb.Execute(func() (interface{}, error) {
+
+		accommodationDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", accommodationServiceHost, accommodationServicePort, createdReservation.AccommodationId)
+		accommodationDetailsRequest, _ := http.NewRequest("GET", accommodationDetailsEndpoint, nil)
+		accommodationDetailsResponse, err := http.DefaultClient.Do(accommodationDetailsRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Error fetching accommodation details: %v", err)
+		}
+		defer accommodationDetailsResponse.Body.Close()
+
+		if accommodationDetailsResponse.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("Error fetching accommodation details. Status code: %d", accommodationDetailsResponse.StatusCode)
+		}
+
+		body, err := ioutil.ReadAll(accommodationDetailsResponse.Body)
+		if err != nil {
+			return nil, fmt.Errorf("Error reading accommodation details response: %v", err)
+		}
+
+		var accommodationDetails AccommodationDetails
+		err = json.Unmarshal(body, &accommodationDetails)
+		if err != nil {
+			return nil, fmt.Errorf("Error unmarshaling accommodation details JSON: %v", err)
+		}
+
+		return &accommodationDetails, nil
+	})
+
+	if breakerErrAccommodation != nil {
+		log.Printf("Circuit breaker error: %v", breakerErrAccommodation)
+		log.Println("Before http.Error")
+
+		rw.WriteHeader(http.StatusServiceUnavailable)
+
+		http.Error(rw, "Error getting accommodation service", http.StatusServiceUnavailable)
+
+		log.Println("After http.Error")
+
+		err := s.reservationRepo.DeleteReservation(createdReservationID)
+		if err != nil {
+			log.Printf("Error deleting reservation after circuit breaker error: %v", err)
+		}
+
+		return
+	}
+
+	accommodationDetails := resultAccommodation.(*AccommodationDetails)
+
+	fmt.Println("OwnerId:", accommodationDetails.OwnerId)
+	fmt.Println("OwnerId:", accommodationDetails.Name)
+
+	// Circuit breaker for notification service
+	resultNotification, breakerErrNotification := s.cb2.Execute(func() (interface{}, error) {
+
+		requestBody := map[string]interface{}{
+			"ByGuestId":   createdReservation.ByUserId,
+			"ForHostId":   accommodationDetails.OwnerId,
+			"Description": fmt.Sprintf("Guest for period %s created reservation for accommodation  %s", createdReservation.Period, accommodationDetails.Name),
+		}
+
+		body, err := json.Marshal(requestBody)
+		if err != nil {
+			return nil, fmt.Errorf("Error marshaling requestBody details JSON: %v", err)
+		}
+
+		notificationServiceEndpoint := fmt.Sprintf("http://%s:%s/", notificationServiceHost, notificationServicePort)
+		notificationServiceRequest, _ := http.NewRequest("POST", notificationServiceEndpoint, bytes.NewReader(body))
+		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Error fetching notification service: %v", err)
+		}
+		defer responseUser.Body.Close()
+
+		if responseUser.StatusCode != http.StatusOK {
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, responseUser.Body)
+			errorMessage := fmt.Sprintf("UserServiceError: %s", buf.String())
+			return nil, fmt.Errorf(errorMessage)
+		}
+
+		return responseUser, nil
+	})
+
+	if breakerErrNotification != nil {
+		log.Printf("Circuit breaker error: %v", breakerErrNotification)
+		log.Println("Before http.Error")
+
+		rw.WriteHeader(http.StatusServiceUnavailable)
+
+		http.Error(rw, "Error getting notification service", http.StatusServiceUnavailable)
+
+		log.Println("After http.Error")
+
+		err := s.reservationRepo.DeleteReservation(createdReservationID)
+		if err != nil {
+			log.Printf("Error deleting reservation after circuit breaker error: %v", err)
+		}
+
+		return
+	}
+
+	s.logger.Println("Code after circuit breaker execution")
+
+	if resultNotification != nil {
+
+		fmt.Println("Received meaningful data:", resultNotification)
+	}
+
 	rw.WriteHeader(http.StatusOK)
-	s.logger.Print("Reservation created succesfully")
+}
+
+type AccommodationDetails struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Images      string   `json:"images"`
+	Location    Location `json:"location"`
+	Benefits    string   `json:"benefits"`
+	MinGuest    int      `json:"minGuest"`
+	MaxGuest    int      `json:"maxGuest"`
+	OwnerId     string   `json:"ownerId"`
+}
+type Location struct {
+	Country string `json:"country"`
+	City    string `json:"city"`
+	Street  string `json:"street"`
+	Number  int    `json:"number"`
 }
 
 func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	reservationID := vars["id"]
 
-	err := s.reservationRepo.CancelReservation(reservationID)
+	reservation, err := s.reservationRepo.GetReservationByID(reservationID)
+	if err != nil {
+		s.logger.Print("Error retrieving reservation: ", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		rw.Write([]byte("Error retrieving reservation."))
+		return
+	}
+
+	s.logger.Print("AccommodationId: ", reservation.AccommodationId)
+
+	// Circuit breaker for accommodation service
+	resultAccommodation, breakerErrAccommodation := s.cb.Execute(func() (interface{}, error) {
+		accommodationDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", accommodationServiceHost, accommodationServicePort, reservation.AccommodationId)
+		accommodationDetailsRequest, _ := http.NewRequest("GET", accommodationDetailsEndpoint, nil)
+		accommodationDetailsResponse, err := http.DefaultClient.Do(accommodationDetailsRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Error fetching accommodation details: %v", err)
+		}
+		defer accommodationDetailsResponse.Body.Close()
+
+		if accommodationDetailsResponse.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("Error fetching accommodation details. Status code: %d", accommodationDetailsResponse.StatusCode)
+		}
+
+		body, err := ioutil.ReadAll(accommodationDetailsResponse.Body)
+		if err != nil {
+			return nil, fmt.Errorf("Error reading accommodation details response: %v", err)
+		}
+
+		var accommodationDetails AccommodationDetails
+		err = json.Unmarshal(body, &accommodationDetails)
+		if err != nil {
+			return nil, fmt.Errorf("Error unmarshaling accommodation details JSON: %v", err)
+		}
+
+		return &accommodationDetails, nil
+	})
+
+	if breakerErrAccommodation != nil {
+		log.Printf("Circuit breaker error: %v", breakerErrAccommodation)
+		log.Println("Before http.Error")
+
+		rw.WriteHeader(http.StatusServiceUnavailable)
+
+		http.Error(rw, "Error getting accommodation service", http.StatusServiceUnavailable)
+
+		log.Println("After http.Error")
+
+		return
+	}
+
+	accommodationDetails := resultAccommodation.(*AccommodationDetails)
+
+	fmt.Println("OwnerId:", accommodationDetails.OwnerId)
+	fmt.Println("OwnerId:", accommodationDetails.Name)
+
+	// Circuit breaker for notification service
+	resultNotification, breakerErrNotification := s.cb2.Execute(func() (interface{}, error) {
+
+		requestBody := map[string]interface{}{
+			"ByGuestId":   reservation.ByUserId,
+			"ForHostId":   accommodationDetails.OwnerId,
+			"Description": fmt.Sprintf("Guest for period %s canceled reservation for accommodation  %s", reservation.Period, accommodationDetails.Name),
+		}
+
+		body, err := json.Marshal(requestBody)
+		if err != nil {
+			return nil, fmt.Errorf("Error marshaling requestBody details JSON: %v", err)
+		}
+
+		notificationServiceEndpoint := fmt.Sprintf("http://%s:%s/", notificationServiceHost, notificationServicePort)
+		notificationServiceRequest, _ := http.NewRequest("POST", notificationServiceEndpoint, bytes.NewReader(body))
+		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Error fetching notification service: %v", err)
+		}
+		defer responseUser.Body.Close()
+
+		if responseUser.StatusCode != http.StatusOK {
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, responseUser.Body)
+			errorMessage := fmt.Sprintf("UserServiceError: %s", buf.String())
+			return nil, fmt.Errorf(errorMessage)
+		}
+
+		return responseUser, nil
+	})
+
+	if breakerErrNotification != nil {
+		log.Printf("Circuit breaker error: %v", breakerErrNotification)
+		log.Println("Before http.Error")
+
+		rw.WriteHeader(http.StatusServiceUnavailable)
+
+		http.Error(rw, "Error getting notification service", http.StatusServiceUnavailable)
+
+		log.Println("After http.Error")
+
+		return
+	}
+
+	s.logger.Println("Code after circuit breaker execution")
+
+	if resultNotification != nil {
+
+		fmt.Println("Received meaningful data:", resultNotification)
+	}
+
+	err = s.reservationRepo.CancelReservation(reservationID)
 	if err != nil {
 		if err.Error() == "Can not cancel reservation. You can only cancel it before it starts." {
 			s.logger.Print("Can not cancel reservation. You can only cancel it before it starts. ")
@@ -227,6 +478,27 @@ func (s *ReservationHandler) GetReservationByAccommodation(rw http.ResponseWrite
 		return
 	}
 }
+
+/*func (s *ReservationHandler) GetReservationById(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	id := vars["id"]
+
+	reservationById, err := s.reservationRepo.GetReservationByID(id)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+	}
+
+	if reservationById == nil {
+		return
+	}
+
+	err = reservationById.ToJSON(rw)
+	if err != nil {
+		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
+		s.logger.Fatal("Unable to convert to json :", err)
+		return
+	}
+}*/
 
 func (s *ReservationHandler) CheckReservation(rw http.ResponseWriter, h *http.Request) {
 	var requestBody struct {

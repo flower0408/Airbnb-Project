@@ -56,6 +56,7 @@ func extractClaims(token *jwt.Token) map[string]string {
 }
 
 func CasbinMiddleware(e *casbin.Enforcer) func(http.Handler) http.Handler {
+	e.EnableLog(true)
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			userRole, err := extractUserType(r)

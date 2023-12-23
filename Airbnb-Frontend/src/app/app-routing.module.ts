@@ -15,11 +15,19 @@ import {RoleGuardService} from "./guards/role-guard.service";
 import {AccommodationDetailsComponent} from "./components/accommodation-details/accommodation-details.component";
 import { UserReservationsComponent } from './components/user-reservations/user-reservations.component';
 import { HostProfileComponent } from './components/host-profile/host-profile.component';
+import {NotificationComponent} from "./components/notifications/notifications.component";
 
 const routes: Routes = [
   {
     path: 'Main-Page',
     component: MainPageComponent
+  },
+
+  {
+    path: 'Notifications',
+    component: NotificationComponent,
+    canActivate: [RoleGuardService],
+    data: {expectedRoles: 'Host'}
   },
 
   {

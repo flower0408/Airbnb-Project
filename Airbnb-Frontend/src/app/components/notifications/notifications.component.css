@@ -1,0 +1,27 @@
+.notification-container {
+  background: linear-gradient(45deg, #F3CFC6, #FCEBEC);
+  color: #fff;
+  border-radius: 15px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+  margin: 20px auto; /* Center the container horizontally */
+  padding: 10px;
+  width: 58.67%; /* 2/3 of the display width */
+}
+
+.notification-description {
+  font-size: 16px;
+  margin-bottom: 5px;
+  color: crimson;
+}
+
+.notification-created-at {
+  font-size: 14px;
+  color: #F88379;
+}
+
+.text {
+  color: #F88379;
+  font-size: 22px;
+  text-align: center;
+  margin-top: 30px;
+}

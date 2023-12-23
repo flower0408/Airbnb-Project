@@ -43,7 +43,7 @@ func (handler *UserHandler) Init(router *mux.Router) {
 
 	CasbinMiddleware1, err := casbin.NewEnforcerSafe("./rbac_model.conf", "./policy.csv")
 
-	log.Println("auth service successful init of enforcer")
+	log.Println("user service successful init of enforcer")
 	if err != nil {
 		log.Fatal(err)
 	}

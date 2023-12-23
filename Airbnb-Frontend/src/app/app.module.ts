@@ -37,6 +37,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatNativeDateModule } from '@angular/material/core';
 import { UserReservationsComponent } from './components/user-reservations/user-reservations.component';
 import { HostProfileComponent } from './components/host-profile/host-profile.component';
+import {NotificationComponent} from "./components/notifications/notifications.component";
 
 @NgModule({
   declarations: [
@@ -56,6 +57,7 @@ import { HostProfileComponent } from './components/host-profile/host-profile.com
     AccommodationDetailsComponent,
     UserReservationsComponent,
     HostProfileComponent,
+    NotificationComponent
   ],
   imports: [
     BrowserModule,

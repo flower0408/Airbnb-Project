@@ -174,6 +174,7 @@ func InitializeCasbinMiddleware(modelPath, policyPath string) (func(http.Handler
 	if err != nil {
 		return nil, err
 	}
+	e.EnableLog(true)
 
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
