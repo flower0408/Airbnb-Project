@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	_ "time/tzdata"
 )
 
 var (
@@ -158,6 +159,313 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	}
 }
 
+func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWriter, req *http.Request) {
+	bearer := req.Header.Get("Authorization")
+	if bearer == "" {
+		log.Println("Authorization header missing")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	bearerToken := strings.Split(bearer, "Bearer ")
+	if len(bearerToken) != 2 {
+		log.Println("Malformed Authorization header")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tokenString := bearerToken[1]
+	log.Printf("Token: %s\n", tokenString)
+
+	token, err := jwt.Parse([]byte(tokenString), verifier)
+	if err != nil {
+		log.Println("Token parsing error:", err)
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	claims := authorization.GetMapClaims(token.Bytes())
+	log.Printf("Token Claims: %+v\n", claims)
+	username := claims["username"]
+
+	// Circuit breaker for user service
+	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		userID, statusCode, err := s.getUserIDFromUserService(username)
+		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
+	})
+
+	if breakerErr != nil {
+		log.Println("Circuit breaker open:", breakerErr)
+		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		log.Println("Internal server error: Unexpected result type")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	userID, ok := resultMap["userID"].(string)
+	if !ok {
+		log.Println("Internal server error: User ID not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	statusCode, ok := resultMap["statusCode"].(int)
+	if !ok {
+		log.Println("Internal server error: Status code not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err, ok := resultMap["err"].(error); ok && err != nil {
+		log.Println("Error from user service:", err)
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}
+	rate := req.Context().Value(KeyProduct{}).(*data.Rate)
+
+	rate.ByGuestId = userID
+
+	// Circuit breaker for reservation service
+	resultR, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/checkUserPastReservationsInAccommodation/%s/%s", reservationServiceHost, reservationServicePort, userID, rate.ForAccommodationId)
+		reservationServiceRequest, _ := http.NewRequest(http.MethodGet, reservationServiceEndpoint, nil)
+		reservationServiceRequest.Header.Set("Authorization", "Bearer "+tokenString)
+		response, err := http.DefaultClient.Do(reservationServiceRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Error communicating with reservation service")
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("Error getting user reservations in reservation service")
+		}
+
+		var hasPastReservations bool
+		if err := json.NewDecoder(response.Body).Decode(&hasPastReservations); err != nil {
+			return nil, fmt.Errorf("Error decoding past reservations response: %v", err)
+		}
+
+		return hasPastReservations, nil
+	})
+
+	if breakerErr != nil {
+		http.Error(writer, breakerErr.Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	hasPastReservations, ok := resultR.(bool)
+	if !ok {
+		log.Println("Error parsing result from reservation service: Unexpected result type")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if !hasPastReservations {
+		http.Error(writer, "User don't have past reservations in host's accommodations", http.StatusForbidden)
+		return
+	}
+
+	hasRated, err := s.repo.HasUserRatedAccommodation(userID, rate.ForAccommodationId)
+	if err != nil {
+		log.Println("Error checking if user has already rated the host:", err)
+		http.Error(writer, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if hasRated {
+		http.Error(writer, "User has already rated the accommodation", http.StatusForbidden)
+		return
+	}
+
+	// Get the current time in UTC
+	utcTime := time.Now().UTC()
+
+	// Set the desired time zone (CET)
+	cetLocation, err := time.LoadLocation("Europe/Belgrade")
+	if err != nil {
+		fmt.Println("Error loading location:", err)
+		return
+	}
+
+	// Convert to CET
+	cetTime := utcTime.In(cetLocation)
+
+	rate.CreatedAt = cetTime.Format(time.RFC3339)
+
+	if err := validateRate(rate); err != nil {
+		http.Error(writer, err.Message, http.StatusUnprocessableEntity)
+		return
+	}
+
+	_, err = s.repo.InsertRateForAccommodation(rate)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req *http.Request) {
+	bearer := req.Header.Get("Authorization")
+	if bearer == "" {
+		log.Println("Authorization header missing")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	bearerToken := strings.Split(bearer, "Bearer ")
+	if len(bearerToken) != 2 {
+		log.Println("Malformed Authorization header")
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tokenString := bearerToken[1]
+	log.Printf("Token: %s\n", tokenString)
+
+	token, err := jwt.Parse([]byte(tokenString), verifier)
+	if err != nil {
+		log.Println("Token parsing error:", err)
+		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	claims := authorization.GetMapClaims(token.Bytes())
+	log.Printf("Token Claims: %+v\n", claims)
+	username := claims["username"]
+
+	// Circuit breaker for user service
+	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		userID, statusCode, err := s.getUserIDFromUserService(username)
+		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
+	})
+
+	if breakerErr != nil {
+		log.Println("Circuit breaker open:", breakerErr)
+		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	resultMap, ok := result.(map[string]interface{})
+	if !ok {
+		log.Println("Internal server error: Unexpected result type")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	userID, ok := resultMap["userID"].(string)
+	if !ok {
+		log.Println("Internal server error: User ID not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	statusCode, ok := resultMap["statusCode"].(int)
+	if !ok {
+		log.Println("Internal server error: Status code not found in the response")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err, ok := resultMap["err"].(error); ok && err != nil {
+		log.Println("Error from user service:", err)
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}
+
+	rate := req.Context().Value(KeyProduct{}).(*data.Rate)
+
+	rate.ByGuestId = userID
+
+	// Circuit breaker for reservation service
+	resultR, breakerErr := s.cb.Execute(func() (interface{}, error) {
+		reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/checkUserPastReservations/%s/%s", reservationServiceHost, reservationServicePort, userID, rate.ForHostId)
+		reservationServiceRequest, _ := http.NewRequest(http.MethodGet, reservationServiceEndpoint, nil)
+		reservationServiceRequest.Header.Set("Authorization", "Bearer "+tokenString)
+		response, err := http.DefaultClient.Do(reservationServiceRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Error communicating with reservation service")
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("Error getting user reservations in reservation service")
+		}
+
+		var hasPastReservations bool
+		if err := json.NewDecoder(response.Body).Decode(&hasPastReservations); err != nil {
+			return nil, fmt.Errorf("Error decoding past reservations response: %v", err)
+		}
+
+		return hasPastReservations, nil
+	})
+
+	if breakerErr != nil {
+		http.Error(writer, breakerErr.Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	hasPastReservations, ok := resultR.(bool)
+	if !ok {
+		log.Println("Error parsing result from reservation service: Unexpected result type")
+		http.Error(writer, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if !hasPastReservations {
+		http.Error(writer, "User don't have past reservations in host's accommodations", http.StatusForbidden)
+		return
+	}
+
+	hasRated, err := s.repo.HasUserRatedHost(userID, rate.ForHostId)
+	if err != nil {
+		log.Println("Error checking if user has already rated the host:", err)
+		http.Error(writer, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if hasRated {
+		http.Error(writer, "User has already rated the host", http.StatusForbidden)
+		return
+	}
+
+	// Get the current time in UTC
+	utcTime := time.Now().UTC()
+
+	// Set the desired time zone (CET)
+	cetLocation, err := time.LoadLocation("Europe/Belgrade")
+	if err != nil {
+		fmt.Println("Error loading location:", err)
+		return
+	}
+
+	// Convert to CET
+	cetTime := utcTime.In(cetLocation)
+
+	rate.CreatedAt = cetTime.Format(time.RFC3339)
+
+	if err := validateRate(rate); err != nil {
+		http.Error(writer, err.Message, http.StatusUnprocessableEntity)
+		return
+	}
+
+	_, err = s.repo.InsertRateForHost(rate)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	writer.WriteHeader(http.StatusOK)
+}
+
 func extractBearerToken(authHeader string) string {
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {
@@ -258,6 +566,58 @@ func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWri
 	rw.Write([]byte("Accommodations deleted successfully"))
 }
 
+func (s *AccommodationHandler) DeleteRateForHost(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	rateID := vars["rateID"]
+
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	err := s.repo.DeleteRateForHost(rateID)
+	if err != nil {
+		http.Error(rw, "Error deleting rate for host", http.StatusInternalServerError)
+	}
+
+	rw.WriteHeader(http.StatusOK)
+}
+func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http.Request) {
+	// Dohvatanje parametra iz URL-a
+	vars := mux.Vars(h)
+	rateID := vars["rateID"]
+
+	rate := h.Context().Value(KeyProduct{}).(*data.Rate)
+
+	// Get the current time in UTC
+	utcTime := time.Now().UTC()
+
+	// Set the desired time zone (CET)
+	cetLocation, err := time.LoadLocation("Europe/Belgrade")
+	if err != nil {
+		fmt.Println("Error loading location:", err)
+		return
+	}
+
+	// Convert to CET
+	cetTime := utcTime.In(cetLocation)
+
+	rate.UpdatedAt = cetTime.Format(time.RFC3339)
+
+	err = s.repo.UpdateRateForHost(rateID, rate)
+	if err != nil {
+		s.logger.Println("Error updating rate for host:", err)
+		http.Error(rw, "Error updating rate for host", http.StatusInternalServerError)
+		return
+	}
+
+	rw.WriteHeader(http.StatusOK)
+}
+
 func (s *AccommodationHandler) getUserIDFromUserService(username interface{}) (string, int, error) {
 	userServiceEndpoint := fmt.Sprintf("http://%s:%s/getOne/%s", userServiceHost, userServicePort, username)
 	userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
@@ -298,6 +658,20 @@ func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
 
+func (s *AccommodationHandler) GetAllRate(rw http.ResponseWriter, h *http.Request) {
+
+	rates, err := s.repo.GetAllRate()
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(rates)
+	rw.WriteHeader(http.StatusOK)
+}
+
 func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	id, err := primitive.ObjectIDFromHex(vars["id"])
@@ -315,6 +689,38 @@ func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) 
 
 	rw.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(rw).Encode(accommodation)
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) GetRatesByAccommodation(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	id := vars["id"]
+
+	rates, err := s.repo.GetRatesByAccommodation(id)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(rates)
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *AccommodationHandler) GetRatesByHost(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	id := vars["id"]
+
+	rates, err := s.repo.GetRatesByHost(id)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(rates)
 	rw.WriteHeader(http.StatusOK)
 }
 
@@ -571,6 +977,18 @@ func validateAccommodation(accommodation *data.Accommodation) *ValidationError {
 	return nil
 }
 
+func validateRate(rate *data.Rate) *ValidationError {
+
+	if rate.Rate == 0 {
+		return &ValidationError{Message: "Rate cannot be 0"}
+	}
+	if rate.Rate > 5 || rate.Rate < 1 {
+		return &ValidationError{Message: "Rate can be only from 1 to 5"}
+	}
+
+	return nil
+}
+
 func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
 		accommodations := &data.Accommodation{}
@@ -581,6 +999,21 @@ func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.
 			return
 		}
 		ctx := context.WithValue(h.Context(), KeyProduct{}, accommodations)
+		h = h.WithContext(ctx)
+		next.ServeHTTP(rw, h)
+	})
+}
+
+func (s *AccommodationHandler) MiddlewareRateDeserialization(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
+		rates := &data.Rate{}
+		err := rates.FromJSON(h.Body)
+		if err != nil {
+			http.Error(rw, "Unable to decode json", http.StatusBadRequest)
+			s.logger.Fatal(err)
+			return
+		}
+		ctx := context.WithValue(h.Context(), KeyProduct{}, rates)
 		h = h.WithContext(ctx)
 		next.ServeHTTP(rw, h)
 	})

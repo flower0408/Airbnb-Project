@@ -36,7 +36,8 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatInputModule } from '@angular/material/input';
 import { MatNativeDateModule } from '@angular/material/core';
 import { UserReservationsComponent } from './components/user-reservations/user-reservations.component';
-import {NotificationComponent} from "./components/notifications/notifications.component";
+import { HostProfileComponent } from './components/host-profile/host-profile.component';
+import { NotificationComponent } from "./components/notifications/notifications.component";
 
 @NgModule({
   declarations: [
@@ -55,6 +56,7 @@ import {NotificationComponent} from "./components/notifications/notifications.co
     CreateAccommodationComponent,
     AccommodationDetailsComponent,
     UserReservationsComponent,
+    HostProfileComponent,
     NotificationComponent
   ],
   imports: [
