@@ -83,8 +83,8 @@ func main() {
 		Addr:         ":" + port,
 		Handler:      router,
 		IdleTimeout:  120 * time.Second,
-		ReadTimeout:  1 * time.Second,
-		WriteTimeout: 1 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 
 	logger.Println("Server listening on port", port)

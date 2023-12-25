@@ -130,7 +130,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 	accommodationDetails := resultAccommodation.(*AccommodationDetails)
 
 	fmt.Println("OwnerId:", accommodationDetails.OwnerId)
-	fmt.Println("OwnerId:", accommodationDetails.Name)
+	fmt.Println("Name:", accommodationDetails.Name)
 
 	// Circuit breaker for notification service
 	resultNotification, breakerErrNotification := s.cb2.Execute(func() (interface{}, error) {
@@ -270,6 +270,20 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 	fmt.Println("OwnerId:", accommodationDetails.OwnerId)
 	fmt.Println("OwnerId:", accommodationDetails.Name)
 
+	err = s.reservationRepo.CancelReservation(reservationID)
+	if err != nil {
+		if err.Error() == "Can not cancel reservation. You can only cancel it before it starts." {
+			s.logger.Print("Can not cancel reservation. You can only cancel it before it starts. ")
+			rw.WriteHeader(http.StatusBadRequest)
+			rw.Write([]byte("Can not cancel reservation. You can only cancel it before it starts."))
+		} else {
+			s.logger.Print("Error cancelling reservation: ", err)
+			rw.WriteHeader(http.StatusInternalServerError)
+			rw.Write([]byte("Error cancelling reservation."))
+		}
+		return
+	}
+
 	// Circuit breaker for notification service
 	resultNotification, breakerErrNotification := s.cb2.Execute(func() (interface{}, error) {
 
@@ -322,7 +336,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 		fmt.Println("Received meaningful data:", resultNotification)
 	}
 
-	err = s.reservationRepo.CancelReservation(reservationID)
+	/*err = s.reservationRepo.CancelReservation(reservationID)
 	if err != nil {
 		if err.Error() == "Can not cancel reservation. You can only cancel it before it starts." {
 			s.logger.Print("Can not cancel reservation. You can only cancel it before it starts. ")
@@ -334,7 +348,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 			rw.Write([]byte("Error cancelling reservation."))
 		}
 		return
-	}
+	}*/
 
 	rw.WriteHeader(http.StatusOK)
 	s.logger.Print("Reservation cancelled succesfully")
