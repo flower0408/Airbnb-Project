@@ -8,6 +8,9 @@ import (
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"github.com/sony/gobreaker"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"io/ioutil"
 	"log"
@@ -33,14 +36,16 @@ var (
 type ReservationHandler struct {
 	logger          *log.Logger
 	reservationRepo *data.ReservationRepo
+	tracer          trace.Tracer
 	cb              *gobreaker.CircuitBreaker
 	cb2             *gobreaker.CircuitBreaker
 }
 
-func NewReservationHandler(l *log.Logger, r *data.ReservationRepo) *ReservationHandler {
+func NewReservationHandler(l *log.Logger, r *data.ReservationRepo, t trace.Tracer) *ReservationHandler {
 	return &ReservationHandler{
 		logger:          l,
 		reservationRepo: r,
+		tracer:          t,
 		cb:              CircuitBreaker("reservationService"),
 		cb2:             CircuitBreaker("reservationService2"),
 	}
@@ -668,4 +673,11 @@ func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
 			},
 		},
 	)
+}
+
+func ExtractTraceInfoMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

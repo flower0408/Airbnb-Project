@@ -11,6 +11,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"log"
 	"net/http"
@@ -23,6 +25,7 @@ type AppointmentRepo struct {
 	cli    *mongo.Client
 	logger *log.Logger
 	client *http.Client
+	tracer trace.Tracer
 }
 
 func NewAppointmentRepo(ctx context.Context, logger *log.Logger) (*AppointmentRepo, error) {
@@ -123,12 +126,16 @@ func (rr *AppointmentRepo) InsertAppointment(appointment *Appointment) error {
 	return nil
 }
 
-func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment) error {
+func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, appointment *Appointment) error {
+	ctx, span := rr.tracer.Start(ctx, "AppointmentRepository.UpdateAppointment")
+	defer span.End()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
 
 	originalAppointment, err := rr.GetAppointmentByID(id)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error retrieving original appointment:", err)
 		return err
 	}
@@ -139,6 +146,7 @@ func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment
 	}
 	body, err := json.Marshal(data)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error marshalling JSON:", err)
 		return err
 	}
@@ -150,12 +158,14 @@ func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment
 	reservationEndpoint := fmt.Sprintf("http://%s:%s/check", reservationServiceHost, reservationServicePort)
 	reservationRequest, err := http.NewRequest("POST", reservationEndpoint, bytes.NewReader(body))
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error creating reservation request:", err)
 		return err
 	}
 
 	reservationResponse, err := http.DefaultClient.Do(reservationRequest)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error sending reservation request:", err)
 		return err
 	}
@@ -164,6 +174,7 @@ func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment
 	if reservationResponse.StatusCode == http.StatusOK {
 		existingAppointments, err := rr.GetAppointmentsByAccommodation(originalAppointment.AccommodationId)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return err
 		}
 
@@ -197,6 +208,7 @@ func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment
 		rr.logger.Println("No reservation found for the appointment. Update allowed.")
 		objectID, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			rr.logger.Println("Error converting ID to ObjectID:", err)
 			return err
 		}
@@ -225,6 +237,7 @@ func (rr *AppointmentRepo) UpdateAppointment(id string, appointment *Appointment
 		rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
 
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			rr.logger.Println(err)
 			return err
 		}

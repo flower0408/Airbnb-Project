@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +18,7 @@ import (
 type AppointmentHandler struct {
 	logger          *log.Logger
 	appointmentRepo *data.AppointmentRepo
+	tracer          trace.Tracer
 }
 
 var (
@@ -23,8 +26,8 @@ var (
 	accommodationServicePort = os.Getenv("ACCOMMODATIONS_SERVICE_PORT")
 )
 
-func NewAppointmentHandler(l *log.Logger, r *data.AppointmentRepo) *AppointmentHandler {
-	return &AppointmentHandler{l, r}
+func NewAppointmentHandler(l *log.Logger, r *data.AppointmentRepo, t trace.Tracer) *AppointmentHandler {
+	return &AppointmentHandler{l, r, t}
 }
 
 // mongo
@@ -138,13 +141,17 @@ func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *ht
 }
 
 func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.UpdateAppointment")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	id := vars["id"]
 
 	appointment := h.Context().Value(KeyProduct{}).(*data.Appointment)
 
-	err := r.appointmentRepo.UpdateAppointment(id, appointment)
+	err := r.appointmentRepo.UpdateAppointment(ctx, id, appointment)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		if err.Error() == "Reservation exists for the appointment." {
 			rw.WriteHeader(http.StatusMethodNotAllowed)
 			rw.Write([]byte("Reservation exists for the appointment. Update not allowed."))
@@ -163,6 +170,7 @@ func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.R
 		return
 	}
 
+	span.SetStatus(codes.Ok, "")
 	rw.WriteHeader(http.StatusOK)
 }
 

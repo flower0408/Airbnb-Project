@@ -126,13 +126,14 @@ services:
       USER_SERVICE_PORT: ${USER_SERVICE_PORT}
       NOTIFICATION_SERVICE_HOST: ${NOTIFICATION_SERVICE_HOST}
       NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT}
+      JAEGER_ADDRESS: ${JAEGER_ADDRESS}
       # depends_on:
       # - reservations_db
     # Pokretanje reservation servisa tek kada je baza uspesno pokrenuta
       SECRET_KEY: ${SECRET_KEY}
     depends_on:
-      reservations_db:
-        condition: service_healthy
+      - reservations_db
+      - jaeger
     networks:
       - network
 
@@ -145,6 +146,8 @@ services:
     restart: on-failure
     ports:
       - ${GATEWAY_PORT}:${GATEWAY_PORT}
+    depends_on:
+      - reservations_service
     networks:
       - network
 
@@ -219,6 +222,22 @@ services:
       - network
     volumes:
       - auth_cache:/data
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "6831:6831/udp"
+      - "16686:16686"
+    networks:
+      - network
+
+  collector:
+    image: otel/opentelemetry-collector:0.69.0
+    command: [ "--config=/etc/otel-collector-config.yaml" ]
+    volumes:
+      - ./api_gateway/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    networks:
+      - network
 
 volumes:
   # Volume na koji se povezuje reservations_db baza podataka
