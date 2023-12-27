@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.opentelemetry.io/otel/trace"
 	"user_service/domain"
 )
 
@@ -17,17 +18,22 @@ const (
 )
 
 type UserMongoDBStore struct {
-	users *mongo.Collection
+	users  *mongo.Collection
+	tracer trace.Tracer
 }
 
-func NewUserMongoDBStore(client *mongo.Client) domain.UserStore {
+func NewUserMongoDBStore(client *mongo.Client, tracer trace.Tracer) domain.UserStore {
 	users := client.Database(DATABASE).Collection(COLLECTION)
 	return &UserMongoDBStore{
-		users: users,
+		users:  users,
+		tracer: tracer,
 	}
 }
 
-func (store *UserMongoDBStore) Register(user *domain.User) (*domain.User, error) {
+func (store *UserMongoDBStore) Register(ctx context.Context, user *domain.User) (*domain.User, error) {
+	ctx, span := store.tracer.Start(ctx, "UserStore.Register")
+	defer span.End()
+
 	fmt.Println(json.Marshal(user))
 	user.ID = primitive.NewObjectID()
 	result, err := store.users.InsertOne(context.TODO(), user)
@@ -38,17 +44,25 @@ func (store *UserMongoDBStore) Register(user *domain.User) (*domain.User, error)
 	return user, nil
 }
 
-func (store *UserMongoDBStore) GetAll() ([]*domain.User, error) {
+func (store *UserMongoDBStore) GetAll(ctx context.Context) ([]*domain.User, error) {
+	ctx, span := store.tracer.Start(ctx, "UserStore.GetAll")
+	defer span.End()
+
 	filter := bson.D{{}}
 	return store.filter(filter)
 }
 
-func (store *UserMongoDBStore) Get(id primitive.ObjectID) (*domain.User, error) {
+func (store *UserMongoDBStore) Get(ctx context.Context, id primitive.ObjectID) (*domain.User, error) {
+	ctx, span := store.tracer.Start(ctx, "UserStore.Get")
+	defer span.End()
+
 	filter := bson.M{"_id": id}
 	return store.filterOne(filter)
 }
 
-func (store *UserMongoDBStore) GetOneUser(username string) (*domain.User, error) {
+func (store *UserMongoDBStore) GetOneUser(ctx context.Context, username string) (*domain.User, error) {
+	ctx, span := store.tracer.Start(ctx, "UserStore.GetOneUser")
+	defer span.End()
 
 	filter := bson.M{"username": username}
 
@@ -60,14 +74,20 @@ func (store *UserMongoDBStore) GetOneUser(username string) (*domain.User, error)
 	return user, nil
 }
 
-func (store *UserMongoDBStore) GetByEmail(email string) (*domain.User, error) {
+func (store *UserMongoDBStore) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
+	ctx, span := store.tracer.Start(ctx, "UserStore.GetByEmail")
+	defer span.End()
+
 	filter := bson.M{"email": email}
 	return store.filterOne(filter)
 }
 
-func (store *UserMongoDBStore) UpdateUserUsername(user *domain.User) error {
+func (store *UserMongoDBStore) UpdateUserUsername(ctx context.Context, user *domain.User) error {
+	ctx, span := store.tracer.Start(ctx, "UserStore.UpdateUserUsername")
+	defer span.End()
+
 	fmt.Println(user)
-	newState, err := store.users.UpdateOne(context.TODO(), bson.M{"_id": user.ID}, bson.M{"$set": user})
+	newState, err := store.users.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": user})
 	if err != nil {
 		return err
 	}
@@ -75,7 +95,10 @@ func (store *UserMongoDBStore) UpdateUserUsername(user *domain.User) error {
 	return nil
 }
 
-func (store *UserMongoDBStore) UpdateUser(updateUser *domain.User) (*domain.User, error) {
+func (store *UserMongoDBStore) UpdateUser(ctx context.Context, updateUser *domain.User) (*domain.User, error) {
+	ctx, span := store.tracer.Start(ctx, "UserStore.UpdateUser")
+	defer span.End()
+
 	updateData := bson.M{
 		"firstName": updateUser.Firstname,
 		"lastName":  updateUser.Lastname,
@@ -88,7 +111,7 @@ func (store *UserMongoDBStore) UpdateUser(updateUser *domain.User) (*domain.User
 	filter := bson.M{"_id": updateUser.ID}
 	update := bson.M{"$set": updateData}
 
-	result, err := store.users.UpdateOne(context.TODO(), filter, update)
+	result, err := store.users.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return nil, err
 	}
@@ -100,10 +123,12 @@ func (store *UserMongoDBStore) UpdateUser(updateUser *domain.User) (*domain.User
 	return updateUser, nil
 }
 
-func (store *UserMongoDBStore) DeleteAccount(userID primitive.ObjectID) error {
+func (store *UserMongoDBStore) DeleteAccount(ctx context.Context, userID primitive.ObjectID) error {
+	ctx, span := store.tracer.Start(ctx, "UserStore.DeleteAccount")
+	defer span.End()
 
 	filter := bson.M{"_id": userID}
-	result, err := store.users.DeleteOne(context.TODO(), filter)
+	result, err := store.users.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}

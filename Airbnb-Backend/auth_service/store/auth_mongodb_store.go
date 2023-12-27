@@ -7,6 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.opentelemetry.io/otel/trace"
 	"log"
 )
 
@@ -17,21 +18,29 @@ const (
 
 type AuthMongoDBStore struct {
 	credentials *mongo.Collection
+	tracer      trace.Tracer
 }
 
-func NewAuthMongoDBStore(client *mongo.Client) domain.AuthStore {
+func NewAuthMongoDBStore(client *mongo.Client, tracer trace.Tracer) domain.AuthStore {
 	auths := client.Database(DATABASE).Collection(COLLECTION)
 	return &AuthMongoDBStore{
 		credentials: auths,
+		tracer:      tracer,
 	}
 
 }
-func (store *AuthMongoDBStore) GetAll() ([]*domain.Credentials, error) {
+func (store *AuthMongoDBStore) GetAll(ctx context.Context) ([]*domain.Credentials, error) {
+	ctx, span := store.tracer.Start(ctx, "AuthStore.GetAll")
+	defer span.End()
+
 	filter := bson.D{{}}
 	return store.filter2(filter)
 }
 
-func (store *AuthMongoDBStore) Register(credentials *domain.Credentials) error {
+func (store *AuthMongoDBStore) Register(ctx context.Context, credentials *domain.Credentials) error {
+	ctx, span := store.tracer.Start(ctx, "AuthStore.Register")
+	defer span.End()
+
 	credentials.ID = primitive.NewObjectID()
 	result, err := store.credentials.InsertOne(context.TODO(), credentials)
 
@@ -42,7 +51,9 @@ func (store *AuthMongoDBStore) Register(credentials *domain.Credentials) error {
 	return nil
 }
 
-func (store *AuthMongoDBStore) GetOneUser(username string) (*domain.Credentials, error) {
+func (store *AuthMongoDBStore) GetOneUser(ctx context.Context, username string) (*domain.Credentials, error) {
+	ctx, span := store.tracer.Start(ctx, "AuthStore.GetOneUser")
+	defer span.End()
 	filter := bson.M{"username": username}
 
 	user, err := store.filterOne2(filter)
@@ -60,10 +71,12 @@ func (store *AuthMongoDBStore) GetOneUser(username string) (*domain.Credentials,
 	return user, nil
 }
 
-func (store *AuthMongoDBStore) UpdateUserUsername(user *domain.Credentials) error {
+func (store *AuthMongoDBStore) UpdateUserUsername(ctx context.Context, user *domain.Credentials) error {
+	ctx, span := store.tracer.Start(ctx, "AuthStore.UpdateUserUsername")
+	defer span.End()
 
 	fmt.Println(user)
-	newState, err := store.credentials.UpdateOne(context.TODO(), bson.M{"username": user.Username}, bson.M{"$set": user})
+	newState, err := store.credentials.UpdateOne(ctx, bson.M{"username": user.Username}, bson.M{"$set": user})
 	if err != nil {
 		return err
 	}
@@ -71,10 +84,12 @@ func (store *AuthMongoDBStore) UpdateUserUsername(user *domain.Credentials) erro
 	return nil
 }
 
-func (store *AuthMongoDBStore) UpdateUser(user *domain.Credentials) error {
+func (store *AuthMongoDBStore) UpdateUser(ctx context.Context, user *domain.Credentials) error {
+	ctx, span := store.tracer.Start(ctx, "AuthStore.UpdateUser")
+	defer span.End()
 
 	fmt.Println(user)
-	newState, err := store.credentials.UpdateOne(context.TODO(), bson.M{"_id": user.ID}, bson.M{"$set": user})
+	newState, err := store.credentials.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": user})
 	if err != nil {
 		return err
 	}
@@ -82,20 +97,26 @@ func (store *AuthMongoDBStore) UpdateUser(user *domain.Credentials) error {
 	return nil
 }
 
-func (store *AuthMongoDBStore) DeleteUser(username string) error {
+func (store *AuthMongoDBStore) DeleteUser(ctx context.Context, username string) error {
+	ctx, span := store.tracer.Start(ctx, "AuthStore.DeleteUser")
+	defer span.End()
+
 	filter := bson.M{"username": username}
-	_, err := store.credentials.DeleteOne(context.TODO(), filter)
+	_, err := store.credentials.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (store *AuthMongoDBStore) GetOneUserByID(id primitive.ObjectID) *domain.Credentials {
+func (store *AuthMongoDBStore) GetOneUserByID(ctx context.Context, id primitive.ObjectID) *domain.Credentials {
+	ctx, span := store.tracer.Start(ctx, "AuthStore.GetOneUserByID")
+	defer span.End()
+
 	filter := bson.M{"_id": id}
 
 	var user domain.Credentials
-	err := store.credentials.FindOne(context.TODO(), filter, nil).Decode(&user)
+	err := store.credentials.FindOne(ctx, filter, nil).Decode(&user)
 	if err != nil {
 		return nil
 	}

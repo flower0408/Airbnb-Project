@@ -5,6 +5,13 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	"go.opentelemetry.io/otel/trace"
 	"log"
 	"net/http"
 	"os"
@@ -36,8 +43,8 @@ func (server *Server) initMongoClient() *mongo.Client {
 	return client
 }
 
-func (server *Server) initUserStore(client *mongo.Client) domain.UserStore {
-	store := store.NewUserMongoDBStore(client)
+func (server *Server) initUserStore(client *mongo.Client, tracer trace.Tracer) domain.UserStore {
+	store := store.NewUserMongoDBStore(client, tracer)
 
 	return store
 }
@@ -51,19 +58,33 @@ func (server *Server) Start() {
 		}
 	}(mongoClient, context.Background())
 
-	userStore := server.initUserStore(mongoClient)
-	userService := server.initUserService(userStore)
-	userHandler := server.initUserHandler(userService)
+	cfg := config.NewConfig()
+
+	ctx := context.Background()
+	exp, err := newExporter(cfg.JaegerAddress)
+	if err != nil {
+		log.Fatalf("Failed to Initialize Exporter: %v", err)
+	}
+
+	tp := newTraceProvider(exp)
+	defer func() { _ = tp.Shutdown(ctx) }()
+	otel.SetTracerProvider(tp)
+	tracer := tp.Tracer("user_service")
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	userStore := server.initUserStore(mongoClient, tracer)
+	userService := server.initUserService(userStore, tracer)
+	userHandler := server.initUserHandler(userService, tracer)
 
 	server.start(userHandler)
 }
 
-func (server *Server) initUserService(store domain.UserStore) *application.UserService {
-	return application.NewUserService(store)
+func (server *Server) initUserService(store domain.UserStore, tracer trace.Tracer) *application.UserService {
+	return application.NewUserService(store, tracer)
 }
 
-func (server *Server) initUserHandler(service *application.UserService) *handlers.UserHandler {
-	return handlers.NewUserHandler(service)
+func (server *Server) initUserHandler(service *application.UserService, tracer trace.Tracer) *handlers.UserHandler {
+	return handlers.NewUserHandler(service, tracer)
 }
 
 func (server *Server) start(tweetHandler *handlers.UserHandler) {
@@ -97,6 +118,33 @@ func (server *Server) start(tweetHandler *handlers.UserHandler) {
 		log.Fatalf("Error Shutting Down Server %s", err)
 	}
 	log.Println("Server Gracefully Stopped")
+}
+
+func newExporter(address string) (*jaeger.Exporter, error) {
+	exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(address)))
+	if err != nil {
+		return nil, err
+	}
+	return exp, nil
+}
+
+func newTraceProvider(exp sdktrace.SpanExporter) *sdktrace.TracerProvider {
+	r, err := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("user_service"),
+		),
+	)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exp),
+		sdktrace.WithResource(r),
+	)
 }
 
 func MiddlewareContentTypeSet(next http.Handler) http.Handler {

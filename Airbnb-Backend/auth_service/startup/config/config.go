@@ -8,6 +8,7 @@ type Config struct {
 	AuthDBPort    string
 	AuthCacheHost string
 	AuthCachePort string
+	JaegerAddress string
 }
 
 func NewConfig() *Config {
@@ -17,5 +18,6 @@ func NewConfig() *Config {
 		AuthDBPort:    os.Getenv("AUTH_DB_PORT"),
 		AuthCacheHost: os.Getenv("AUTH_CACHE_HOST"),
 		AuthCachePort: os.Getenv("AUTH_CACHE_PORT"),
+		JaegerAddress: os.Getenv("JAEGER_ADDRESS"),
 	}
 }

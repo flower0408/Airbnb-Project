@@ -6,6 +6,7 @@ import (
 	"auth_service/errors"
 	"bufio"
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/gomail.v2"
 	"io"
@@ -37,21 +41,26 @@ var (
 )
 
 type AuthService struct {
-	store domain.AuthStore
-	cache domain.AuthCache
-	cb    *gobreaker.CircuitBreaker
+	store  domain.AuthStore
+	cache  domain.AuthCache
+	cb     *gobreaker.CircuitBreaker
+	tracer trace.Tracer
 }
 
-func NewAuthService(store domain.AuthStore, cache domain.AuthCache) *AuthService {
+func NewAuthService(store domain.AuthStore, cache domain.AuthCache, tracer trace.Tracer) *AuthService {
 	return &AuthService{
-		store: store,
-		cache: cache,
-		cb:    CircuitBreaker("authService"),
+		store:  store,
+		cache:  cache,
+		cb:     CircuitBreaker("authService"),
+		tracer: tracer,
 	}
 }
 
-func (service *AuthService) GetAll() ([]*domain.Credentials, error) {
-	return service.store.GetAll()
+func (service *AuthService) GetAll(ctx context.Context) ([]*domain.Credentials, error) {
+	ctx, span := service.tracer.Start(ctx, "AuthService.GetAll")
+	defer span.End()
+
+	return service.store.GetAll(ctx)
 }
 
 type ValidationError struct {
@@ -67,7 +76,10 @@ type RecaptchaResponse struct {
 	ErrorCodes  []string `json:"error-codes"`
 }
 
-func (service *AuthService) VerifyRecaptcha(recaptchaToken string) (bool, error) {
+func (service *AuthService) VerifyRecaptcha(ctx context.Context, recaptchaToken string) (bool, error) {
+	ctx, span := service.tracer.Start(ctx, "AuthService.VerifyRecaptcha")
+	defer span.End()
+
 	recaptchaEndpoint := "https://www.google.com/recaptcha/api/siteverify"
 	recaptchaSecret := recaptchaSecretKey
 
@@ -207,8 +219,9 @@ func (se StatusError) Error() string {
 	return fmt.Sprintf("HTTP Status %d: %s", se.Code, se.Err.Error())
 }
 
-func (service *AuthService) Register(user *domain.User) (string, int, error) {
-
+func (service *AuthService) Register(ctx context.Context, user *domain.User) (string, int, error) {
+	ctx, span := service.tracer.Start(ctx, "AuthService.Register")
+	defer span.End()
 	if err := validateUser(user); err != nil {
 		return "", 400, err
 	}
@@ -220,7 +233,7 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 		return "", 406, fmt.Errorf("Password is in black list, try with another one!")
 	}
 
-	existingUser, err := service.store.GetOneUser(user.Username)
+	existingUser, err := service.store.GetOneUser(ctx, user.Username)
 	if err != nil {
 		return "", 500, err
 	}
@@ -233,7 +246,7 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 	/*result, breakerErr := service.cb.Execute(func() (interface{}, error) {
 		userServiceEndpointMail := fmt.Sprintf("http://%s:%s/mailExist/%s", userServiceHost, userServicePort, user.Email)
 		userServiceRequestMail, _ := http.NewRequest("GET", userServiceEndpointMail, nil)
-
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequestMail.Header))
 		response, err := http.DefaultClient.Do(userServiceRequestMail)
 		if err != nil {
 			fmt.Println(err)
@@ -275,7 +288,7 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 
 		userServiceEndpoint := fmt.Sprintf("http://%s:%s/", userServiceHost, userServicePort)
 		userServiceRequest, _ := http.NewRequest("POST", userServiceEndpoint, bytes.NewReader(body))
-
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
 		responseUser, err := http.DefaultClient.Do(userServiceRequest)
 		if err != nil {
 			return nil, fmt.Errorf("UserServiceError")
@@ -303,7 +316,7 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 			Verified: false,
 		}
 
-		err = service.store.Register(&credentials)
+		err = service.store.Register(ctx, &credentials)
 		if err != nil {
 			return nil, err
 		}
@@ -329,7 +342,7 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 		return "", 500, err
 	}
 
-	err = sendValidationMail(validationToken, user.Email)
+	err = service.sendValidationMail(ctx, validationToken, user.Email)
 	if err != nil {
 		return "", 500, err
 	}
@@ -338,7 +351,10 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 
 }
 
-func sendValidationMail(validationToken uuid.UUID, email string) error {
+func (service *AuthService) sendValidationMail(ctx context.Context, validationToken uuid.UUID, email string) error {
+	ctx, span := service.tracer.Start(ctx, "AuthService.sendValidationMail")
+	defer span.End()
+
 	m := gomail.NewMessage()
 	m.SetHeader("From", smtpEmail)
 	m.SetHeader("To", email)
@@ -357,8 +373,9 @@ func sendValidationMail(validationToken uuid.UUID, email string) error {
 	return nil
 }
 
-func (service *AuthService) AccountConfirmation(validation *domain.RegisterValidation) error {
-
+func (service *AuthService) AccountConfirmation(ctx context.Context, validation *domain.RegisterValidation) error {
+	ctx, span := service.tracer.Start(ctx, "AuthService.VerifyAccount")
+	defer span.End()
 	log.Printf("Validation token for verification: %s", validation.MailToken)
 	token, err := service.cache.GetCachedValue(validation.UserToken)
 	if err != nil {
@@ -376,14 +393,14 @@ func (service *AuthService) AccountConfirmation(validation *domain.RegisterValid
 
 		log.Printf("validation.UserToken: %s", validation.UserToken)
 
-		user, err := service.store.GetOneUser(validation.UserToken)
+		user, err := service.store.GetOneUser(ctx, validation.UserToken)
 		if user == nil {
 			log.Println("User is not found")
 			return fmt.Errorf("User is not found")
 		}
 		user.Verified = true
 
-		err = service.store.UpdateUserUsername(user)
+		err = service.store.UpdateUserUsername(ctx, user)
 		if err != nil {
 			log.Printf("Error in updating user after changing status of verify: %s", err.Error())
 			return err
@@ -395,7 +412,10 @@ func (service *AuthService) AccountConfirmation(validation *domain.RegisterValid
 	return fmt.Errorf(errors.InvalidTokenError)
 }
 
-func (service *AuthService) ResendVerificationToken(request *domain.ResendVerificationRequest) error {
+func (service *AuthService) ResendVerificationToken(ctx context.Context, request *domain.ResendVerificationRequest) error {
+	ctx, span := service.tracer.Start(ctx, "AuthService.ResendVerificationToken")
+	defer span.End()
+
 	if len(request.UserMail) == 0 {
 		log.Println(errors.InvalidResendMailError)
 		return fmt.Errorf(errors.InvalidResendMailError)
@@ -409,7 +429,7 @@ func (service *AuthService) ResendVerificationToken(request *domain.ResendVerifi
 		return err
 	}
 
-	err = sendValidationMail(tokenUUID, request.UserMail)
+	err = service.sendValidationMail(ctx, tokenUUID, request.UserMail)
 	if err != nil {
 		log.Println("Send verification mail problem")
 		return err
@@ -418,11 +438,14 @@ func (service *AuthService) ResendVerificationToken(request *domain.ResendVerifi
 	return nil
 }
 
-func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int, error) {
+func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email string) (string, int, error) {
+	ctx, span := service.tracer.Start(ctx, "AuthService.SendRecoveryPasswordToken")
+	defer span.End()
 	// Circuit breaker for communication with user service
 	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
 		userServiceEndpoint := fmt.Sprintf("http://%s:%s/mailExist/%s", userServiceHost, userServicePort, email)
 		userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
 		response, err := http.DefaultClient.Do(userServiceRequest)
 		if err != nil {
 			return nil, fmt.Errorf("EmailServiceError")
@@ -444,6 +467,7 @@ func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int
 
 		userDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", userServiceHost, userServicePort, userID)
 		userDetailsRequest, _ := http.NewRequest("GET", userDetailsEndpoint, nil)
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
 		userDetailsResponse, err := http.DefaultClient.Do(userDetailsRequest)
 		if err != nil {
 			return nil, fmt.Errorf("UserServiceError")
@@ -466,7 +490,7 @@ func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int
 
 		fmt.Println("Username:", userDetails.Username)
 
-		userUsernameCredentials, err := service.store.GetOneUser(userDetails.Username)
+		userUsernameCredentials, err := service.store.GetOneUser(ctx, userDetails.Username)
 		if err != nil {
 			return nil, err
 		}
@@ -475,7 +499,7 @@ func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int
 		fmt.Println("Retrieved user ID:", userID)
 
 		recoverUUID, _ := uuid.NewUUID()
-		err = sendRecoverPasswordMail(recoverUUID, email)
+		err = service.sendRecoverPasswordMail(ctx, recoverUUID, email)
 		if err != nil {
 			return nil, err
 		}
@@ -511,7 +535,10 @@ type UserDetails struct {
 	UserType  string `json:"userType"`
 }
 
-func sendRecoverPasswordMail(validationToken uuid.UUID, email string) error {
+func (service *AuthService) sendRecoverPasswordMail(ctx context.Context, validationToken uuid.UUID, email string) error {
+	ctx, span := service.tracer.Start(ctx, "AuthService.sendValidationMail")
+	defer span.End()
+
 	m := gomail.NewMessage()
 	m.SetHeader("From", smtpEmail)
 	m.SetHeader("To", email)
@@ -530,7 +557,9 @@ func sendRecoverPasswordMail(validationToken uuid.UUID, email string) error {
 	return nil
 }
 
-func (service *AuthService) CheckRecoveryPasswordToken(request *domain.RegisterValidation) error {
+func (service *AuthService) CheckRecoveryPasswordToken(ctx context.Context, request *domain.RegisterValidation) error {
+	ctx, span := service.tracer.Start(ctx, "AuthService.CheckRecoveryPasswordToken")
+	defer span.End()
 
 	if len(request.UserToken) == 0 {
 		return fmt.Errorf(errors.InvalidUserTokenError)
@@ -549,7 +578,10 @@ func (service *AuthService) CheckRecoveryPasswordToken(request *domain.RegisterV
 	return nil
 }
 
-func (service *AuthService) RecoverPassword(recoverPassword *domain.RecoverPasswordRequest) (string, int, error) {
+func (service *AuthService) RecoverPassword(ctx context.Context, recoverPassword *domain.RecoverPasswordRequest) (string, int, error) {
+	ctx, span := service.tracer.Start(ctx, "AuthService.RecoverPassword")
+	defer span.End()
+
 	log.Println("Starting password recovery process...")
 
 	if recoverPassword.NewPassword == "" {
@@ -582,7 +614,7 @@ func (service *AuthService) RecoverPassword(recoverPassword *domain.RecoverPassw
 
 	log.Printf("Recovering password for user ID: %s", primitiveID.Hex())
 
-	credentials := service.store.GetOneUserByID(primitiveID)
+	credentials := service.store.GetOneUserByID(ctx, primitiveID)
 	if credentials == nil {
 		log.Printf("User not found for ID: %s", primitiveID.Hex())
 		return "", http.StatusNotFound, fmt.Errorf("User not found")
@@ -595,7 +627,7 @@ func (service *AuthService) RecoverPassword(recoverPassword *domain.RecoverPassw
 	}
 	credentials.Password = string(hash)
 
-	err = service.store.UpdateUser(credentials)
+	err = service.store.UpdateUser(ctx, credentials)
 	if err != nil {
 		return "baseErr", http.StatusInternalServerError, err
 	}
@@ -603,14 +635,16 @@ func (service *AuthService) RecoverPassword(recoverPassword *domain.RecoverPassw
 	return "OK", http.StatusOK, nil
 }
 
-func (service *AuthService) ChangePassword(password domain.PasswordChange, token string) (string, int, error) {
+func (service *AuthService) ChangePassword(ctx context.Context, password domain.PasswordChange, token string) (string, int, error) {
+	ctx, span := service.tracer.Start(ctx, "AuthService.ChangePassword")
+	defer span.End()
 
 	parsedToken := authorization.GetToken(token)
 	claims := authorization.GetMapClaims(parsedToken.Bytes())
 
 	username := claims["username"]
 
-	user, err := service.store.GetOneUser(username)
+	user, err := service.store.GetOneUser(ctx, username)
 	if err != nil {
 		log.Println(err)
 	}
@@ -653,7 +687,7 @@ func (service *AuthService) ChangePassword(password domain.PasswordChange, token
 
 		user.Password = string(newEncryptedPassword)
 
-		err = service.store.UpdateUser(user)
+		err = service.store.UpdateUser(ctx, user)
 		if err != nil {
 			return "baseErr", http.StatusInternalServerError, err
 		}
@@ -666,7 +700,10 @@ func (service *AuthService) ChangePassword(password domain.PasswordChange, token
 	return "OK", http.StatusOK, nil
 }
 
-func (service *AuthService) ChangeUsername(username domain.UsernameChange, token string) (string, int, error) {
+func (service *AuthService) ChangeUsername(ctx context.Context, username domain.UsernameChange, token string) (string, int, error) {
+	ctx, span := service.tracer.Start(ctx, "AuthService.ChangePassword")
+	defer span.End()
+
 	parsedToken := authorization.GetToken(token)
 	claims := authorization.GetMapClaims(parsedToken.Bytes())
 
@@ -678,7 +715,7 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 		return "InvalidUsername", http.StatusBadRequest, fmt.Errorf("Invalid username format. It must be 4-30 characters long and contain only letters, numbers, underscores, and hyphens")
 	}
 
-	existingUser, err := service.store.GetOneUser(username.NewUsername)
+	existingUser, err := service.store.GetOneUser(ctx, username.NewUsername)
 	if err != nil {
 		return "GetUserErr", http.StatusInternalServerError, err
 	}
@@ -701,6 +738,7 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
 		userServiceEndpoint := fmt.Sprintf("http://%s:%s/changeUsername", userServiceHost, userServicePort)
 		userServiceRequest, _ := http.NewRequest("POST", userServiceEndpoint, bytes.NewReader(body))
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
 		responseUser, err := http.DefaultClient.Do(userServiceRequest)
 
 		if err != nil {
@@ -726,7 +764,7 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 		return "UserServiceError", http.StatusServiceUnavailable, breakerErr
 	}
 
-	user, err := service.store.GetOneUser(currentUsername)
+	user, err := service.store.GetOneUser(ctx, currentUsername)
 	if err != nil {
 		fmt.Println(err)
 		return "GetUserErr", http.StatusInternalServerError, err
@@ -735,7 +773,7 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 
 	user.Username = username.NewUsername
 
-	err = service.store.UpdateUser(user)
+	err = service.store.UpdateUser(ctx, user)
 	if err != nil {
 		return "baseErr", http.StatusInternalServerError, err
 	}
@@ -744,8 +782,10 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 	return "OK", http.StatusOK, nil
 }
 
-func (service *AuthService) Login(credentials *domain.Credentials) (string, error) {
-	user, err := service.store.GetOneUser(credentials.Username)
+func (service *AuthService) Login(ctx context.Context, credentials *domain.Credentials) (string, error) {
+	ctx, span := service.tracer.Start(ctx, "AuthService.Login")
+	defer span.End()
+	user, err := service.store.GetOneUser(ctx, credentials.Username)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", fmt.Errorf(errors.InvalidCredentials)
@@ -787,8 +827,11 @@ func responseToType(response io.ReadCloser, any any) error {
 	return nil
 }
 
-func (service *AuthService) DeleteUser(username string) (string, int, error) {
-	existingUser, err := service.store.GetOneUser(username)
+func (service *AuthService) DeleteUser(ctx context.Context, username string) (string, int, error) {
+	ctx, span := service.tracer.Start(ctx, "AuthService.Login")
+	defer span.End()
+
+	existingUser, err := service.store.GetOneUser(ctx, username)
 	if err != nil {
 		return "baseErr", http.StatusInternalServerError, err
 	}
@@ -797,7 +840,7 @@ func (service *AuthService) DeleteUser(username string) (string, int, error) {
 		return "notFound", http.StatusNotFound, fmt.Errorf("User not found")
 	}
 
-	if err := service.store.DeleteUser(username); err != nil {
+	if err := service.store.DeleteUser(ctx, username); err != nil {
 		return "baseErr", http.StatusInternalServerError, err
 	}
 

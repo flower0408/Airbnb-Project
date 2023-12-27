@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"log"
 	"net/http"
 	"os"
@@ -31,11 +32,13 @@ var (
 
 type UserHandler struct {
 	service *application.UserService
+	tracer  trace.Tracer
 }
 
-func NewUserHandler(service *application.UserService) *UserHandler {
+func NewUserHandler(service *application.UserService, tracer trace.Tracer) *UserHandler {
 	return &UserHandler{
 		service: service,
+		tracer:  tracer,
 	}
 }
 
@@ -120,6 +123,9 @@ func validateUser(user *domain.User) *ValidationError {
 }
 
 func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.Register")
+	defer span.End()
+
 	var user domain.User
 	err := json.NewDecoder(req.Body).Decode(&user)
 	if err != nil {
@@ -133,7 +139,7 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	saved, err := handler.service.Register(&user)
+	saved, err := handler.service.Register(ctx, &user)
 	if err != nil {
 		if err.Error() == errors.DatabaseError {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
@@ -153,6 +159,8 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 }
 
 func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.UpdateUser")
+	defer span.End()
 
 	vars := mux.Vars(req)
 	userID, err := primitive.ObjectIDFromHex(vars["userID"])
@@ -161,7 +169,7 @@ func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Req
 		return
 	}
 
-	existingUser, err := handler.service.Get(userID)
+	existingUser, err := handler.service.Get(ctx, userID)
 	if err != nil {
 		http.Error(writer, "User not found", http.StatusBadRequest)
 		return
@@ -179,7 +187,7 @@ func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Req
 	}
 
 	if newEmail, ok := updatePayload["email"].(string); ok && newEmail != existingUser.Email {
-		if _, err := handler.service.DoesEmailExist(newEmail); err == nil {
+		if _, err := handler.service.DoesEmailExist(ctx, newEmail); err == nil {
 			http.Error(writer, "Updated email already exists", http.StatusMethodNotAllowed)
 			return
 		}
@@ -197,7 +205,7 @@ func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Req
 		return
 	}
 
-	updatedUser, err := handler.service.UpdateUser(existingUser)
+	updatedUser, err := handler.service.UpdateUser(ctx, existingUser)
 	if err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
@@ -256,6 +264,9 @@ func validateUserFields(fields bson.M) *ValidationError {
 }
 
 func (handler *UserHandler) ChangeUsername(writer http.ResponseWriter, request *http.Request) {
+	ctx, span := handler.tracer.Start(request.Context(), "UserHandler.ChangeUsername")
+	defer span.End()
+
 	var username domain.UsernameChange
 	err := json.NewDecoder(request.Body).Decode(&username)
 	if err != nil {
@@ -264,7 +275,7 @@ func (handler *UserHandler) ChangeUsername(writer http.ResponseWriter, request *
 		return
 	}
 
-	status, statusCode, err := handler.service.ChangeUsername(username)
+	status, statusCode, err := handler.service.ChangeUsername(ctx, username)
 
 	if err != nil {
 		log.Println("Error in ChangeUsername:", err)
@@ -287,7 +298,10 @@ func (handler *UserHandler) ChangeUsername(writer http.ResponseWriter, request *
 }
 
 func (handler *UserHandler) GetAll(writer http.ResponseWriter, req *http.Request) {
-	users, err := handler.service.GetAll()
+	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.GetAll")
+	defer span.End()
+
+	users, err := handler.service.GetAll(ctx)
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
@@ -296,6 +310,9 @@ func (handler *UserHandler) GetAll(writer http.ResponseWriter, req *http.Request
 }
 
 func (handler *UserHandler) Get(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.Get")
+	defer span.End()
+
 	vars := mux.Vars(req)
 	id, ok := vars["id"]
 	if !ok {
@@ -309,7 +326,7 @@ func (handler *UserHandler) Get(writer http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	user, err := handler.service.Get(objectID)
+	user, err := handler.service.Get(ctx, objectID)
 	if err != nil {
 		writer.WriteHeader(http.StatusNotFound)
 		return
@@ -318,10 +335,13 @@ func (handler *UserHandler) Get(writer http.ResponseWriter, req *http.Request) {
 }
 
 func (handler *UserHandler) GetOne(writer http.ResponseWriter, request *http.Request) {
+	ctx, span := handler.tracer.Start(request.Context(), "UserHandler.GetOne")
+	defer span.End()
+
 	vars := mux.Vars(request)
 	username := vars["username"]
 
-	user, err := handler.service.GetOneUser(username)
+	user, err := handler.service.GetOneUser(ctx, username)
 	if err != nil {
 		log.Println(err)
 		writer.WriteHeader(http.StatusNotFound)
@@ -330,10 +350,13 @@ func (handler *UserHandler) GetOne(writer http.ResponseWriter, request *http.Req
 }
 
 func (handler *UserHandler) GetId(writer http.ResponseWriter, request *http.Request) {
+	ctx, span := handler.tracer.Start(request.Context(), "UserHandler.GetId")
+	defer span.End()
+
 	vars := mux.Vars(request)
 	username := vars["username"]
 
-	userId, err := handler.service.GetOneUserId(username)
+	userId, err := handler.service.GetOneUserId(ctx, username)
 	if err != nil {
 		log.Println(err)
 		writer.WriteHeader(http.StatusNotFound)
@@ -342,13 +365,16 @@ func (handler *UserHandler) GetId(writer http.ResponseWriter, request *http.Requ
 }
 
 func (handler *UserHandler) DeleteAccount(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.DeleteAccount")
+	defer span.End()
+
 	vars := mux.Vars(req)
 	userID, err := primitive.ObjectIDFromHex(vars["id"])
 	if err != nil {
 		http.Error(writer, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
-	err = handler.service.DeleteAccount(userID)
+	err = handler.service.DeleteAccount(ctx, userID)
 	if err != nil {
 		http.Error(writer, "Error deleting account", http.StatusInternalServerError)
 		return
@@ -367,6 +393,8 @@ func extractBearerToken(authHeader string) string {
 }
 
 func (handler *UserHandler) Profile(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.Profile")
+	defer span.End()
 
 	bearer := req.Header.Get("Authorization")
 	if bearer == "" {
@@ -396,7 +424,7 @@ func (handler *UserHandler) Profile(writer http.ResponseWriter, req *http.Reques
 	log.Printf("Token Claims: %+v\n", claims)
 	username := claims["username"]
 
-	user, err := handler.service.GetOneUser(username)
+	user, err := handler.service.GetOneUser(ctx, username)
 	if err != nil {
 		log.Println("GetOneUser error:", err)
 		http.Error(writer, "User not found", http.StatusNotFound)
@@ -407,6 +435,9 @@ func (handler *UserHandler) Profile(writer http.ResponseWriter, req *http.Reques
 }
 
 func (handler *UserHandler) MailExist(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.MailExist")
+	defer span.End()
+
 	vars := mux.Vars(req)
 	mail, ok := vars["mail"]
 	if !ok {
@@ -414,7 +445,7 @@ func (handler *UserHandler) MailExist(writer http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	id, err := handler.service.DoesEmailExist(mail)
+	id, err := handler.service.DoesEmailExist(ctx, mail)
 	if err != nil {
 		writer.WriteHeader(http.StatusNotFound)
 		return

@@ -1,14 +1,17 @@
 package domain
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
+import (
+	"context"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type UserStore interface {
-	Get(id primitive.ObjectID) (*User, error)
-	GetAll() ([]*User, error)
-	Register(user *User) (*User, error)
-	GetOneUser(username string) (*User, error)
-	GetByEmail(email string) (*User, error)
-	UpdateUserUsername(user *User) error
-	UpdateUser(updateUser *User) (*User, error)
-	DeleteAccount(userID primitive.ObjectID) error
+	Get(ctx context.Context, id primitive.ObjectID) (*User, error)
+	GetAll(ctx context.Context) ([]*User, error)
+	Register(ctx context.Context, user *User) (*User, error)
+	GetOneUser(ctx context.Context, username string) (*User, error)
+	GetByEmail(ctx context.Context, email string) (*User, error)
+	UpdateUserUsername(ctx context.Context, user *User) error
+	UpdateUser(ctx context.Context, updateUser *User) (*User, error)
+	DeleteAccount(ctx context.Context, userID primitive.ObjectID) error
 }

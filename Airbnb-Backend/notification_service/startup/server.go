@@ -5,6 +5,13 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	"go.opentelemetry.io/otel/trace"
 	"log"
 	"net/http"
 	"notification_service/domain"
@@ -36,8 +43,8 @@ func (server *Server) initMongoClient() *mongo.Client {
 	return client
 }
 
-func (server *Server) initNotificationStore(client *mongo.Client) domain.NotificationStore {
-	store := store.NewNotificationMongoDBStore(client)
+func (server *Server) initNotificationStore(client *mongo.Client, tracer trace.Tracer) domain.NotificationStore {
+	store := store.NewNotificationMongoDBStore(client, tracer)
 
 	return store
 }
@@ -51,19 +58,33 @@ func (server *Server) Start() {
 		}
 	}(mongoClient, context.Background())
 
-	notificationStore := server.initNotificationStore(mongoClient)
-	notificationService := server.initNotificationService(notificationStore)
-	notificationHandler := server.initNotificationHandler(notificationService)
+	cfg := config.NewConfig()
+
+	ctx := context.Background()
+	exp, err := newExporter(cfg.JaegerAddress)
+	if err != nil {
+		log.Fatalf("Failed to Initialize Exporter: %v", err)
+	}
+
+	tp := newTraceProvider(exp)
+	defer func() { _ = tp.Shutdown(ctx) }()
+	otel.SetTracerProvider(tp)
+	tracer := tp.Tracer("user_service")
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	notificationStore := server.initNotificationStore(mongoClient, tracer)
+	notificationService := server.initNotificationService(notificationStore, tracer)
+	notificationHandler := server.initNotificationHandler(notificationService, tracer)
 
 	server.start(notificationHandler)
 }
 
-func (server *Server) initNotificationService(store domain.NotificationStore) *application.NotificationService {
-	return application.NewNotificationService(store)
+func (server *Server) initNotificationService(store domain.NotificationStore, tracer trace.Tracer) *application.NotificationService {
+	return application.NewNotificationService(store, tracer)
 }
 
-func (server *Server) initNotificationHandler(service *application.NotificationService) *handlers.NotificationHandler {
-	return handlers.NewNotificationHandler(service)
+func (server *Server) initNotificationHandler(service *application.NotificationService, tracer trace.Tracer) *handlers.NotificationHandler {
+	return handlers.NewNotificationHandler(service, tracer)
 }
 
 func (server *Server) start(notificationHandler *handlers.NotificationHandler) {
@@ -97,6 +118,33 @@ func (server *Server) start(notificationHandler *handlers.NotificationHandler) {
 		log.Fatalf("Error Shutting Down Server %s", err)
 	}
 	log.Println("Server Gracefully Stopped")
+}
+
+func newExporter(address string) (*jaeger.Exporter, error) {
+	exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(address)))
+	if err != nil {
+		return nil, err
+	}
+	return exp, nil
+}
+
+func newTraceProvider(exp sdktrace.SpanExporter) *sdktrace.TracerProvider {
+	r, err := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("notification_service"),
+		),
+	)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exp),
+		sdktrace.WithResource(r),
+	)
 }
 
 func MiddlewareContentTypeSet(next http.Handler) http.Handler {

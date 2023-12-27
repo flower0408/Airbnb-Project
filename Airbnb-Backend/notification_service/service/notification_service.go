@@ -1,10 +1,14 @@
 package application
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/sony/gobreaker"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/gomail.v2"
 	"io/ioutil"
 	"log"
@@ -25,26 +29,37 @@ var (
 )
 
 type NotificationService struct {
-	store domain.NotificationStore
-	cb    *gobreaker.CircuitBreaker
+	store  domain.NotificationStore
+	cb     *gobreaker.CircuitBreaker
+	tracer trace.Tracer
 }
 
-func NewNotificationService(store domain.NotificationStore) *NotificationService {
+func NewNotificationService(store domain.NotificationStore, tracer trace.Tracer) *NotificationService {
 	return &NotificationService{
-		store: store,
-		cb:    CircuitBreaker("notificationService"),
+		store:  store,
+		cb:     CircuitBreaker("notificationService"),
+		tracer: tracer,
 	}
 }
 
-func (service *NotificationService) GetNotificationByHostId(hostId string) ([]*domain.Notification, error) {
-	return service.store.GetNotificationsByHostId(hostId)
+func (service *NotificationService) GetNotificationByHostId(ctx context.Context, hostId string) ([]*domain.Notification, error) {
+	ctx, span := service.tracer.Start(ctx, "NotificationService.GetNotificationByHostId")
+	defer span.End()
+
+	return service.store.GetNotificationsByHostId(ctx, hostId)
 }
 
-func (service *NotificationService) GetAllNotifications() ([]*domain.Notification, error) {
-	return service.store.GetAllNotifications()
+func (service *NotificationService) GetAllNotifications(ctx context.Context) ([]*domain.Notification, error) {
+	ctx, span := service.tracer.Start(ctx, "NotificationService.GetAllNotifications")
+	defer span.End()
+
+	return service.store.GetAllNotifications(ctx)
 }
 
-func (service *NotificationService) CreateNotification(notification *domain.Notification) error {
+func (service *NotificationService) CreateNotification(ctx context.Context, notification *domain.Notification) error {
+	ctx, span := service.tracer.Start(ctx, "NotificationService.CreateNotification")
+	defer span.End()
+
 	notificationInfo := domain.Notification{
 		ID:          notification.ID,
 		ByGuestId:   notification.ByGuestId,
@@ -53,13 +68,13 @@ func (service *NotificationService) CreateNotification(notification *domain.Noti
 		CreatedAt:   time.Now(),
 	}
 
-	_, err := service.store.CreateNotification(&notificationInfo)
+	_, err := service.store.CreateNotification(ctx, &notificationInfo)
 	if err != nil {
 		return err
 	}
 
 	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
-		userDetails, err := getUserDetails(notification.ForHostId)
+		userDetails, err := service.getUserDetails(ctx, notification.ForHostId)
 		return userDetails, err
 	})
 
@@ -82,7 +97,7 @@ func (service *NotificationService) CreateNotification(notification *domain.Noti
 
 	fmt.Println("Email:", userDetails.Email)
 
-	err = sendValidationMail(notification.Description, email)
+	err = service.sendValidationMail(ctx, notification.Description, email)
 	if err != nil {
 		return err
 	}
@@ -90,9 +105,13 @@ func (service *NotificationService) CreateNotification(notification *domain.Noti
 	return nil
 }
 
-func getUserDetails(userID string) (*UserDetails, error) {
+func (service *NotificationService) getUserDetails(ctx context.Context, userID string) (*UserDetails, error) {
+	ctx, span := service.tracer.Start(ctx, "NotificationService.getUserDetails")
+	defer span.End()
+
 	userDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", userServiceHost, userServicePort, userID)
 	userDetailsResponse, err := http.Get(userDetailsEndpoint)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userDetailsResponse.Header))
 	if err != nil {
 		return nil, fmt.Errorf("UserServiceError: %v", err)
 	}
@@ -127,7 +146,10 @@ type UserDetails struct {
 	UserType  string `json:"userType"`
 }
 
-func sendValidationMail(Description, email string) error {
+func (service *NotificationService) sendValidationMail(ctx context.Context, Description, email string) error {
+	ctx, span := service.tracer.Start(ctx, "NotificationService.sendValidationMail")
+	defer span.End()
+
 	m := gomail.NewMessage()
 	m.SetHeader("From", smtpEmail)
 	m.SetHeader("To", email)

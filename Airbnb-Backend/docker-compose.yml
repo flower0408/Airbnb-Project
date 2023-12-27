@@ -20,8 +20,10 @@ services:
       SMTP_AUTH_MAIL: ${SMTP_AUTH_MAIL}
       SMTP_AUTH_PASSWORD: ${SMTP_AUTH_PASSWORD}
       SECRET_KEY: ${SECRET_KEY}
+      JAEGER_ADDRESS: ${JAEGER_ADDRESS}
     depends_on:
       - notification_db
+      - jaeger
     networks:
       - network
     dns:
@@ -43,8 +45,10 @@ services:
       RESERVATIONS_SERVICE_HOST: ${RESERVATIONS_SERVICE_HOST}
       RESERVATIONS_SERVICE_PORT: ${RESERVATIONS_SERVICE_PORT}
       SECRET_KEY: ${SECRET_KEY}
+      JAEGER_ADDRESS: ${JAEGER_ADDRESS}
     depends_on:
       - user_db
+      - jaeger
     networks:
       - network
 
@@ -74,11 +78,15 @@ services:
       ACCOMMODATIONS_SERVICE_HOST: ${ACCOMMODATIONS_SERVICE_HOST}
       SMTP_AUTH_MAIL: ${SMTP_AUTH_MAIL}
       SMTP_AUTH_PASSWORD: ${SMTP_AUTH_PASSWORD}
+      JAEGER_ADDRESS: ${JAEGER_ADDRESS}
     depends_on:
       - auth_db
       - auth_cache
+      - jaeger
     networks:
       - network
+    dns:
+      - 8.8.8.8
 
 
   accommodations_service:
@@ -99,8 +107,10 @@ services:
       RESERVATIONS_SERVICE_PORT: ${RESERVATIONS_SERVICE_PORT}
       RESERVATIONS_SERVICE_HOST: ${RESERVATIONS_SERVICE_HOST}
       SECRET_KEY: ${SECRET_KEY}
+      JAEGER_ADDRESS: ${JAEGER_ADDRESS}
     depends_on:
       - accommodations_db
+      - jaeger
     networks:
       - network
 
@@ -132,8 +142,11 @@ services:
     # Pokretanje reservation servisa tek kada je baza uspesno pokrenuta
       SECRET_KEY: ${SECRET_KEY}
     depends_on:
-      - reservations_db
-      - jaeger
+      jaeger:
+        condition: service_started
+      reservations_db:
+        condition: service_healthy
+
     networks:
       - network
 
@@ -148,6 +161,10 @@ services:
       - ${GATEWAY_PORT}:${GATEWAY_PORT}
     depends_on:
       - reservations_service
+      - auth_service
+      - user_service
+      - notification_service
+      - accommodations_service
     networks:
       - network
 
