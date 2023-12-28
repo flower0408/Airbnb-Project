@@ -8,6 +8,9 @@ import (
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"github.com/sony/gobreaker"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"io/ioutil"
 	"log"
@@ -33,27 +36,31 @@ var (
 type ReservationHandler struct {
 	logger          *log.Logger
 	reservationRepo *data.ReservationRepo
+	tracer          trace.Tracer
 	cb              *gobreaker.CircuitBreaker
 	cb2             *gobreaker.CircuitBreaker
 }
 
-func NewReservationHandler(l *log.Logger, r *data.ReservationRepo) *ReservationHandler {
+func NewReservationHandler(l *log.Logger, r *data.ReservationRepo, t trace.Tracer) *ReservationHandler {
 	return &ReservationHandler{
 		logger:          l,
 		reservationRepo: r,
+		tracer:          t,
 		cb:              CircuitBreaker("reservationService"),
 		cb2:             CircuitBreaker("reservationService2"),
 	}
 }
 
 func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "ReservationHandler.CreateReservation")
+	defer span.End()
 
 	var (
 		createdReservationID string
 	)
 
 	reservation := h.Context().Value(KeyProduct{}).(*data.Reservation)
-	createdReservation, err := s.reservationRepo.InsertReservation(reservation)
+	createdReservation, err := s.reservationRepo.InsertReservation(ctx, reservation)
 	if err != nil {
 		if err.Error() == "Reservation already exists for the specified dates and accommodation." {
 			s.logger.Print("No one else can book accommodation for the reserved dates. ")
@@ -85,6 +92,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 
 		accommodationDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", accommodationServiceHost, accommodationServicePort, createdReservation.AccommodationId)
 		accommodationDetailsRequest, _ := http.NewRequest("GET", accommodationDetailsEndpoint, nil)
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationDetailsRequest.Header))
 		accommodationDetailsResponse, err := http.DefaultClient.Do(accommodationDetailsRequest)
 		if err != nil {
 			return nil, fmt.Errorf("Error fetching accommodation details: %v", err)
@@ -119,7 +127,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 
 		log.Println("After http.Error")
 
-		err := s.reservationRepo.DeleteReservation(createdReservationID)
+		err := s.reservationRepo.DeleteReservation(ctx, createdReservationID)
 		if err != nil {
 			log.Printf("Error deleting reservation after circuit breaker error: %v", err)
 		}
@@ -148,6 +156,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 
 		notificationServiceEndpoint := fmt.Sprintf("http://%s:%s/", notificationServiceHost, notificationServicePort)
 		notificationServiceRequest, _ := http.NewRequest("POST", notificationServiceEndpoint, bytes.NewReader(body))
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(notificationServiceRequest.Header))
 		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
 		if err != nil {
 			return nil, fmt.Errorf("Error fetching notification service: %v", err)
@@ -174,7 +183,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 
 		log.Println("After http.Error")
 
-		err := s.reservationRepo.DeleteReservation(createdReservationID)
+		err := s.reservationRepo.DeleteReservation(ctx, createdReservationID)
 		if err != nil {
 			log.Printf("Error deleting reservation after circuit breaker error: %v", err)
 		}
@@ -211,10 +220,13 @@ type Location struct {
 }
 
 func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "ReservationHandler.CancelReservation")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	reservationID := vars["id"]
 
-	reservation, err := s.reservationRepo.GetReservationByID(reservationID)
+	reservation, err := s.reservationRepo.GetReservationByID(ctx, reservationID)
 	if err != nil {
 		s.logger.Print("Error retrieving reservation: ", err)
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -228,6 +240,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 	resultAccommodation, breakerErrAccommodation := s.cb.Execute(func() (interface{}, error) {
 		accommodationDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", accommodationServiceHost, accommodationServicePort, reservation.AccommodationId)
 		accommodationDetailsRequest, _ := http.NewRequest("GET", accommodationDetailsEndpoint, nil)
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationDetailsRequest.Header))
 		accommodationDetailsResponse, err := http.DefaultClient.Do(accommodationDetailsRequest)
 		if err != nil {
 			return nil, fmt.Errorf("Error fetching accommodation details: %v", err)
@@ -270,7 +283,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 	fmt.Println("OwnerId:", accommodationDetails.OwnerId)
 	fmt.Println("OwnerId:", accommodationDetails.Name)
 
-	err = s.reservationRepo.CancelReservation(reservationID)
+	err = s.reservationRepo.CancelReservation(ctx, reservationID)
 	if err != nil {
 		if err.Error() == "Can not cancel reservation. You can only cancel it before it starts." {
 			s.logger.Print("Can not cancel reservation. You can only cancel it before it starts. ")
@@ -300,6 +313,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 
 		notificationServiceEndpoint := fmt.Sprintf("http://%s:%s/", notificationServiceHost, notificationServicePort)
 		notificationServiceRequest, _ := http.NewRequest("POST", notificationServiceEndpoint, bytes.NewReader(body))
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(notificationServiceRequest.Header))
 		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
 		if err != nil {
 			return nil, fmt.Errorf("Error fetching notification service: %v", err)
@@ -356,6 +370,9 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 }
 
 func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "ReservationHandler.GetReservationByUser")
+	defer span.End()
+
 	bearer := h.Header.Get("Authorization")
 	if bearer == "" {
 		log.Println("Authorization header missing")
@@ -387,7 +404,7 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 	// Circuit breaker for user service
 	log.Printf("Circuit Breaker: %+v\n", s.cb)
 	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
-		userID, statusCode, err := s.getUserIDFromUserService(username)
+		userID, statusCode, err := s.getUserIDFromUserService(ctx, username)
 		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
 	})
 
@@ -424,7 +441,7 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 		return
 	}
 
-	reservationByUser, err := s.reservationRepo.GetReservationByUser(userID)
+	reservationByUser, err := s.reservationRepo.GetReservationByUser(ctx, userID)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		http.Error(rw, "Error getting reservations", http.StatusInternalServerError)
@@ -444,11 +461,14 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 	}
 }
 
-func (s *ReservationHandler) getUserIDFromUserService(username interface{}) (string, int, error) {
+func (s *ReservationHandler) getUserIDFromUserService(ctx context.Context, username interface{}) (string, int, error) {
+	ctx, span := s.tracer.Start(ctx, "ReservationHandler.getUserIDFromUserService")
+	defer span.End()
+
 	userServiceEndpoint := fmt.Sprintf("http://%s:%s/getOne/%s", userServiceHost, userServicePort, username)
 	userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
 	log.Printf("Host: %s, Port: %s, Username: %s\n", userServiceHost, userServicePort, username)
-
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
 	response, err := http.DefaultClient.Do(userServiceRequest)
 	if err != nil {
 		return "", http.StatusInternalServerError, err
@@ -473,10 +493,13 @@ func (s *ReservationHandler) getUserIDFromUserService(username interface{}) (str
 }
 
 func (s *ReservationHandler) GetReservationByAccommodation(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "ReservationHandler.GetReservationByAccommodation")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	id := vars["id"]
 
-	reservationByUser, err := s.reservationRepo.GetReservationByAccommodation(id)
+	reservationByUser, err := s.reservationRepo.GetReservationByAccommodation(ctx, id)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 	}
@@ -515,6 +538,9 @@ func (s *ReservationHandler) GetReservationByAccommodation(rw http.ResponseWrite
 }*/
 
 func (s *ReservationHandler) CheckReservation(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "ReservationHandler.CheckReservation")
+	defer span.End()
+
 	var requestBody struct {
 		AccommodationID string   `json:"accommodationId"`
 		Available       []string `json:"available"`
@@ -540,7 +566,7 @@ func (s *ReservationHandler) CheckReservation(rw http.ResponseWriter, h *http.Re
 	}
 	fmt.Println(available, "Available check reservation")
 
-	exists, err := s.reservationRepo.ReservationExistsForAppointment(requestBody.AccommodationID, available)
+	exists, err := s.reservationRepo.ReservationExistsForAppointment(ctx, requestBody.AccommodationID, available)
 	if err != nil {
 		http.Error(rw, "Error checking reservation", http.StatusInternalServerError)
 		s.logger.Println("Error checking reservation:", err)
@@ -555,6 +581,9 @@ func (s *ReservationHandler) CheckReservation(rw http.ResponseWriter, h *http.Re
 }
 
 func (s *ReservationHandler) CheckHostReservations(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "ReservationHandler.CheckHostReservations")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	userID := vars["id"]
 
@@ -567,7 +596,7 @@ func (s *ReservationHandler) CheckHostReservations(rw http.ResponseWriter, h *ht
 		return
 	}
 
-	hasReservations, err := s.reservationRepo.HasReservationsForHost(userID, authToken)
+	hasReservations, err := s.reservationRepo.HasReservationsForHost(ctx, userID, authToken)
 	if err != nil {
 		s.logger.Println("Error checking host reservations:", err)
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -583,6 +612,9 @@ func (s *ReservationHandler) CheckHostReservations(rw http.ResponseWriter, h *ht
 }
 
 func (rh *ReservationHandler) CheckUserPastReservations(w http.ResponseWriter, r *http.Request) {
+	ctx, span := rh.tracer.Start(r.Context(), "ReservationHandler.CheckUserPastReservations")
+	defer span.End()
+
 	userID := mux.Vars(r)["id"]
 	hostID := mux.Vars(r)["hostId"]
 
@@ -595,7 +627,7 @@ func (rh *ReservationHandler) CheckUserPastReservations(w http.ResponseWriter, r
 		return
 	}
 
-	hasPastReservations, err := rh.reservationRepo.CheckUserPastReservations(userID, hostID, authToken)
+	hasPastReservations, err := rh.reservationRepo.CheckUserPastReservations(ctx, userID, hostID, authToken)
 	if err != nil {
 		log.Println("Error checking user past reservations:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -610,6 +642,9 @@ func (rh *ReservationHandler) CheckUserPastReservations(w http.ResponseWriter, r
 }
 
 func (rh *ReservationHandler) CheckUserPastReservationsInAccommodation(w http.ResponseWriter, r *http.Request) {
+	ctx, span := rh.tracer.Start(r.Context(), "ReservationHandler.CheckUserPastReservationsInAccommodation")
+	defer span.End()
+
 	userID := mux.Vars(r)["id"]
 	accommodationID := mux.Vars(r)["accommodationId"]
 
@@ -622,7 +657,7 @@ func (rh *ReservationHandler) CheckUserPastReservationsInAccommodation(w http.Re
 		return
 	}
 
-	hasPastReservations, err := rh.reservationRepo.CheckUserPastReservationsInAccommodation(userID, accommodationID)
+	hasPastReservations, err := rh.reservationRepo.CheckUserPastReservationsInAccommodation(ctx, userID, accommodationID)
 	if err != nil {
 		log.Println("Error checking user past reservations:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -682,4 +717,11 @@ func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
 			},
 		},
 	)
+}
+
+func ExtractTraceInfoMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

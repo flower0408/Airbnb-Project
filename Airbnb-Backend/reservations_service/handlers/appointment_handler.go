@@ -6,6 +6,10 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +20,7 @@ import (
 type AppointmentHandler struct {
 	logger          *log.Logger
 	appointmentRepo *data.AppointmentRepo
+	tracer          trace.Tracer
 }
 
 var (
@@ -23,14 +28,17 @@ var (
 	accommodationServicePort = os.Getenv("ACCOMMODATIONS_SERVICE_PORT")
 )
 
-func NewAppointmentHandler(l *log.Logger, r *data.AppointmentRepo) *AppointmentHandler {
-	return &AppointmentHandler{l, r}
+func NewAppointmentHandler(l *log.Logger, r *data.AppointmentRepo, t trace.Tracer) *AppointmentHandler {
+	return &AppointmentHandler{l, r, t}
 }
 
 // mongo
 func (r *AppointmentHandler) CreateAppointment(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.CreateAppointment")
+	defer span.End()
+
 	appointment := h.Context().Value(KeyProduct{}).(*data.Appointment)
-	err := r.appointmentRepo.InsertAppointment(appointment)
+	err := r.appointmentRepo.InsertAppointment(ctx, appointment)
 	if err != nil {
 		if err.Error() == "Error adding appointment. Date already exists. " {
 			r.logger.Print("Error adding appointment. Date already exists. ")
@@ -51,7 +59,10 @@ func (r *AppointmentHandler) CreateAppointment(rw http.ResponseWriter, h *http.R
 }
 
 func (r *AppointmentHandler) GetAllAppointment(rw http.ResponseWriter, h *http.Request) {
-	appointments, err := r.appointmentRepo.GetAllAppointment()
+	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.GetAllAppointment")
+	defer span.End()
+
+	appointments, err := r.appointmentRepo.GetAllAppointment(ctx)
 	if err != nil {
 		r.logger.Print("Database exception")
 	}
@@ -69,10 +80,13 @@ func (r *AppointmentHandler) GetAllAppointment(rw http.ResponseWriter, h *http.R
 }
 
 func (r *AppointmentHandler) GetAppointmentsByAccommodation(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.GetAppointmentsByAccommodation")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	id := vars["id"]
 
-	appointments, err := r.appointmentRepo.GetAppointmentsByAccommodation(id)
+	appointments, err := r.appointmentRepo.GetAppointmentsByAccommodation(ctx, id)
 	if err != nil {
 		r.logger.Print("Database exception")
 	}
@@ -90,6 +104,9 @@ func (r *AppointmentHandler) GetAppointmentsByAccommodation(rw http.ResponseWrit
 }
 
 func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.GetAppointmentsByDate")
+	defer span.End()
+
 	startDateStr := h.URL.Query().Get("startDate")
 	endDateStr := h.URL.Query().Get("endDate")
 
@@ -106,7 +123,7 @@ func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *ht
 		return
 	}
 
-	appointments, err := r.appointmentRepo.GetAppointmentsByDate(startDate, endDate)
+	appointments, err := r.appointmentRepo.GetAppointmentsByDate(ctx, startDate, endDate)
 	if err != nil {
 		r.logger.Print("Database exception")
 		http.Error(rw, "Unable to retrieve appointments", http.StatusInternalServerError)
@@ -138,13 +155,17 @@ func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *ht
 }
 
 func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.UpdateAppointment")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	id := vars["id"]
 
 	appointment := h.Context().Value(KeyProduct{}).(*data.Appointment)
 
-	err := r.appointmentRepo.UpdateAppointment(id, appointment)
+	err := r.appointmentRepo.UpdateAppointment(ctx, id, appointment)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		if err.Error() == "Reservation exists for the appointment." {
 			rw.WriteHeader(http.StatusMethodNotAllowed)
 			rw.Write([]byte("Reservation exists for the appointment. Update not allowed."))
@@ -163,10 +184,14 @@ func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.R
 		return
 	}
 
+	span.SetStatus(codes.Ok, "")
 	rw.WriteHeader(http.StatusOK)
 }
 
 func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.DeleteAppointmentsByAccommodationIDs")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	userId := vars["id"]
 
@@ -181,6 +206,7 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 
 	accommodationEndpoint := fmt.Sprintf("http://%s:%s/owner/%s", accommodationServiceHost, accommodationServicePort, userId)
 	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
 	if err != nil {
 		r.logger.Println("Error creating accommodation request:", err)
 		rw.Write([]byte("Error creating accommodation request"))
@@ -213,7 +239,7 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 
 	defer accommodationResponse.Body.Close()
 	for _, accommodationID := range accommodations {
-		err := r.appointmentRepo.DeleteAppointmentsByAccommodationID(accommodationID.Hex())
+		err := r.appointmentRepo.DeleteAppointmentsByAccommodationID(ctx, accommodationID.Hex())
 		if err != nil {
 			r.logger.Print("Database exception:", err)
 			rw.WriteHeader(http.StatusInternalServerError)

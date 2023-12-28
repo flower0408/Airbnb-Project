@@ -1,7 +1,9 @@
 package domain
 
+import "context"
+
 type NotificationStore interface {
-	GetNotificationsByHostId(hostId string) ([]*Notification, error)
-	GetAllNotifications() ([]*Notification, error)
-	CreateNotification(user *Notification) (*Notification, error)
+	GetNotificationsByHostId(ctx context.Context, hostId string) ([]*Notification, error)
+	GetAllNotifications(ctx context.Context) ([]*Notification, error)
+	CreateNotification(ctx context.Context, user *Notification) (*Notification, error)
 }

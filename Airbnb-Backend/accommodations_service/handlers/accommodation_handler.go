@@ -13,6 +13,9 @@ import (
 	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"io/ioutil"
 	"log"
@@ -44,22 +47,27 @@ type AccommodationHandler struct {
 	repo   *data.AccommodationRepo
 	cb     *gobreaker.CircuitBreaker
 	cb2    *gobreaker.CircuitBreaker
+	tracer trace.Tracer
 }
 
 type ValidationError struct {
 	Message string `json:"message"`
 }
 
-func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo) *AccommodationHandler {
+func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo, t trace.Tracer) *AccommodationHandler {
 	return &AccommodationHandler{
 		logger: l,
 		repo:   r,
 		cb:     CircuitBreaker("accommodationService"),
 		cb2:    CircuitBreaker("reservationService2"),
+		tracer: t,
 	}
 }
 
 func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := s.tracer.Start(req.Context(), "AccommodationHandler.CreateAccommodation")
+	defer span.End()
+
 	bearer := req.Header.Get("Authorization")
 	if bearer == "" {
 		log.Println("Authorization header missing")
@@ -96,7 +104,7 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 
 	// Circuit breaker for user service
 	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
-		userID, statusCode, err := s.getUserIDFromUserService(username)
+		userID, statusCode, err := s.getUserIDFromUserService(ctx, username)
 		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
 	})
 
@@ -142,7 +150,7 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	}
 
 	id := ""
-	id, err = s.repo.InsertAccommodation(accommodation)
+	id, err = s.repo.InsertAccommodation(ctx, accommodation)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		writer.WriteHeader(http.StatusBadRequest)
@@ -166,6 +174,9 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 }
 
 func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := s.tracer.Start(req.Context(), "AccommodationHandler.CreateRateForAccommodation")
+	defer span.End()
+
 	bearer := req.Header.Get("Authorization")
 	if bearer == "" {
 		log.Println("Authorization header missing")
@@ -196,7 +207,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 	// Circuit breaker for user service
 	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
-		userID, statusCode, err := s.getUserIDFromUserService(username)
+		userID, statusCode, err := s.getUserIDFromUserService(ctx, username)
 		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
 	})
 
@@ -240,6 +251,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	resultR, breakerErr := s.cb.Execute(func() (interface{}, error) {
 		reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/checkUserPastReservationsInAccommodation/%s/%s", reservationServiceHost, reservationServicePort, userID, rate.ForAccommodationId)
 		reservationServiceRequest, _ := http.NewRequest(http.MethodGet, reservationServiceEndpoint, nil)
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationServiceRequest.Header))
 		reservationServiceRequest.Header.Set("Authorization", "Bearer "+tokenString)
 		response, err := http.DefaultClient.Do(reservationServiceRequest)
 		if err != nil {
@@ -276,7 +288,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 		return
 	}
 
-	hasRated, err := s.repo.HasUserRatedAccommodation(userID, rate.ForAccommodationId)
+	hasRated, err := s.repo.HasUserRatedAccommodation(ctx, userID, rate.ForAccommodationId)
 	if err != nil {
 		log.Println("Error checking if user has already rated the host:", err)
 		http.Error(writer, "Internal Server Error", http.StatusInternalServerError)
@@ -308,7 +320,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 		return
 	}
 
-	_, err = s.repo.InsertRateForAccommodation(rate)
+	_, err = s.repo.InsertRateForAccommodation(ctx, rate)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		writer.WriteHeader(http.StatusBadRequest)
@@ -321,7 +333,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 		return
 	}
 
-	accommodation, err := s.repo.GetByID(accommodationID)
+	accommodation, err := s.repo.GetByID(ctx, accommodationID)
 	if err != nil {
 		log.Println("Error getting accommodation details:", err)
 		http.Error(writer, "Error getting accommodation details", http.StatusInternalServerError)
@@ -372,7 +384,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 		log.Println("After http.Error")
 
-		err := s.repo.DeleteRateForHost(rate.ID.String())
+		err := s.repo.DeleteRateForHost(ctx, rate.ID.String())
 		if err != nil {
 			log.Printf("Error deleting rate for accommodation after circuit breaker error: %v", err)
 		}
@@ -391,6 +403,9 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 }
 
 func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := s.tracer.Start(req.Context(), "AccommodationHandler.CreateRateForHost")
+	defer span.End()
+
 	bearer := req.Header.Get("Authorization")
 	if bearer == "" {
 		log.Println("Authorization header missing")
@@ -421,7 +436,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 
 	// Circuit breaker for user service
 	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
-		userID, statusCode, err := s.getUserIDFromUserService(username)
+		userID, statusCode, err := s.getUserIDFromUserService(ctx, username)
 		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
 	})
 
@@ -466,6 +481,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	resultR, breakerErr := s.cb.Execute(func() (interface{}, error) {
 		reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/checkUserPastReservations/%s/%s", reservationServiceHost, reservationServicePort, userID, rate.ForHostId)
 		reservationServiceRequest, _ := http.NewRequest(http.MethodGet, reservationServiceEndpoint, nil)
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationServiceRequest.Header))
 		reservationServiceRequest.Header.Set("Authorization", "Bearer "+tokenString)
 		response, err := http.DefaultClient.Do(reservationServiceRequest)
 		if err != nil {
@@ -502,7 +518,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 		return
 	}
 
-	hasRated, err := s.repo.HasUserRatedHost(userID, rate.ForHostId)
+	hasRated, err := s.repo.HasUserRatedHost(ctx, userID, rate.ForHostId)
 	if err != nil {
 		log.Println("Error checking if user has already rated the host:", err)
 		http.Error(writer, "Internal Server Error", http.StatusInternalServerError)
@@ -534,7 +550,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 		return
 	}
 
-	_, err = s.repo.InsertRateForHost(rate)
+	_, err = s.repo.InsertRateForHost(ctx, rate)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		writer.WriteHeader(http.StatusBadRequest)
@@ -583,7 +599,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 
 		log.Println("After http.Error")
 
-		err := s.repo.DeleteRateForHost(rate.ID.String())
+		err := s.repo.DeleteRateForHost(ctx, rate.ID.String())
 		if err != nil {
 			log.Printf("Error deleting rate for host after circuit breaker error: %v", err)
 		}
@@ -650,6 +666,9 @@ func extractBearerToken(authHeader string) string {
 }*/
 
 func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.DeleteAccommodationsByOwnerID")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	ownerID := vars["ownerID"]
 
@@ -666,6 +685,7 @@ func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWri
 	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
 		reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/deleteAppointments/%s", reservationServiceHost, reservationServicePort, ownerID)
 		reservationServiceRequest, _ := http.NewRequest(http.MethodDelete, reservationServiceEndpoint, nil)
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationServiceRequest.Header))
 		reservationServiceRequest.Header.Set("Authorization", "Bearer "+authToken)
 		response, err := http.DefaultClient.Do(reservationServiceRequest)
 		if err != nil {
@@ -690,7 +710,7 @@ func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWri
 		return
 	}
 
-	err := s.repo.DeleteAccommodationsByOwner(ownerID)
+	err := s.repo.DeleteAccommodationsByOwner(ctx, ownerID)
 	if err != nil {
 		s.logger.Print("Database exception")
 		http.Error(rw, "Error deleting accommodations", http.StatusInternalServerError)
@@ -702,6 +722,9 @@ func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWri
 }
 
 func (s *AccommodationHandler) DeleteRateForHost(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.DeleteRateForHost")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	rateID := vars["rateID"]
 
@@ -714,7 +737,7 @@ func (s *AccommodationHandler) DeleteRateForHost(rw http.ResponseWriter, h *http
 		return
 	}
 
-	err := s.repo.DeleteRateForHost(rateID)
+	err := s.repo.DeleteRateForHost(ctx, rateID)
 	if err != nil {
 		http.Error(rw, "Error deleting rate for host", http.StatusInternalServerError)
 	}
@@ -723,6 +746,9 @@ func (s *AccommodationHandler) DeleteRateForHost(rw http.ResponseWriter, h *http
 }
 func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http.Request) {
 	// Dohvatanje parametra iz URL-a
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.UpdateRateForHost")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	rateID := vars["rateID"]
 
@@ -743,7 +769,7 @@ func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http
 
 	rate.UpdatedAt = cetTime.Format(time.RFC3339)
 
-	err = s.repo.UpdateRateForHost(rateID, rate)
+	err = s.repo.UpdateRateForHost(ctx, rateID, rate)
 	if err != nil {
 		s.logger.Println("Error updating rate for host:", err)
 		http.Error(rw, "Error updating rate for host", http.StatusInternalServerError)
@@ -753,9 +779,13 @@ func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http
 	rw.WriteHeader(http.StatusOK)
 }
 
-func (s *AccommodationHandler) getUserIDFromUserService(username interface{}) (string, int, error) {
+func (s *AccommodationHandler) getUserIDFromUserService(ctx context.Context, username interface{}) (string, int, error) {
+	ctx, span := s.tracer.Start(ctx, "AccommodationHandler.getUserIDFromUserService")
+	defer span.End()
+
 	userServiceEndpoint := fmt.Sprintf("http://%s:%s/getOne/%s", userServiceHost, userServicePort, username)
 	userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
 	response, err := http.DefaultClient.Do(userServiceRequest)
 	if err != nil {
 		return "", http.StatusInternalServerError, err
@@ -780,8 +810,10 @@ func (s *AccommodationHandler) getUserIDFromUserService(username interface{}) (s
 }
 
 func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.GetAll")
+	defer span.End()
 
-	accommodations, err := s.repo.GetAll()
+	accommodations, err := s.repo.GetAll(ctx)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		rw.WriteHeader(http.StatusBadRequest)
@@ -794,8 +826,10 @@ func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
 }
 
 func (s *AccommodationHandler) GetAllRate(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.GetAllRate")
+	defer span.End()
 
-	rates, err := s.repo.GetAllRate()
+	rates, err := s.repo.GetAllRate(ctx)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		rw.WriteHeader(http.StatusBadRequest)
@@ -808,6 +842,9 @@ func (s *AccommodationHandler) GetAllRate(rw http.ResponseWriter, h *http.Reques
 }
 
 func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.GetByID")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	id, err := primitive.ObjectIDFromHex(vars["id"])
 	if err != nil {
@@ -815,7 +852,7 @@ func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) 
 		return
 	}
 
-	accommodation, err := s.repo.GetByID(id)
+	accommodation, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		rw.WriteHeader(http.StatusNotFound)
@@ -828,10 +865,13 @@ func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) 
 }
 
 func (s *AccommodationHandler) GetRatesByAccommodation(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.GetRatesByAccommodation")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	id := vars["id"]
 
-	rates, err := s.repo.GetRatesByAccommodation(id)
+	rates, err := s.repo.GetRatesByAccommodation(ctx, id)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		rw.WriteHeader(http.StatusNotFound)
@@ -844,10 +884,13 @@ func (s *AccommodationHandler) GetRatesByAccommodation(rw http.ResponseWriter, h
 }
 
 func (s *AccommodationHandler) GetRatesByHost(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.GetRatesByHost")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	id := vars["id"]
 
-	rates, err := s.repo.GetRatesByHost(id)
+	rates, err := s.repo.GetRatesByHost(ctx, id)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		rw.WriteHeader(http.StatusNotFound)
@@ -860,10 +903,13 @@ func (s *AccommodationHandler) GetRatesByHost(rw http.ResponseWriter, h *http.Re
 }
 
 func (s *AccommodationHandler) GetAccommodationsByOwner(rw http.ResponseWriter, req *http.Request) {
+	ctx, span := s.tracer.Start(req.Context(), "AccommodationHandler.GetAccommodationsByOwner")
+	defer span.End()
+
 	vars := mux.Vars(req)
 	ownerID := vars["ownerID"]
 
-	accommodations, err := s.repo.GetAccommodationsByOwner(ownerID)
+	accommodations, err := s.repo.GetAccommodationsByOwner(ctx, ownerID)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		rw.WriteHeader(http.StatusBadRequest)
@@ -879,6 +925,8 @@ func (s *AccommodationHandler) GetAccommodationsByOwner(rw http.ResponseWriter, 
 }
 
 func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.SearchAccommodations")
+	defer span.End()
 
 	location := h.URL.Query().Get("location")
 	minGuests := h.URL.Query().Get("minGuests")
@@ -905,7 +953,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 			}
 		}
 
-		accommodations, err := s.repo.Search(filter)
+		accommodations, err := s.repo.Search(ctx, filter)
 		if err != nil {
 			s.logger.Print("Database exception: ", err)
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
@@ -933,6 +981,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 		// Reservation service call
 		reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/appointmentsByDate/?%s", reservationServiceHost, reservationServicePort, query.Encode())
 		reservationServiceRequest, _ := http.NewRequest("GET", reservationServiceEndpoint, nil)
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationServiceRequest.Header))
 		reservationServiceResponse, err := http.DefaultClient.Do(reservationServiceRequest)
 
 		if err != nil {
@@ -981,7 +1030,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 				continue
 			}
 
-			accommodation, err := s.repo.GetByID(objectID)
+			accommodation, err := s.repo.GetByID(ctx, objectID)
 			if err != nil {
 				log.Printf("Accommodation not found for ObjectID (%s)\n", id)
 				continue
@@ -1177,4 +1226,11 @@ func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
 			},
 		},
 	)
+}
+
+func ExtractTraceInfoMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

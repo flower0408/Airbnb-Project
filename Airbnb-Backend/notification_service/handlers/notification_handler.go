@@ -6,7 +6,9 @@ import (
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"log"
 	"net/http"
 	"notification_service/casbinAuthorization"
@@ -23,11 +25,13 @@ var (
 
 type NotificationHandler struct {
 	service *application.NotificationService
+	tracer  trace.Tracer
 }
 
-func NewNotificationHandler(service *application.NotificationService) *NotificationHandler {
+func NewNotificationHandler(service *application.NotificationService, tracer trace.Tracer) *NotificationHandler {
 	return &NotificationHandler{
 		service: service,
+		tracer:  tracer,
 	}
 }
 
@@ -54,21 +58,27 @@ type ValidationError struct {
 }
 
 func (handler *NotificationHandler) CreateNotification(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := handler.tracer.Start(req.Context(), "NotificationHandler.CreateNotification")
+	defer span.End()
+
 	var notification domain.Notification
 	err := json.NewDecoder(req.Body).Decode(&notification)
 	if err != nil {
 		log.Println(err)
+		span.SetStatus(codes.Error, err.Error())
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	notification.CreatedAt = time.Now()
 
-	err = handler.service.CreateNotification(&notification)
+	err = handler.service.CreateNotification(ctx, &notification)
 	if err != nil {
 		if err.Error() == "Database error" {
+			span.SetStatus(codes.Error, err.Error())
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		} else {
+			span.SetStatus(codes.Error, err.Error())
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 		}
 		return
@@ -78,8 +88,12 @@ func (handler *NotificationHandler) CreateNotification(writer http.ResponseWrite
 }
 
 func (handler *NotificationHandler) GetAllNotifications(writer http.ResponseWriter, req *http.Request) {
-	users, err := handler.service.GetAllNotifications()
+	ctx, span := handler.tracer.Start(req.Context(), "NotificationHandler.GetAllNotifications")
+	defer span.End()
+
+	users, err := handler.service.GetAllNotifications(ctx)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -87,6 +101,9 @@ func (handler *NotificationHandler) GetAllNotifications(writer http.ResponseWrit
 }
 
 func (handler *NotificationHandler) GetNotificationByHostId(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := handler.tracer.Start(req.Context(), "NotificationHandler.GetNotificationByHostId")
+	defer span.End()
+
 	vars := mux.Vars(req)
 	id, ok := vars["id"]
 	if !ok {
@@ -94,8 +111,9 @@ func (handler *NotificationHandler) GetNotificationByHostId(writer http.Response
 		return
 	}
 
-	notification, err := handler.service.GetNotificationByHostId(id)
+	notification, err := handler.service.GetNotificationByHostId(ctx, id)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		writer.WriteHeader(http.StatusNotFound)
 		return
 	}

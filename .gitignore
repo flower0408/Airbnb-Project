@@ -24,3 +24,5 @@ Airbnb-Frontend/.idea/
 Airbnb-Frontend/.vscode/
 
 Airbnb-Backend/api_gateway/cert
+
+Airbnb-Backend/api_gateway/opentelemetry-webserver-sdk-x64-linux

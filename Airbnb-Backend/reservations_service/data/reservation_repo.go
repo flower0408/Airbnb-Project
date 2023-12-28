@@ -1,10 +1,14 @@
 package data
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"log"
 	"net/http"
@@ -26,9 +30,10 @@ type ReservationRepo struct {
 	session *gocql.Session
 	logger  *log.Logger
 	client  *http.Client
+	tracer  trace.Tracer
 }
 
-func NewReservationRepo(logger *log.Logger) (*ReservationRepo, error) {
+func NewReservationRepo(tracer trace.Tracer, logger *log.Logger) (*ReservationRepo, error) {
 
 	db := os.Getenv("RESERVATIONS_DB_HOST")
 
@@ -75,6 +80,7 @@ func NewReservationRepo(logger *log.Logger) (*ReservationRepo, error) {
 		session: session,
 		logger:  logger,
 		client:  httpClient,
+		tracer:  tracer,
 	}, nil
 }
 
@@ -107,9 +113,11 @@ func (sr *ReservationRepo) CreateTables() {
 }
 
 // cassandra
-func (sr *ReservationRepo) InsertReservation(reservation *Reservation) (*Reservation, error) {
+func (sr *ReservationRepo) InsertReservation(ctx context.Context, reservation *Reservation) (*Reservation, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.InsertReservation")
+	defer span.End()
 
-	exists, err := sr.ReservationExistsForAppointment(reservation.AccommodationId, reservation.Period)
+	exists, err := sr.ReservationExistsForAppointment(ctx, reservation.AccommodationId, reservation.Period)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +127,7 @@ func (sr *ReservationRepo) InsertReservation(reservation *Reservation) (*Reserva
 
 	reservationId, _ := gocql.RandomUUID()
 
-	appointments, err := getAppointmentsByAccommodation(reservation.AccommodationId)
+	appointments, err := sr.getAppointmentsByAccommodation(ctx, reservation.AccommodationId)
 	if err != nil {
 		return nil, err
 	}
@@ -195,9 +203,11 @@ func (sr *ReservationRepo) InsertReservation(reservation *Reservation) (*Reserva
 	return createdReservation, nil
 }
 
-func (sr *ReservationRepo) ReservationExistsForAppointment(accommodationID string, available []time.Time) (bool, error) {
+func (sr *ReservationRepo) ReservationExistsForAppointment(ctx context.Context, accommodationID string, available []time.Time) (bool, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.ReservationExistsForAppointment")
+	defer span.End()
 
-	allReservations, err := sr.GetReservationByAccommodation(accommodationID)
+	allReservations, err := sr.GetReservationByAccommodation(ctx, accommodationID)
 	if err != nil {
 		return false, err
 	}
@@ -215,10 +225,13 @@ func (sr *ReservationRepo) ReservationExistsForAppointment(accommodationID strin
 	return false, nil
 }
 
-func (sr *ReservationRepo) HasReservationsForHost(userID string, authToken string) (bool, error) {
+func (sr *ReservationRepo) HasReservationsForHost(ctx context.Context, userID string, authToken string) (bool, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.HasReservationsForHost")
+	defer span.End()
 
 	accommodationEndpoint := fmt.Sprintf("http://%s:%s/owner/%s", accommodationServiceHost, accommodationServicePort, userID)
 	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
 	if err != nil {
 		sr.logger.Println("Error creating accommodation request:", err)
 		return false, err
@@ -248,7 +261,7 @@ func (sr *ReservationRepo) HasReservationsForHost(userID string, authToken strin
 
 	defer accommodationResponse.Body.Close()
 	for _, accommodationID := range accommodations {
-		hasReservations, err := sr.HasReservationsForAccommodation(accommodationID)
+		hasReservations, err := sr.HasReservationsForAccommodation(ctx, accommodationID)
 		if err != nil {
 			sr.logger.Println(err)
 			return false, err
@@ -262,7 +275,10 @@ func (sr *ReservationRepo) HasReservationsForHost(userID string, authToken strin
 	return false, nil
 }
 
-func (sr *ReservationRepo) HasReservationsForAccommodation(accommodationID primitive.ObjectID) (bool, error) {
+func (sr *ReservationRepo) HasReservationsForAccommodation(ctx context.Context, accommodationID primitive.ObjectID) (bool, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.HasReservationsForAccommodation")
+	defer span.End()
+
 	scanner := sr.session.Query(
 		`SELECT COUNT(*) FROM reservation_by_accommodation WHERE accommodation_id = ?`, accommodationID.Hex()).
 		Iter().Scanner()
@@ -285,10 +301,13 @@ func (sr *ReservationRepo) HasReservationsForAccommodation(accommodationID primi
 	return count > 0, nil
 }
 
-func (sr *ReservationRepo) CheckUserPastReservations(userID string, hostID string, token string) (bool, error) {
+func (sr *ReservationRepo) CheckUserPastReservations(ctx context.Context, userID string, hostID string, token string) (bool, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.CheckUserPastReservations")
+	defer span.End()
 
 	accommodationEndpoint := fmt.Sprintf("http://%s:%s/owner/%s", accommodationServiceHost, accommodationServicePort, hostID)
 	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
 	if err != nil {
 		sr.logger.Println("Error creating accommodation request:", err)
 		return false, err
@@ -317,7 +336,7 @@ func (sr *ReservationRepo) CheckUserPastReservations(userID string, hostID strin
 
 	defer accommodationResponse.Body.Close()
 
-	reservations, err := sr.GetReservationByUser(userID)
+	reservations, err := sr.GetReservationByUser(ctx, userID)
 	if err != nil {
 		sr.logger.Println(err)
 		return false, err
@@ -340,9 +359,11 @@ func (sr *ReservationRepo) CheckUserPastReservations(userID string, hostID strin
 	return false, nil
 }
 
-func (sr *ReservationRepo) CheckUserPastReservationsInAccommodation(userID string, accommodationID string) (bool, error) {
+func (sr *ReservationRepo) CheckUserPastReservationsInAccommodation(ctx context.Context, userID string, accommodationID string) (bool, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.CheckUserPastReservationsInAccommodation")
+	defer span.End()
 
-	reservations, err := sr.GetReservationByAccommodation(accommodationID)
+	reservations, err := sr.GetReservationByAccommodation(ctx, accommodationID)
 	if err != nil {
 		sr.logger.Println(err)
 		return false, err
@@ -363,9 +384,11 @@ func (sr *ReservationRepo) CheckUserPastReservationsInAccommodation(userID strin
 	return false, nil
 }
 
-func (sr *ReservationRepo) CancelReservation(reservationID string) error {
+func (sr *ReservationRepo) CancelReservation(ctx context.Context, reservationID string) error {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.CancelReservation")
+	defer span.End()
 
-	reservation, err := sr.GetReservationByID(reservationID)
+	reservation, err := sr.GetReservationByID(ctx, reservationID)
 	if err != nil {
 		sr.logger.Println(err)
 		return err
@@ -395,9 +418,11 @@ func (sr *ReservationRepo) CancelReservation(reservationID string) error {
 	return nil
 }
 
-func (sr *ReservationRepo) DeleteReservation(reservationID string) error {
+func (sr *ReservationRepo) DeleteReservation(ctx context.Context, reservationID string) error {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.DeleteReservation")
+	defer span.End()
 
-	reservation, err := sr.GetReservationByID(reservationID)
+	reservation, err := sr.GetReservationByID(ctx, reservationID)
 	if err != nil {
 		sr.logger.Println(err)
 		return err
@@ -421,7 +446,9 @@ func (sr *ReservationRepo) DeleteReservation(reservationID string) error {
 	return nil
 }
 
-func (sr *ReservationRepo) GetReservationByID(reservationID string) (*Reservation, error) {
+func (sr *ReservationRepo) GetReservationByID(ctx context.Context, reservationID string) (*Reservation, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.GetReservationByID")
+	defer span.End()
 
 	parsedUUID, err := gocql.ParseUUID(reservationID)
 	if err != nil {
@@ -455,7 +482,10 @@ func (sr *ReservationRepo) GetReservationByID(reservationID string) (*Reservatio
 	return &reservation, nil
 }
 
-func (sr *ReservationRepo) GetReservationByUser(id string) (Reservations, error) {
+func (sr *ReservationRepo) GetReservationByUser(ctx context.Context, id string) (Reservations, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.GetReservationByUser")
+	defer span.End()
+
 	scanner := sr.session.Query(`SELECT by_userId, reservation_id, periodd, accommodation_id, price FROM reservation_by_user WHERE by_userId = ?`, id).Iter().Scanner()
 
 	var reservations Reservations
@@ -482,7 +512,10 @@ func (sr *ReservationRepo) GetReservationByUser(id string) (Reservations, error)
 	return reservations, nil
 }
 
-func (sr *ReservationRepo) GetReservationByAccommodation(id string) (Reservations, error) {
+func (sr *ReservationRepo) GetReservationByAccommodation(ctx context.Context, id string) (Reservations, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.GetReservationByAccommodation")
+	defer span.End()
+
 	scanner := sr.session.Query(`SELECT accommodation_id, reservation_id, periodd, by_userId, price FROM reservation_by_accommodation WHERE accommodation_id = ?`, id).Iter().Scanner()
 
 	var reservations Reservations
@@ -533,10 +566,13 @@ func (sr *ReservationRepo) GetDistinctIds(idColumnName string, tableName string)
 	return ids, nil
 }
 
-func getAppointmentsByAccommodation(id string) (Appointments, error) {
+func (sr *ReservationRepo) getAppointmentsByAccommodation(ctx context.Context, id string) (Appointments, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.GetReservationByAccommodation")
+	defer span.End()
 
 	reservationServiceEndpoint := fmt.Sprintf("http://%s:%s/appointmentsByAccommodation/%s", reservationServiceHost, reservationServicePort, id)
 	reservationServiceRequest, _ := http.NewRequest("GET", reservationServiceEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationServiceRequest.Header))
 	response, _ := http.DefaultClient.Do(reservationServiceRequest)
 	if response.StatusCode != 200 {
 		if response.StatusCode == 404 {

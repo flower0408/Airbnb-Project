@@ -7,6 +7,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"notification_service/domain"
 )
 
@@ -17,48 +19,67 @@ const (
 
 type NotificationMongoDBStore struct {
 	notifications *mongo.Collection
+	tracer        trace.Tracer
 }
 
-func NewNotificationMongoDBStore(client *mongo.Client) domain.NotificationStore {
+func NewNotificationMongoDBStore(client *mongo.Client, tracer trace.Tracer) domain.NotificationStore {
 	notifications := client.Database(DATABASE).Collection(COLLECTION)
 	return &NotificationMongoDBStore{
 		notifications: notifications,
+		tracer:        tracer,
 	}
 }
 
-func (store *NotificationMongoDBStore) CreateNotification(notification *domain.Notification) (*domain.Notification, error) {
+func (store *NotificationMongoDBStore) CreateNotification(ctx context.Context, notification *domain.Notification) (*domain.Notification, error) {
+	ctx, span := store.tracer.Start(ctx, "NotificationMongoDBStore.CreateNotification")
+	defer span.End()
+
 	fmt.Println(json.Marshal(notification))
 	notification.ID = primitive.NewObjectID()
 	result, err := store.notifications.InsertOne(context.TODO(), notification)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	notification.ID = result.InsertedID.(primitive.ObjectID)
 	return notification, nil
 }
 
-func (store *NotificationMongoDBStore) GetAllNotifications() ([]*domain.Notification, error) {
+func (store *NotificationMongoDBStore) GetAllNotifications(ctx context.Context) ([]*domain.Notification, error) {
+	ctx, span := store.tracer.Start(ctx, "NotificationMongoDBStore.GetAllNotifications")
+	defer span.End()
+
 	filter := bson.D{{}}
-	return store.filter(filter)
+	return store.filter(ctx, filter)
 }
 
-func (store *NotificationMongoDBStore) GetNotificationsByHostId(hostId string) ([]*domain.Notification, error) {
+func (store *NotificationMongoDBStore) GetNotificationsByHostId(ctx context.Context, hostId string) ([]*domain.Notification, error) {
+	ctx, span := store.tracer.Start(ctx, "NotificationMongoDBStore.GetNotificationsByHostId")
+	defer span.End()
+
 	filter := bson.M{"forHostId": hostId}
-	return store.filter(filter)
+	return store.filter(ctx, filter)
 }
 
-func (store *NotificationMongoDBStore) filter(filter interface{}) ([]*domain.Notification, error) {
-	cursor, err := store.notifications.Find(context.TODO(), filter)
-	defer cursor.Close(context.TODO())
+func (store *NotificationMongoDBStore) filter(ctx context.Context, filter interface{}) ([]*domain.Notification, error) {
+	ctx, span := store.tracer.Start(ctx, "NotificationMongoDBStore.filter")
+	defer span.End()
+
+	cursor, err := store.notifications.Find(ctx, filter)
+	defer cursor.Close(ctx)
 
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	return decode(cursor)
 }
 
-func (store *NotificationMongoDBStore) filterOne(filter interface{}) (notification *domain.Notification, err error) {
-	result := store.notifications.FindOne(context.TODO(), filter)
+func (store *NotificationMongoDBStore) filterOne(ctx context.Context, filter interface{}) (notification *domain.Notification, err error) {
+	ctx, span := store.tracer.Start(ctx, "NotificationMongoDBStore.filterOne")
+	defer span.End()
+
+	result := store.notifications.FindOne(ctx, filter)
 	err = result.Decode(&notification)
 	return
 }

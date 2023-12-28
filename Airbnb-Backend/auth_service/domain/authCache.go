@@ -1,7 +1,9 @@
 package domain
 
+import "context"
+
 type AuthCache interface {
-	PostCacheData(key string, value string) error
-	GetCachedValue(key string) (string, error)
-	DelCachedValue(key string) error
+	PostCacheData(ctx context.Context, key string, value string) error
+	GetCachedValue(ctx context.Context, key string) (string, error)
+	DelCachedValue(ctx context.Context, key string) error
 }
