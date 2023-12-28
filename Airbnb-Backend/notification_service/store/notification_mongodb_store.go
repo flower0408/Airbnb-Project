@@ -7,6 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"notification_service/domain"
 )
@@ -37,6 +38,7 @@ func (store *NotificationMongoDBStore) CreateNotification(ctx context.Context, n
 	notification.ID = primitive.NewObjectID()
 	result, err := store.notifications.InsertOne(context.TODO(), notification)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	notification.ID = result.InsertedID.(primitive.ObjectID)
@@ -60,16 +62,23 @@ func (store *NotificationMongoDBStore) GetNotificationsByHostId(ctx context.Cont
 }
 
 func (store *NotificationMongoDBStore) filter(ctx context.Context, filter interface{}) ([]*domain.Notification, error) {
+	ctx, span := store.tracer.Start(ctx, "NotificationMongoDBStore.filter")
+	defer span.End()
+
 	cursor, err := store.notifications.Find(ctx, filter)
 	defer cursor.Close(ctx)
 
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	return decode(cursor)
 }
 
 func (store *NotificationMongoDBStore) filterOne(ctx context.Context, filter interface{}) (notification *domain.Notification, err error) {
+	ctx, span := store.tracer.Start(ctx, "NotificationMongoDBStore.filterOne")
+	defer span.End()
+
 	result := store.notifications.FindOne(ctx, filter)
 	err = result.Decode(&notification)
 	return

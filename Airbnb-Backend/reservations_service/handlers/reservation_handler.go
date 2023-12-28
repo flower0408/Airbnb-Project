@@ -283,7 +283,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 	fmt.Println("OwnerId:", accommodationDetails.OwnerId)
 	fmt.Println("OwnerId:", accommodationDetails.Name)
 
-	err = s.reservationRepo.CancelReservation(reservationID)
+	err = s.reservationRepo.CancelReservation(ctx, reservationID)
 	if err != nil {
 		if err.Error() == "Can not cancel reservation. You can only cancel it before it starts." {
 			s.logger.Print("Can not cancel reservation. You can only cancel it before it starts. ")

@@ -43,6 +43,7 @@ func (service *UserService) GetOneUser(ctx context.Context, username string) (*d
 
 	retUser, err := service.store.GetOneUser(ctx, username)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Println(err)
 		return nil, fmt.Errorf("User not found")
 	}
@@ -56,6 +57,7 @@ func (service *UserService) GetOneUserId(ctx context.Context, username string) (
 	retUser, err := service.store.GetOneUser(ctx, username)
 	if err != nil {
 		log.Println(err)
+		span.SetStatus(codes.Error, err.Error())
 		return primitive.NilObjectID, fmt.Errorf("User not found")
 	}
 	return retUser.ID, nil
@@ -67,6 +69,7 @@ func (service *UserService) DoesEmailExist(ctx context.Context, email string) (s
 
 	user, err := service.store.GetByEmail(ctx, email)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "", err
 	}
 
@@ -106,6 +109,7 @@ func (service *UserService) DeleteAccount(ctx context.Context, userID primitive.
 
 	err := service.store.DeleteAccount(ctx, userID)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 

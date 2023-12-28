@@ -4,6 +4,7 @@ import (
 	"auth_service/domain"
 	"context"
 	"github.com/go-redis/redis"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"log"
 	"time"
@@ -41,6 +42,7 @@ func (a *AuthRedisCache) GetCachedValue(ctx context.Context, key string) (string
 	result := a.client.Get(key)
 	token, err := result.Result()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Println(err)
 		return "", err
 	}

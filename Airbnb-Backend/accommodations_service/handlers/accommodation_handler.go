@@ -333,7 +333,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 		return
 	}
 
-	accommodation, err := s.repo.GetByID(accommodationID)
+	accommodation, err := s.repo.GetByID(ctx, accommodationID)
 	if err != nil {
 		log.Println("Error getting accommodation details:", err)
 		http.Error(writer, "Error getting accommodation details", http.StatusInternalServerError)
@@ -384,7 +384,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 		log.Println("After http.Error")
 
-		err := s.repo.DeleteRateForHost(rate.ID.String())
+		err := s.repo.DeleteRateForHost(ctx, rate.ID.String())
 		if err != nil {
 			log.Printf("Error deleting rate for accommodation after circuit breaker error: %v", err)
 		}
@@ -599,7 +599,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 
 		log.Println("After http.Error")
 
-		err := s.repo.DeleteRateForHost(rate.ID.String())
+		err := s.repo.DeleteRateForHost(ctx, rate.ID.String())
 		if err != nil {
 			log.Printf("Error deleting rate for host after circuit breaker error: %v", err)
 		}

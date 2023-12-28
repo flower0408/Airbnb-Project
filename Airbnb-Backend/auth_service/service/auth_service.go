@@ -88,6 +88,7 @@ func (service *AuthService) VerifyRecaptcha(ctx context.Context, recaptchaToken 
 	response, err := http.Post(recaptchaEndpoint, "application/x-www-form-urlencoded",
 		bytes.NewBuffer([]byte(fmt.Sprintf("secret=%s&response=%s", recaptchaSecret, recaptchaToken))))
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return false, err
 	}
 	defer response.Body.Close()
@@ -95,12 +96,14 @@ func (service *AuthService) VerifyRecaptcha(ctx context.Context, recaptchaToken 
 	// Čitamo odgovor od reCAPTCHA API-ja
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return false, err
 	}
 
 	// Parsiramo JSON odgovor
 	var recaptchaResponse RecaptchaResponse
 	if err := json.Unmarshal(body, &recaptchaResponse); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return false, err
 	}
 
@@ -112,6 +115,7 @@ func (service *AuthService) VerifyRecaptcha(ctx context.Context, recaptchaToken 
 	log.Printf("ReCAPTCHA response: %v\n", recaptchaResponse)
 
 	// Ako nije uspešna provera ili nije postignut dobar rezultat, vraćamo grešku
+	span.SetStatus(codes.Error, "Invalid reCAPTCHA token or low score")
 	return false, fmt.Errorf("Invalid reCAPTCHA token or low score")
 }
 
@@ -224,6 +228,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 	ctx, span := service.tracer.Start(ctx, "AuthService.Register")
 	defer span.End()
 	if err := validateUser(user); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "", 400, err
 	}
 	checkUser, err := blackListChecking(user.Password)
@@ -231,15 +236,18 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 
 	if checkUser {
 		log.Println("Password is in blacklist")
+		span.SetStatus(codes.Error, err.Error())
 		return "", 406, fmt.Errorf("Password is in black list, try with another one!")
 	}
 
 	existingUser, err := service.store.GetOneUser(ctx, user.Username)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "", 500, err
 	}
 
 	if existingUser != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "", 409, fmt.Errorf(errors.UsernameExist)
 	}
 
@@ -250,12 +258,14 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequestMail.Header))
 		response, err := http.DefaultClient.Do(userServiceRequestMail)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			fmt.Println(err)
 			return nil, fmt.Errorf("EmailServiceError")
 		}
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusNotFound {
+			span.SetStatus(codes.Error, err.Error())
 			return nil, StatusError{Code: http.StatusMethodNotAllowed, Err: fmt.Errorf(errors.EmailAlreadyExist)}
 		}
 
@@ -264,23 +274,28 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 
 	if breakerErr != nil {
 		if statusErr, ok := breakerErr.(StatusError); ok {
+			span.SetStatus(codes.Error, err.Error())
 			return "", statusErr.Code, statusErr.Err
 		}
+		span.SetStatus(codes.Error, err.Error())
 		return "", http.StatusServiceUnavailable, breakerErr
 	}
 
 	if result != nil {
+		span.SetStatus(codes.Error, err.Error())
 		fmt.Println("Received meaningful data:", result)
 	}*/
 	pass := []byte(user.Password)
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "", 500, err
 	}
 	user.Password = string(hash)
 
 	body, err := json.Marshal(user)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "", 500, err
 	}
 
@@ -292,6 +307,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
 		responseUser, err := http.DefaultClient.Do(userServiceRequest)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("UserServiceError")
 		}
 		defer responseUser.Body.Close()
@@ -306,6 +322,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 
 		err = responseToType(responseUser.Body, newUser)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 
@@ -319,6 +336,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 
 		err = service.store.Register(ctx, &credentials)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 
@@ -326,10 +344,12 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 	})
 
 	if breakerErr != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "UserServiceError", http.StatusServiceUnavailable, breakerErr
 	}
 
 	if result != nil {
+		span.SetStatus(codes.Error, err.Error())
 		fmt.Println("Received meaningful data:", result)
 	}
 
@@ -339,12 +359,14 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 
 	err = service.cache.PostCacheData(ctx, user.Username, validationToken.String())
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Fatalf("Failed to post validation data to redis: %s", err)
 		return "", 500, err
 	}
 
 	err = service.sendValidationMail(ctx, validationToken, user.Email)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "", 500, err
 	}
 
@@ -367,6 +389,7 @@ func (service *AuthService) sendValidationMail(ctx context.Context, validationTo
 	client := gomail.NewDialer(smtpServer, smtpServerPort, smtpEmail, smtpPassword)
 
 	if err := client.DialAndSend(m); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Fatalf("Failed to send verification mail because of: %s", err)
 		return err
 	}
@@ -380,6 +403,7 @@ func (service *AuthService) AccountConfirmation(ctx context.Context, validation 
 	log.Printf("Validation token for verification: %s", validation.MailToken)
 	token, err := service.cache.GetCachedValue(ctx, validation.UserToken)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Printf("Error fetching validation token from cache: %s", err)
 		log.Println(errors.ExpiredTokenError)
 		return fmt.Errorf(errors.ExpiredTokenError)
@@ -388,6 +412,7 @@ func (service *AuthService) AccountConfirmation(ctx context.Context, validation 
 	if validation.MailToken == token {
 		err = service.cache.DelCachedValue(ctx, validation.UserToken)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			log.Printf("Error in deleting cached value: %s", err)
 			return err
 		}
@@ -396,6 +421,7 @@ func (service *AuthService) AccountConfirmation(ctx context.Context, validation 
 
 		user, err := service.store.GetOneUser(ctx, validation.UserToken)
 		if user == nil {
+			span.SetStatus(codes.Error, err.Error())
 			log.Println("User is not found")
 			return fmt.Errorf("User is not found")
 		}
@@ -403,6 +429,7 @@ func (service *AuthService) AccountConfirmation(ctx context.Context, validation 
 
 		err = service.store.UpdateUserUsername(ctx, user)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			log.Printf("Error in updating user after changing status of verify: %s", err.Error())
 			return err
 		}
@@ -410,6 +437,7 @@ func (service *AuthService) AccountConfirmation(ctx context.Context, validation 
 		return nil
 	}
 
+	span.SetStatus(codes.Error, err.Error())
 	return fmt.Errorf(errors.InvalidTokenError)
 }
 
@@ -426,12 +454,14 @@ func (service *AuthService) ResendVerificationToken(ctx context.Context, request
 
 	err := service.cache.PostCacheData(ctx, request.UserToken, tokenUUID.String())
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Println("Post cache problem")
 		return err
 	}
 
 	err = service.sendValidationMail(ctx, tokenUUID, request.UserMail)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Println("Send verification mail problem")
 		return err
 	}
@@ -449,6 +479,7 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
 		response, err := http.DefaultClient.Do(userServiceRequest)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("EmailServiceError")
 		}
 		defer response.Body.Close()
@@ -471,11 +502,13 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
 		userDetailsResponse, err := http.DefaultClient.Do(userDetailsRequest)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("UserServiceError")
 		}
 
 		body, err := ioutil.ReadAll(userDetailsResponse.Body)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 
@@ -485,6 +518,7 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 		var userDetails UserDetails
 		err = json.Unmarshal(body, &userDetails)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			fmt.Println("Error unmarshaling JSON:", err)
 			return nil, err
 		}
@@ -493,6 +527,7 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 
 		userUsernameCredentials, err := service.store.GetOneUser(ctx, userDetails.Username)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 		userID = userUsernameCredentials.ID.Hex()
@@ -502,11 +537,13 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 		recoverUUID, _ := uuid.NewUUID()
 		err = service.sendRecoverPasswordMail(ctx, recoverUUID, email)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 
 		err = service.cache.PostCacheData(ctx, userID, recoverUUID.String())
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 
@@ -551,6 +588,7 @@ func (service *AuthService) sendRecoverPasswordMail(ctx context.Context, validat
 	client := gomail.NewDialer(smtpServer, smtpServerPort, smtpEmail, smtpPassword)
 
 	if err := client.DialAndSend(m); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Fatalf("failed to send verification mail because of: %s", err)
 		return err
 	}
@@ -568,10 +606,12 @@ func (service *AuthService) CheckRecoveryPasswordToken(ctx context.Context, requ
 
 	token, err := service.cache.GetCachedValue(ctx, request.UserToken)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf(errors.InvalidTokenError)
 	}
 
 	if request.MailToken != token {
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf(errors.InvalidTokenError)
 	}
 
@@ -594,6 +634,7 @@ func (service *AuthService) RecoverPassword(ctx context.Context, recoverPassword
 
 	checkPassword, err := blackListChecking(recoverPassword.NewPassword)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Println(err)
 		return "Error checking password against blacklist", http.StatusInternalServerError, err
 	}
@@ -609,6 +650,7 @@ func (service *AuthService) RecoverPassword(ctx context.Context, recoverPassword
 
 	primitiveID, err := primitive.ObjectIDFromHex(recoverPassword.UserID)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Printf("Error converting user ID to ObjectID: %s", err)
 		return "", http.StatusNotFound, err
 	}
@@ -617,6 +659,7 @@ func (service *AuthService) RecoverPassword(ctx context.Context, recoverPassword
 
 	credentials := service.store.GetOneUserByID(ctx, primitiveID)
 	if credentials == nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Printf("User not found for ID: %s", primitiveID.Hex())
 		return "", http.StatusNotFound, fmt.Errorf("User not found")
 	}
@@ -624,12 +667,14 @@ func (service *AuthService) RecoverPassword(ctx context.Context, recoverPassword
 	pass := []byte(recoverPassword.NewPassword)
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "Error trying to hash password.", http.StatusInternalServerError, err
 	}
 	credentials.Password = string(hash)
 
 	err = service.store.UpdateUser(ctx, credentials)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "baseErr", http.StatusInternalServerError, err
 	}
 
@@ -647,11 +692,13 @@ func (service *AuthService) ChangePassword(ctx context.Context, password domain.
 
 	user, err := service.store.GetOneUser(ctx, username)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		log.Println(err)
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password.OldPassword))
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "oldPassErr", http.StatusConflict, fmt.Errorf("Old password is incorrect")
 	}
 
@@ -664,6 +711,7 @@ func (service *AuthService) ChangePassword(ctx context.Context, password domain.
 
 	checkPassword, err := blackListChecking(password.NewPassword)
 	if err != nil {
+		span.SetStatus(codes.Error, "Error checking password against blacklist")
 		log.Println(err)
 		return "Error checking password against blacklist", http.StatusInternalServerError, err
 	}
@@ -682,6 +730,7 @@ func (service *AuthService) ChangePassword(ctx context.Context, password domain.
 	if isNewPasswordValid {
 		newEncryptedPassword, err := bcrypt.GenerateFromPassword([]byte(password.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			log.Println(err)
 			return "Error trying to hash password.", http.StatusInternalServerError, err
 		}
@@ -690,10 +739,12 @@ func (service *AuthService) ChangePassword(ctx context.Context, password domain.
 
 		err = service.store.UpdateUser(ctx, user)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return "baseErr", http.StatusInternalServerError, err
 		}
 
 	} else {
+		span.SetStatus(codes.Error, "New password does not match confirmation")
 		return "newPassErr", http.StatusNotAcceptable, fmt.Errorf("New password does not match confirmation")
 
 	}
@@ -765,6 +816,7 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 		fmt.Println("Received meaningful data:", result)
 	}
 	if breakerErr != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "UserServiceError", http.StatusServiceUnavailable, breakerErr
 	}
 
@@ -793,24 +845,29 @@ func (service *AuthService) Login(ctx context.Context, credentials *domain.Crede
 	defer span.End()
 	user, err := service.store.GetOneUser(ctx, credentials.Username)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		if err == sql.ErrNoRows {
+			span.SetStatus(codes.Error, err.Error())
 			return "", fmt.Errorf(errors.InvalidCredentials)
 		}
 		return "", fmt.Errorf("Error retrieving user: %v", err)
 	}
 
 	if user == nil {
+		span.SetStatus(codes.Error, "Invalid credentials")
 		return "", fmt.Errorf(errors.InvalidCredentials)
 	}
 
 	passError := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(credentials.Password))
 	if passError != nil {
+		span.SetStatus(codes.Error, "Invalid password")
 		return "not_same", err
 	}
 
 	tokenString, err := GenerateJWT(user)
 
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "", err
 	}
 
@@ -839,6 +896,7 @@ func (service *AuthService) DeleteUser(ctx context.Context, username string) (st
 
 	existingUser, err := service.store.GetOneUser(ctx, username)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "baseErr", http.StatusInternalServerError, err
 	}
 
@@ -847,6 +905,7 @@ func (service *AuthService) DeleteUser(ctx context.Context, username string) (st
 	}
 
 	if err := service.store.DeleteUser(ctx, username); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "baseErr", http.StatusInternalServerError, err
 	}
 

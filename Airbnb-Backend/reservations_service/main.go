@@ -30,7 +30,7 @@ func main() {
 
 	port := os.Getenv("RESERVATIONS_SERVICE_PORT")
 
-	timeoutContext, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	timeoutContext, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	exp, err := newExporter(JaegerAddress)
