@@ -69,7 +69,7 @@ func (server *Server) Start() {
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
 	redisClient := server.initRedisClient()
-	authCache := server.initAuthCache(redisClient)
+	authCache := server.initAuthCache(redisClient, tracer)
 	authStore := server.initAuthStore(mongoClient, tracer)
 	authService := server.initAuthService(authStore, authCache, tracer)
 	authHandler := server.initAuthHandler(authService, tracer)
@@ -98,8 +98,8 @@ func (server *Server) initAuthStore(client *mongo.Client, tracer trace.Tracer) d
 	return store
 }
 
-func (server *Server) initAuthCache(client *redis.Client) domain.AuthCache {
-	cache := store2.NewAuthRedisCache(client)
+func (server *Server) initAuthCache(client *redis.Client, tracer trace.Tracer) domain.AuthCache {
+	cache := store2.NewAuthRedisCache(client, tracer)
 	return cache
 }
 

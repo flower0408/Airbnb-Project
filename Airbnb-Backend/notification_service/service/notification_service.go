@@ -110,8 +110,10 @@ func (service *NotificationService) getUserDetails(ctx context.Context, userID s
 	defer span.End()
 
 	userDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", userServiceHost, userServicePort, userID)
-	userDetailsResponse, err := http.Get(userDetailsEndpoint)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userDetailsResponse.Header))
+	userDetailsRequest, _ := http.NewRequest("GET", userDetailsEndpoint, nil)
+	//userDetailsResponse, err := http.Get(userDetailsEndpoint)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userDetailsRequest.Header))
+	userDetailsResponse, err := http.DefaultClient.Do(userDetailsRequest)
 	if err != nil {
 		return nil, fmt.Errorf("UserServiceError: %v", err)
 	}

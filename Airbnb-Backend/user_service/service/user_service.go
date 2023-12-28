@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"log"
 	"net/http"
@@ -120,6 +121,7 @@ func (service *UserService) ChangeUsername(ctx context.Context, username domain.
 	user, err := service.store.GetOneUser(ctx, currentUsername)
 	if err != nil {
 		log.Println(err)
+		span.SetStatus(codes.Error, err.Error())
 		return "GetUserErr", http.StatusInternalServerError, err
 	}
 
@@ -127,6 +129,7 @@ func (service *UserService) ChangeUsername(ctx context.Context, username domain.
 
 	err = service.store.UpdateUserUsername(ctx, user)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "baseErr", http.StatusInternalServerError, err
 	}
 

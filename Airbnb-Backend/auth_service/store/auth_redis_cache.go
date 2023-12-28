@@ -2,22 +2,29 @@ package store
 
 import (
 	"auth_service/domain"
+	"context"
 	"github.com/go-redis/redis"
+	"go.opentelemetry.io/otel/trace"
 	"log"
 	"time"
 )
 
 type AuthRedisCache struct {
 	client *redis.Client
+	tracer trace.Tracer
 }
 
-func NewAuthRedisCache(client *redis.Client) domain.AuthCache {
+func NewAuthRedisCache(client *redis.Client, tracer trace.Tracer) domain.AuthCache {
 	return &AuthRedisCache{
 		client: client,
+		tracer: tracer,
 	}
 }
 
-func (a *AuthRedisCache) PostCacheData(key string, value string) error {
+func (a *AuthRedisCache) PostCacheData(ctx context.Context, key string, value string) error {
+	ctx, span := a.tracer.Start(ctx, "AuthRedisCache.PostCacheData")
+	defer span.End()
+
 	result := a.client.Set(key, value, 10*time.Minute)
 	if result.Err() != nil {
 		log.Printf("redis set error: %s", result.Err())
@@ -27,7 +34,10 @@ func (a *AuthRedisCache) PostCacheData(key string, value string) error {
 	return nil
 }
 
-func (a *AuthRedisCache) GetCachedValue(key string) (string, error) {
+func (a *AuthRedisCache) GetCachedValue(ctx context.Context, key string) (string, error) {
+	ctx, span := a.tracer.Start(ctx, "AuthRedisCache.GetCachedValue")
+	defer span.End()
+
 	result := a.client.Get(key)
 	token, err := result.Result()
 	if err != nil {
@@ -37,7 +47,10 @@ func (a *AuthRedisCache) GetCachedValue(key string) (string, error) {
 	return token, nil
 }
 
-func (a *AuthRedisCache) DelCachedValue(key string) error {
+func (a *AuthRedisCache) DelCachedValue(ctx context.Context, key string) error {
+	ctx, span := a.tracer.Start(ctx, "AuthRedisCache.DelCachedValue")
+	defer span.End()
+
 	result := a.client.Del(key)
 	if result.Err() != nil {
 		log.Println(result.Err())

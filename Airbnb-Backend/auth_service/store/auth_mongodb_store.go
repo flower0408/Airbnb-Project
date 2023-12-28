@@ -7,6 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"log"
 )
@@ -34,7 +35,7 @@ func (store *AuthMongoDBStore) GetAll(ctx context.Context) ([]*domain.Credential
 	defer span.End()
 
 	filter := bson.D{{}}
-	return store.filter2(filter)
+	return store.filter2(ctx, filter)
 }
 
 func (store *AuthMongoDBStore) Register(ctx context.Context, credentials *domain.Credentials) error {
@@ -56,7 +57,7 @@ func (store *AuthMongoDBStore) GetOneUser(ctx context.Context, username string) 
 	defer span.End()
 	filter := bson.M{"username": username}
 
-	user, err := store.filterOne2(filter)
+	user, err := store.filterOne2(ctx, filter)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			// No user found, return nil without an error
@@ -78,6 +79,7 @@ func (store *AuthMongoDBStore) UpdateUserUsername(ctx context.Context, user *dom
 	fmt.Println(user)
 	newState, err := store.credentials.UpdateOne(ctx, bson.M{"username": user.Username}, bson.M{"$set": user})
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 	fmt.Println(newState)
@@ -124,8 +126,7 @@ func (store *AuthMongoDBStore) GetOneUserByID(ctx context.Context, id primitive.
 	return &user
 }
 
-func (store *AuthMongoDBStore) filter(filter interface{}) ([]*domain.User, error) {
-	ctx := context.TODO()
+func (store *AuthMongoDBStore) filter(ctx context.Context, filter interface{}) ([]*domain.User, error) {
 	cursor, err := store.credentials.Find(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -135,8 +136,7 @@ func (store *AuthMongoDBStore) filter(filter interface{}) ([]*domain.User, error
 	return decode(cursor)
 }
 
-func (store *AuthMongoDBStore) filter2(filter interface{}) ([]*domain.Credentials, error) {
-	ctx := context.TODO()
+func (store *AuthMongoDBStore) filter2(ctx context.Context, filter interface{}) ([]*domain.Credentials, error) {
 	cursor, err := store.credentials.Find(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -146,8 +146,8 @@ func (store *AuthMongoDBStore) filter2(filter interface{}) ([]*domain.Credential
 	return decode1(cursor)
 }
 
-func (store *AuthMongoDBStore) filterOne(filter interface{}) (*domain.User, error) {
-	result := store.credentials.FindOne(context.TODO(), filter)
+func (store *AuthMongoDBStore) filterOne(ctx context.Context, filter interface{}) (*domain.User, error) {
+	result := store.credentials.FindOne(ctx, filter)
 
 	var user domain.User
 	if err := result.Decode(&user); err != nil {
@@ -162,8 +162,8 @@ func (store *AuthMongoDBStore) filterOne(filter interface{}) (*domain.User, erro
 	return &user, nil
 }
 
-func (store *AuthMongoDBStore) filterOne2(filter interface{}) (user *domain.Credentials, err error) {
-	result := store.credentials.FindOne(context.TODO(), filter)
+func (store *AuthMongoDBStore) filterOne2(ctx context.Context, filter interface{}) (user *domain.Credentials, err error) {
+	result := store.credentials.FindOne(ctx, filter)
 	err = result.Decode(&user)
 	return
 }

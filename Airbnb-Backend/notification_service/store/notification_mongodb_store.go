@@ -48,7 +48,7 @@ func (store *NotificationMongoDBStore) GetAllNotifications(ctx context.Context) 
 	defer span.End()
 
 	filter := bson.D{{}}
-	return store.filter(filter)
+	return store.filter(ctx, filter)
 }
 
 func (store *NotificationMongoDBStore) GetNotificationsByHostId(ctx context.Context, hostId string) ([]*domain.Notification, error) {
@@ -56,12 +56,12 @@ func (store *NotificationMongoDBStore) GetNotificationsByHostId(ctx context.Cont
 	defer span.End()
 
 	filter := bson.M{"forHostId": hostId}
-	return store.filter(filter)
+	return store.filter(ctx, filter)
 }
 
-func (store *NotificationMongoDBStore) filter(filter interface{}) ([]*domain.Notification, error) {
-	cursor, err := store.notifications.Find(context.TODO(), filter)
-	defer cursor.Close(context.TODO())
+func (store *NotificationMongoDBStore) filter(ctx context.Context, filter interface{}) ([]*domain.Notification, error) {
+	cursor, err := store.notifications.Find(ctx, filter)
+	defer cursor.Close(ctx)
 
 	if err != nil {
 		return nil, err
@@ -69,8 +69,8 @@ func (store *NotificationMongoDBStore) filter(filter interface{}) ([]*domain.Not
 	return decode(cursor)
 }
 
-func (store *NotificationMongoDBStore) filterOne(filter interface{}) (notification *domain.Notification, err error) {
-	result := store.notifications.FindOne(context.TODO(), filter)
+func (store *NotificationMongoDBStore) filterOne(ctx context.Context, filter interface{}) (notification *domain.Notification, err error) {
+	result := store.notifications.FindOne(ctx, filter)
 	err = result.Decode(&notification)
 	return
 }

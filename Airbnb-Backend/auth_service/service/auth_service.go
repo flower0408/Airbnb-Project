@@ -15,6 +15,7 @@ import (
 	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/crypto/bcrypt"
@@ -336,7 +337,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 	log.Printf("Username: %s", user.Username)
 	log.Printf("Generated validation token: %s", validationToken.String())
 
-	err = service.cache.PostCacheData(user.Username, validationToken.String())
+	err = service.cache.PostCacheData(ctx, user.Username, validationToken.String())
 	if err != nil {
 		log.Fatalf("Failed to post validation data to redis: %s", err)
 		return "", 500, err
@@ -377,7 +378,7 @@ func (service *AuthService) AccountConfirmation(ctx context.Context, validation 
 	ctx, span := service.tracer.Start(ctx, "AuthService.VerifyAccount")
 	defer span.End()
 	log.Printf("Validation token for verification: %s", validation.MailToken)
-	token, err := service.cache.GetCachedValue(validation.UserToken)
+	token, err := service.cache.GetCachedValue(ctx, validation.UserToken)
 	if err != nil {
 		log.Printf("Error fetching validation token from cache: %s", err)
 		log.Println(errors.ExpiredTokenError)
@@ -385,7 +386,7 @@ func (service *AuthService) AccountConfirmation(ctx context.Context, validation 
 	}
 
 	if validation.MailToken == token {
-		err = service.cache.DelCachedValue(validation.UserToken)
+		err = service.cache.DelCachedValue(ctx, validation.UserToken)
 		if err != nil {
 			log.Printf("Error in deleting cached value: %s", err)
 			return err
@@ -423,7 +424,7 @@ func (service *AuthService) ResendVerificationToken(ctx context.Context, request
 
 	tokenUUID, _ := uuid.NewUUID()
 
-	err := service.cache.PostCacheData(request.UserToken, tokenUUID.String())
+	err := service.cache.PostCacheData(ctx, request.UserToken, tokenUUID.String())
 	if err != nil {
 		log.Println("Post cache problem")
 		return err
@@ -504,7 +505,7 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 			return nil, err
 		}
 
-		err = service.cache.PostCacheData(userID, recoverUUID.String())
+		err = service.cache.PostCacheData(ctx, userID, recoverUUID.String())
 		if err != nil {
 			return nil, err
 		}
@@ -565,7 +566,7 @@ func (service *AuthService) CheckRecoveryPasswordToken(ctx context.Context, requ
 		return fmt.Errorf(errors.InvalidUserTokenError)
 	}
 
-	token, err := service.cache.GetCachedValue(request.UserToken)
+	token, err := service.cache.GetCachedValue(ctx, request.UserToken)
 	if err != nil {
 		return fmt.Errorf(errors.InvalidTokenError)
 	}
@@ -574,7 +575,7 @@ func (service *AuthService) CheckRecoveryPasswordToken(ctx context.Context, requ
 		return fmt.Errorf(errors.InvalidTokenError)
 	}
 
-	_ = service.cache.DelCachedValue(request.UserToken)
+	_ = service.cache.DelCachedValue(ctx, request.UserToken)
 	return nil
 }
 
@@ -717,6 +718,7 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 
 	existingUser, err := service.store.GetOneUser(ctx, username.NewUsername)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "GetUserErr", http.StatusInternalServerError, err
 	}
 
@@ -731,6 +733,7 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 
 	body, err := json.Marshal(requestBody)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "MarshalError", http.StatusInternalServerError, err
 	}
 
@@ -743,6 +746,7 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 
 		if err != nil {
 			fmt.Println(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("UserServiceError")
 		}
 		defer responseUser.Body.Close()
@@ -767,6 +771,7 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 	user, err := service.store.GetOneUser(ctx, currentUsername)
 	if err != nil {
 		fmt.Println(err)
+		span.SetStatus(codes.Error, err.Error())
 		return "GetUserErr", http.StatusInternalServerError, err
 	}
 	fmt.Println("Retrieved User:", user)
@@ -775,6 +780,7 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 
 	err = service.store.UpdateUser(ctx, user)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return "baseErr", http.StatusInternalServerError, err
 	}
 	fmt.Println("Username Updated Successfully")

@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sony/gobreaker"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"io"
@@ -499,6 +500,7 @@ func (handler *AuthHandler) ChangeUsername(writer http.ResponseWriter, request *
 	err := json.NewDecoder(request.Body).Decode(&username)
 	if err != nil {
 		log.Println(err)
+		span.SetStatus(codes.Error, err.Error())
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -521,6 +523,7 @@ func (handler *AuthHandler) ChangeUsername(writer http.ResponseWriter, request *
 			errorMessage = "An error occurred"
 		}
 
+		span.SetStatus(codes.Error, err.Error())
 		http.Error(writer, errorMessage, statusCode)
 		return
 	}
