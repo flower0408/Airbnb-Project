@@ -54,13 +54,13 @@ func main() {
 	storeLogger2 := log.New(os.Stdout, "[app-store] ", log.LstdFlags)
 
 	// NoSQL: Initialize Product Repository store
-	store, err := data.NewReservationRepo(storeLogger)
+	store, err := data.NewReservationRepo(tracer, storeLogger)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
 	// NoSQL: Initialize Product Repository store
-	store2, err := data.NewAppointmentRepo(timeoutContext, storeLogger2)
+	store2, err := data.NewAppointmentRepo(timeoutContext, storeLogger2, tracer)
 	if err != nil {
 		logger2.Fatal(err)
 	}
@@ -142,8 +142,8 @@ func main() {
 		Addr:         ":" + port,
 		Handler:      router,
 		IdleTimeout:  120 * time.Second,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
 	}
 
 	logger.Println("Server listening on port", port)

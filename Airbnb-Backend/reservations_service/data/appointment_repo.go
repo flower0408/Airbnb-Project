@@ -11,7 +11,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"io"
 	"log"
@@ -28,7 +30,7 @@ type AppointmentRepo struct {
 	tracer trace.Tracer
 }
 
-func NewAppointmentRepo(ctx context.Context, logger *log.Logger) (*AppointmentRepo, error) {
+func NewAppointmentRepo(ctx context.Context, logger *log.Logger, tracer trace.Tracer) (*AppointmentRepo, error) {
 	dburi := fmt.Sprintf("mongodb://%s:%s/", os.Getenv("APPOINTMENTS_DB_HOST"), os.Getenv("APPOINTMENTS_DB_PORT"))
 
 	client, err := mongo.NewClient(options.Client().ApplyURI(dburi))
@@ -54,6 +56,7 @@ func NewAppointmentRepo(ctx context.Context, logger *log.Logger) (*AppointmentRe
 		logger: logger,
 		cli:    client,
 		client: httpClient,
+		tracer: tracer,
 	}, nil
 }
 
@@ -86,9 +89,9 @@ func (rr *AppointmentRepo) Ping() {
 }
 
 // mongo
-func (rr *AppointmentRepo) InsertAppointment(appointment *Appointment) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
-	defer cancel()
+func (rr *AppointmentRepo) InsertAppointment(ctx context.Context, appointment *Appointment) error {
+	ctx, span := rr.tracer.Start(ctx, "AppointmentRepo.InsertAppointment")
+	defer span.End()
 	appointmentsCollection := rr.getCollection()
 
 	if appointment.PricePerGuest != 0 && appointment.PricePerAccommodation != 0 {
@@ -96,7 +99,7 @@ func (rr *AppointmentRepo) InsertAppointment(appointment *Appointment) error {
 		return errors.New("Error adding accommodation price and guest price at the same time.")
 	}
 
-	existingAppointments, err := rr.GetAppointmentsByAccommodation(appointment.AccommodationId)
+	existingAppointments, err := rr.GetAppointmentsByAccommodation(ctx, appointment.AccommodationId)
 	if err != nil {
 		return err
 	}
@@ -130,12 +133,9 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 	ctx, span := rr.tracer.Start(ctx, "AppointmentRepository.UpdateAppointment")
 	defer span.End()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
-	defer cancel()
-
-	originalAppointment, err := rr.GetAppointmentByID(id)
+	originalAppointment, err := rr.GetAppointmentByID(ctx, id)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		//span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error retrieving original appointment:", err)
 		return err
 	}
@@ -146,33 +146,34 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 	}
 	body, err := json.Marshal(data)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		//span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error marshalling JSON:", err)
 		return err
 	}
 
 	appointmentsCollection := rr.getCollection()
 
-	http.DefaultClient.Timeout = 60 * time.Second
+	//http.DefaultClient.Timeout = 60 * time.Second
 
 	reservationEndpoint := fmt.Sprintf("http://%s:%s/check", reservationServiceHost, reservationServicePort)
 	reservationRequest, err := http.NewRequest("POST", reservationEndpoint, bytes.NewReader(body))
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest.Header))
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		//span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error creating reservation request:", err)
 		return err
 	}
 
 	reservationResponse, err := http.DefaultClient.Do(reservationRequest)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		//span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error sending reservation request:", err)
 		return err
 	}
 	defer reservationResponse.Body.Close()
 
 	if reservationResponse.StatusCode == http.StatusOK {
-		existingAppointments, err := rr.GetAppointmentsByAccommodation(originalAppointment.AccommodationId)
+		existingAppointments, err := rr.GetAppointmentsByAccommodation(ctx, originalAppointment.AccommodationId)
 		if err != nil {
 			span.SetStatus(codes.Error, err.Error())
 			return err
@@ -208,7 +209,7 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 		rr.logger.Println("No reservation found for the appointment. Update allowed.")
 		objectID, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			//span.SetStatus(codes.Error, err.Error())
 			rr.logger.Println("Error converting ID to ObjectID:", err)
 			return err
 		}
@@ -237,7 +238,7 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 		rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
 
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			//span.SetStatus(codes.Error, err.Error())
 			rr.logger.Println(err)
 			return err
 		}
@@ -254,9 +255,9 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 	return nil
 }
 
-func (rr *AppointmentRepo) DeleteAppointmentsByAccommodationID(accommodationID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
-	defer cancel()
+func (rr *AppointmentRepo) DeleteAppointmentsByAccommodationID(ctx context.Context, accommodationID string) error {
+	ctx, span := rr.tracer.Start(ctx, "AppointmentRepository.DeleteAppointmentsByAccommodationID")
+	defer span.End()
 
 	appointmentsCollection := rr.getCollection()
 
@@ -273,9 +274,9 @@ func (rr *AppointmentRepo) DeleteAppointmentsByAccommodationID(accommodationID s
 	return nil
 }
 
-func (rr *AppointmentRepo) GetAppointmentByID(id string) (*Appointment, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
-	defer cancel()
+func (rr *AppointmentRepo) GetAppointmentByID(ctx context.Context, id string) (*Appointment, error) {
+	ctx, span := rr.tracer.Start(ctx, "AppointmentRepository.GetAppointmentByID")
+	defer span.End()
 
 	appointmentsCollection := rr.getCollection()
 
@@ -289,9 +290,9 @@ func (rr *AppointmentRepo) GetAppointmentByID(id string) (*Appointment, error) {
 	return &appointment, nil
 }
 
-func (rr *AppointmentRepo) GetAllAppointment() (*Appointments, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
-	defer cancel()
+func (rr *AppointmentRepo) GetAllAppointment(ctx context.Context) (*Appointments, error) {
+	ctx, span := rr.tracer.Start(ctx, "AppointmentRepository.GetAllAppointment")
+	defer span.End()
 
 	appointmentsCollection := rr.getCollection()
 
@@ -308,9 +309,14 @@ func (rr *AppointmentRepo) GetAllAppointment() (*Appointments, error) {
 	return &appointments, nil
 }
 
-func (rr *AppointmentRepo) GetAppointmentsByAccommodation(id string) (Appointments, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
-	defer cancel()
+func (rr *AppointmentRepo) GetAppointmentsByAccommodation(ctx context.Context, id string) (Appointments, error) {
+	ctx, span := rr.tracer.Start(ctx, "AppointmentRepository.GetAppointmentsByAccommodation")
+	defer func() {
+		// Check if span is not nil before calling End()
+		if span != nil {
+			span.End()
+		}
+	}()
 
 	appointmentsCollection := rr.getCollection()
 
@@ -343,9 +349,9 @@ func (rr *AppointmentRepo) GetAppointmentsByAccommodation(id string) (Appointmen
 
 	return appointments, nil
 }
-func (rr *AppointmentRepo) GetAppointmentsByDate(startDate, endDate time.Time) (Appointments, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+func (rr *AppointmentRepo) GetAppointmentsByDate(ctx context.Context, startDate, endDate time.Time) (Appointments, error) {
+	ctx, span := rr.tracer.Start(ctx, "AppointmentRepository.GetAppointmentsByDate")
+	defer span.End()
 
 	appointmentsCollection := rr.getCollection()
 
