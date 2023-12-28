@@ -4,6 +4,7 @@ import (
 	"accommodations_service/authorization"
 	"accommodations_service/data"
 	"accommodations_service/errors"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -28,12 +30,14 @@ import (
 )
 
 var (
-	jwtKey                 = []byte(os.Getenv("SECRET_KEY"))
-	verifier, _            = jwt.NewVerifierHS(jwt.HS256, jwtKey)
-	userServiceHost        = os.Getenv("USER_SERVICE_HOST")
-	userServicePort        = os.Getenv("USER_SERVICE_PORT")
-	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
-	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
+	jwtKey                  = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _             = jwt.NewVerifierHS(jwt.HS256, jwtKey)
+	userServiceHost         = os.Getenv("USER_SERVICE_HOST")
+	userServicePort         = os.Getenv("USER_SERVICE_PORT")
+	reservationServiceHost  = os.Getenv("RESERVATIONS_SERVICE_HOST")
+	reservationServicePort  = os.Getenv("RESERVATIONS_SERVICE_PORT")
+	notificationServiceHost = os.Getenv("NOTIFICATION_SERVICE_HOST")
+	notificationServicePort = os.Getenv("NOTIFICATION_SERVICE_PORT")
 )
 
 type KeyProduct struct{}
@@ -42,6 +46,7 @@ type AccommodationHandler struct {
 	logger *log.Logger
 	repo   *data.AccommodationRepo
 	cb     *gobreaker.CircuitBreaker
+	cb2    *gobreaker.CircuitBreaker
 	tracer trace.Tracer
 }
 
@@ -54,6 +59,7 @@ func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo, t trace.T
 		logger: l,
 		repo:   r,
 		cb:     CircuitBreaker("accommodationService"),
+		cb2:    CircuitBreaker("reservationService2"),
 		tracer: t,
 	}
 }
@@ -320,6 +326,78 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	accommodationID, err := primitive.ObjectIDFromHex(rate.ForAccommodationId)
+	if err != nil {
+		log.Println("Invalid accommodation ID:", err)
+		http.Error(writer, "Invalid accommodation ID", http.StatusBadRequest)
+		return
+	}
+
+	accommodation, err := s.repo.GetByID(accommodationID)
+	if err != nil {
+		log.Println("Error getting accommodation details:", err)
+		http.Error(writer, "Error getting accommodation details", http.StatusInternalServerError)
+		return
+	}
+	fmt.Println("OwnerId:", accommodation.OwnerId)
+	log.Println("Accommodation Name:", accommodation.Name)
+
+	// Circuit breaker for notification service
+	resultNotification, breakerErrNotification := s.cb2.Execute(func() (interface{}, error) {
+
+		requestBody := map[string]interface{}{
+			"ByGuestId":   rate.ByGuestId,
+			"ForHostId":   accommodation.OwnerId,
+			"Description": fmt.Sprintf("Guest created rate %d for accommodation %s ", rate.Rate, accommodation.Name),
+		}
+
+		body, err := json.Marshal(requestBody)
+		if err != nil {
+			return nil, fmt.Errorf("Error marshaling requestBody details JSON: %v", err)
+		}
+
+		notificationServiceEndpoint := fmt.Sprintf("http://%s:%s/", notificationServiceHost, notificationServicePort)
+		notificationServiceRequest, _ := http.NewRequest("POST", notificationServiceEndpoint, bytes.NewReader(body))
+		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Error fetching notification service: %v", err)
+		}
+		defer responseUser.Body.Close()
+
+		if responseUser.StatusCode != http.StatusOK {
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, responseUser.Body)
+			errorMessage := fmt.Sprintf("UserServiceError: %s", buf.String())
+			return nil, fmt.Errorf(errorMessage)
+		}
+
+		return responseUser, nil
+	})
+
+	if breakerErrNotification != nil {
+		log.Printf("Circuit breaker error: %v", breakerErrNotification)
+		log.Println("Before http.Error")
+
+		writer.WriteHeader(http.StatusServiceUnavailable)
+
+		http.Error(writer, "Error getting notification service", http.StatusServiceUnavailable)
+
+		log.Println("After http.Error")
+
+		err := s.repo.DeleteRateForHost(rate.ID.String())
+		if err != nil {
+			log.Printf("Error deleting rate for accommodation after circuit breaker error: %v", err)
+		}
+
+		return
+	}
+
+	s.logger.Println("Code after circuit breaker execution")
+
+	if resultNotification != nil {
+
+		fmt.Println("Received meaningful data:", resultNotification)
+	}
 
 	writer.WriteHeader(http.StatusOK)
 }
@@ -477,6 +555,63 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 		s.logger.Print("Database exception: ", err)
 		writer.WriteHeader(http.StatusBadRequest)
 		return
+	}
+
+	// Circuit breaker for notification service
+	resultNotification, breakerErrNotification := s.cb2.Execute(func() (interface{}, error) {
+
+		requestBody := map[string]interface{}{
+			"ByGuestId":   rate.ByGuestId,
+			"ForHostId":   rate.ForHostId,
+			"Description": fmt.Sprintf("Guest created rate %d for you", rate.Rate),
+		}
+
+		body, err := json.Marshal(requestBody)
+		if err != nil {
+			return nil, fmt.Errorf("Error marshaling requestBody details JSON: %v", err)
+		}
+
+		notificationServiceEndpoint := fmt.Sprintf("http://%s:%s/", notificationServiceHost, notificationServicePort)
+		notificationServiceRequest, _ := http.NewRequest("POST", notificationServiceEndpoint, bytes.NewReader(body))
+		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
+		if err != nil {
+			return nil, fmt.Errorf("Error fetching notification service: %v", err)
+		}
+		defer responseUser.Body.Close()
+
+		if responseUser.StatusCode != http.StatusOK {
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, responseUser.Body)
+			errorMessage := fmt.Sprintf("UserServiceError: %s", buf.String())
+			return nil, fmt.Errorf(errorMessage)
+		}
+
+		return responseUser, nil
+	})
+
+	if breakerErrNotification != nil {
+		log.Printf("Circuit breaker error: %v", breakerErrNotification)
+		log.Println("Before http.Error")
+
+		writer.WriteHeader(http.StatusServiceUnavailable)
+
+		http.Error(writer, "Error getting notification service", http.StatusServiceUnavailable)
+
+		log.Println("After http.Error")
+
+		err := s.repo.DeleteRateForHost(rate.ID.String())
+		if err != nil {
+			log.Printf("Error deleting rate for host after circuit breaker error: %v", err)
+		}
+
+		return
+	}
+
+	s.logger.Println("Code after circuit breaker execution")
+
+	if resultNotification != nil {
+
+		fmt.Println("Received meaningful data:", resultNotification)
 	}
 
 	writer.WriteHeader(http.StatusOK)
