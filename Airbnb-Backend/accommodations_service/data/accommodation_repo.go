@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"log"
 	"net/http"
@@ -89,12 +90,14 @@ func (rr *AccommodationRepo) InsertAccommodation(ctx context.Context, accommodat
 
 	result, err := accommodationCollection.InsertOne(ctx, accommodation)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err)
 		return "", err
 	}
 
 	insertedID, ok := result.InsertedID.(primitive.ObjectID)
 	if !ok {
+		span.AddEvent("Failed to convert InsertedID to ObjectID")
 		rr.logger.Println("Failed to convert InsertedID to ObjectID")
 		return "", errors.New("Failed to convert InsertedID")
 	}
@@ -110,6 +113,7 @@ func (rr *AccommodationRepo) InsertRateForAccommodation(ctx context.Context, rat
 
 	_, err := rateCollection.InsertOne(ctx, rate)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err)
 		return "", err
 	}
@@ -125,6 +129,7 @@ func (rr *AccommodationRepo) InsertRateForHost(ctx context.Context, rate *Rate) 
 
 	_, err := rateCollection.InsertOne(ctx, rate)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err)
 		return "", err
 	}
@@ -138,6 +143,7 @@ func (rr *AccommodationRepo) DeleteRateForHost(ctx context.Context, rateID strin
 
 	objID, err := primitive.ObjectIDFromHex(rateID)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err)
 		return err
 	}
@@ -148,6 +154,7 @@ func (rr *AccommodationRepo) DeleteRateForHost(ctx context.Context, rateID strin
 
 	_, err2 := rateCollection.DeleteOne(ctx, filter)
 	if err2 != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err2)
 		return err2
 	}
@@ -160,11 +167,13 @@ func (rr *AccommodationRepo) UpdateRateForHost(ctx context.Context, rateID strin
 
 	rateId, err := primitive.ObjectIDFromHex(rateID)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		fmt.Println("Error converting ID to ObjectID:", err)
 		return err
 	}
 
 	if rate.Rate <= 0 || rate.Rate > 5 {
+		span.SetStatus(codes.Error, "Invalid rate value")
 		return fmt.Errorf("Invalid rate value: %v. Rate must be between 0 and 5", rate.Rate)
 	}
 
@@ -174,6 +183,7 @@ func (rr *AccommodationRepo) UpdateRateForHost(ctx context.Context, rateID strin
 	result, err := rr.getRateCollection(ctx).UpdateOne(ctx, filter, update)
 
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error updating rate:", err)
 		return err
 	}
@@ -259,6 +269,7 @@ func (rr *AccommodationRepo) getByFilter(ctx context.Context, filter interface{}
 	var accommodation Accommodation
 	err := accommodationCollection.FindOne(ctx, filter).Decode(&accommodation)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
@@ -299,14 +310,22 @@ func (rr *AccommodationRepo) DeleteAccommodationsByOwner(ctx context.Context, ow
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.GetAccommodationsByOwner")
 	defer span.End()
 
+	owner, err := primitive.ObjectIDFromHex(ownerID)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		fmt.Println("Error converting ID to ObjectID:", owner, err)
+		return err
+	}
+
 	accommodationsCollection := rr.getCollection(ctx)
 
 	filter := bson.M{"ownerId": ownerID}
 
-	_, err := accommodationsCollection.DeleteMany(ctx, filter)
-	if err != nil {
-		rr.logger.Println(err)
-		return err
+	_, err2 := accommodationsCollection.DeleteMany(ctx, filter)
+	if err2 != nil {
+		span.SetStatus(codes.Error, err2.Error())
+		rr.logger.Println(err2)
+		return err2
 	}
 
 	return nil
@@ -325,6 +344,7 @@ func (rr *AccommodationRepo) HasUserRatedHost(ctx context.Context, userID string
 
 	count, err := rateCollection.CountDocuments(ctx, filter)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return false, err
 	}
 
@@ -344,6 +364,7 @@ func (rr *AccommodationRepo) HasUserRatedAccommodation(ctx context.Context, user
 
 	count, err := rateCollection.CountDocuments(ctx, filter)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return false, err
 	}
 
@@ -357,6 +378,7 @@ func (rr *AccommodationRepo) filterIDs(ctx context.Context, filter interface{}) 
 	accommodationCollection := rr.getCollection(ctx)
 	cursor, err := accommodationCollection.Find(ctx, filter)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	defer cursor.Close(ctx)
@@ -365,12 +387,14 @@ func (rr *AccommodationRepo) filterIDs(ctx context.Context, filter interface{}) 
 	for cursor.Next(ctx) {
 		var accommodation Accommodation
 		if err := cursor.Decode(&accommodation); err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 		accommodationIDs = append(accommodationIDs, accommodation.ID)
 	}
 
 	if err := cursor.Err(); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
@@ -384,6 +408,7 @@ func (rr *AccommodationRepo) filter(ctx context.Context, filter interface{}) ([]
 	accommodationCollection := rr.getCollection(ctx)
 	cursor, err := accommodationCollection.Find(ctx, filter)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	defer cursor.Close(ctx)
@@ -398,6 +423,7 @@ func (rr *AccommodationRepo) filterRate(ctx context.Context, filter interface{})
 	rateCollection := rr.getRateCollection(ctx)
 	cursor, err := rateCollection.Find(ctx, filter)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 	defer cursor.Close(ctx)

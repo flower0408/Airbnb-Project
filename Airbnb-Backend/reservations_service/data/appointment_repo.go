@@ -95,12 +95,14 @@ func (rr *AppointmentRepo) InsertAppointment(ctx context.Context, appointment *A
 	appointmentsCollection := rr.getCollection()
 
 	if appointment.PricePerGuest != 0 && appointment.PricePerAccommodation != 0 {
+		span.SetStatus(codes.Error, "Error adding accommodation price and guest price at the same time.")
 		rr.logger.Printf("Error adding accommodation price and guest price at the same time.")
 		return errors.New("Error adding accommodation price and guest price at the same time.")
 	}
 
 	existingAppointments, err := rr.GetAppointmentsByAccommodation(ctx, appointment.AccommodationId)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 
@@ -116,12 +118,14 @@ func (rr *AppointmentRepo) InsertAppointment(ctx context.Context, appointment *A
 
 	for _, newAppointment := range appointment.Available {
 		if time.Now().After(newAppointment) {
+			span.SetStatus(codes.Error, "Error adding appointment. Cannot add appointment in the past.")
 			return errors.New("Error adding appointment. Cannot add appointment in the past.")
 		}
 	}
 
 	result, err := appointmentsCollection.InsertOne(ctx, &appointment)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err)
 		return err
 	}
@@ -135,7 +139,7 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 
 	originalAppointment, err := rr.GetAppointmentByID(ctx, id)
 	if err != nil {
-		//span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error retrieving original appointment:", err)
 		return err
 	}
@@ -146,7 +150,7 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 	}
 	body, err := json.Marshal(data)
 	if err != nil {
-		//span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error marshalling JSON:", err)
 		return err
 	}
@@ -159,14 +163,14 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 	reservationRequest, err := http.NewRequest("POST", reservationEndpoint, bytes.NewReader(body))
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest.Header))
 	if err != nil {
-		//span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error creating reservation request:", err)
 		return err
 	}
 
 	reservationResponse, err := http.DefaultClient.Do(reservationRequest)
 	if err != nil {
-		//span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println("Error sending reservation request:", err)
 		return err
 	}
@@ -187,6 +191,7 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 				for _, newAppointment := range appointment.Available {
 
 					if newAppointment.Equal(existAppointment) {
+						span.SetStatus(codes.Error, "Error editing appointment. Date already exists,")
 						return errors.New("Error editing appointment. Date already exists. ")
 					}
 
@@ -196,12 +201,14 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 		}
 
 		for _, newAppointment := range appointment.Available {
+			span.SetStatus(codes.Error, "Error editing appointment. Cannot add appointment in the past.")
 			if time.Now().After(newAppointment) {
 				return errors.New("Error editing appointment. Cannot add appointment in the past.")
 			}
 		}
 
 		if appointment.PricePerGuest != 0 && appointment.PricePerAccommodation != 0 {
+			span.SetStatus(codes.Error, "Error adding accommodation price and guest price at the same time.")
 			rr.logger.Printf("Error adding accommodation price and guest price at the same time.")
 			return errors.New("Error adding accommodation price and guest price at the same time.")
 		}
@@ -209,7 +216,7 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 		rr.logger.Println("No reservation found for the appointment. Update allowed.")
 		objectID, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
-			//span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, err.Error())
 			rr.logger.Println("Error converting ID to ObjectID:", err)
 			return err
 		}
@@ -238,7 +245,7 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 		rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
 
 		if err != nil {
-			//span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, err.Error())
 			rr.logger.Println(err)
 			return err
 		}
@@ -259,12 +266,14 @@ func (rr *AppointmentRepo) DeleteAppointmentsByAccommodationID(ctx context.Conte
 	ctx, span := rr.tracer.Start(ctx, "AppointmentRepository.DeleteAppointmentsByAccommodationID")
 	defer span.End()
 
+	fmt.Println("lolaa", accommodationID)
 	appointmentsCollection := rr.getCollection()
 
 	filter := bson.M{"accommodationId": accommodationID}
 
 	result, err := appointmentsCollection.DeleteMany(ctx, filter)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err)
 		return err
 	}
@@ -284,6 +293,7 @@ func (rr *AppointmentRepo) GetAppointmentByID(ctx context.Context, id string) (*
 	objID, _ := primitive.ObjectIDFromHex(id)
 	err := appointmentsCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&appointment)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err)
 		return nil, err
 	}
@@ -299,10 +309,12 @@ func (rr *AppointmentRepo) GetAllAppointment(ctx context.Context) (*Appointments
 	var appointments Appointments
 	appointmentCursor, err := appointmentsCollection.Find(ctx, bson.M{})
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err)
 		return nil, err
 	}
 	if err = appointmentCursor.All(ctx, &appointments); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err)
 		return nil, err
 	}
@@ -320,11 +332,19 @@ func (rr *AppointmentRepo) GetAppointmentsByAccommodation(ctx context.Context, i
 
 	appointmentsCollection := rr.getCollection()
 
+	idValid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		fmt.Println("Error converting ID to ObjectID:", idValid, err)
+		return nil, err
+	}
+
 	filter := bson.M{"accommodationId": id}
 
 	// Find appointments matching the filter
 	cursor, err := appointmentsCollection.Find(ctx, filter)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err)
 		return nil, err
 	}
@@ -335,6 +355,7 @@ func (rr *AppointmentRepo) GetAppointmentsByAccommodation(ctx context.Context, i
 	for cursor.Next(ctx) {
 		var appointment Appointment
 		if err := cursor.Decode(&appointment); err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			rr.logger.Println(err)
 			return nil, err
 		}
@@ -343,6 +364,7 @@ func (rr *AppointmentRepo) GetAppointmentsByAccommodation(ctx context.Context, i
 
 	// Check for errors during cursor iteration
 	if err := cursor.Err(); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Println(err)
 		return nil, err
 	}
@@ -367,6 +389,7 @@ func (rr *AppointmentRepo) GetAppointmentsByDate(ctx context.Context, startDate,
 
 	cursor, err := appointmentsCollection.Find(ctx, filter)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Printf("Error querying MongoDB: %v\n", err)
 		return nil, err
 	}
@@ -376,6 +399,7 @@ func (rr *AppointmentRepo) GetAppointmentsByDate(ctx context.Context, startDate,
 	for cursor.Next(ctx) {
 		var appointment Appointment
 		if err := cursor.Decode(&appointment); err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			rr.logger.Printf("Error decoding result: %v\n", err)
 			return nil, err
 		}
@@ -384,6 +408,7 @@ func (rr *AppointmentRepo) GetAppointmentsByDate(ctx context.Context, startDate,
 	}
 
 	if err := cursor.Err(); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		rr.logger.Printf("Cursor error: %v\n", err)
 		return nil, err
 	}

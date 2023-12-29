@@ -14,4 +14,4 @@ p, Guest, /createRateForHost, POST
 p, Guest, /getRatesByHost/*, GET
 p, Guest, /updateRate/*, PATCH
 p, Guest, /deleteRateForHost/*, DELETE
-
+p, Host, /delete_accommodations/*, DELETE
