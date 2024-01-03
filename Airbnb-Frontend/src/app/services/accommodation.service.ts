@@ -75,4 +75,8 @@ export class AccommodationService {
   deleteRate(rateID:string): Observable<any> {
     return this.http.delete<any>(`${environment.baseApiUrl}/${this.url}/deleteRate/${rateID}`);
   }
+
+  uploadImages(folderName: string, formData: FormData): Observable<any> {
+    return this.http.post<any>(`${environment.baseApiUrl}/${this.url}/upload/${folderName}`, formData);
+  }
 }

@@ -110,11 +110,26 @@ services:
       NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT}
       SECRET_KEY: ${SECRET_KEY}
       JAEGER_ADDRESS: ${JAEGER_ADDRESS}
+      HDFS_URI: namenode:9000
+    volumes:
+      - ./files:/usr/bin/files
     depends_on:
-      - accommodations_db
-      - jaeger
+      namenode:
+        condition: service_healthy
+      datanode1:
+        condition: service_healthy
+      datanode2:
+        condition: service_healthy
+      datanode3:
+        condition: service_healthy
+    extra_hosts:
+      - "namenode:172.18.0.4"
+      - "namenode:172.18.0.5"
+      - "namenode:172.18.0.2"
+      - "namenode:172.18.0.3"
     networks:
       - network
+
 
   reservations_service:
     image: reservations_service
@@ -199,6 +214,7 @@ services:
     networks:
       - network
 
+
   reservations_db:
     image: cassandra
     container_name: reservations_db
@@ -258,12 +274,58 @@ services:
     networks:
       - network
 
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    ports:
+      - 9870:9870
+      - 9000:9000
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hdfs.env
+
+  datanode1:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode1
+    volumes:
+      - hadoop_datanode1:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    env_file:
+      - ./hdfs.env
+
+  datanode2:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode2
+    volumes:
+      - hadoop_datanode2:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    env_file:
+      - ./hdfs.env
+
+  datanode3:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode3
+    volumes:
+      - hadoop_datanode3:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    env_file:
+      - ./hdfs.env
+
 volumes:
   # Volume na koji se povezuje reservations_db baza podataka
   reservations_db_store:
   auth_cache:
     driver: local
-
+  hadoop_namenode:
+  hadoop_datanode1:
+  hadoop_datanode2:
+  hadoop_datanode3:
 
 networks:
   network:

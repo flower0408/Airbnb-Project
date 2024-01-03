@@ -3,6 +3,7 @@ package main
 import (
 	"accommodations_service/data"
 	"accommodations_service/handlers"
+	"accommodations_service/storage"
 	"context"
 	"errors"
 	"github.com/casbin/casbin"
@@ -58,7 +59,18 @@ func main() {
 	defer store.DisconnectMongo(timeoutContext)
 	store.Ping()
 
-	accommodationHandler := handlers.NewAccommodationHandler(logger, store, tracer)
+	//// NoSQL: Initialize File Storage store
+	fileStorage, err := storage.New(storeLogger)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	// Close connection to HDFS on shutdown
+	defer fileStorage.Close()
+
+	//// Create directory tree on HDFS
+	_ = fileStorage.CreateDirectoriesStart()
+
+	accommodationHandler := handlers.NewAccommodationHandler(logger, store, tracer, fileStorage)
 
 	//Initialize the router and add a middleware for all the requests
 	router := mux.NewRouter()
@@ -85,6 +97,8 @@ func main() {
 	getAccommodationId.HandleFunc("/{id}", accommodationHandler.GetByID)
 	getAccommodationsByOwner := router.Methods(http.MethodGet).Subrouter()
 	getAccommodationsByOwner.HandleFunc("/owner/{ownerID}", accommodationHandler.GetAccommodationsByOwner)
+	getImages := router.Methods(http.MethodGet).Subrouter()
+	getImages.HandleFunc("/getImages/{folderName}", accommodationHandler.GetImageURLS)
 	postAccommodation := router.Methods(http.MethodPost).Subrouter()
 	postAccommodation.HandleFunc("/", accommodationHandler.CreateAccommodation)
 	postAccommodation.Use(accommodationHandler.MiddlewareAccommodationDeserialization)
@@ -94,6 +108,8 @@ func main() {
 	postRateForHost := router.Methods(http.MethodPost).Subrouter()
 	postRateForHost.HandleFunc("/createRateForHost", accommodationHandler.CreateRateForHost)
 	postRateForHost.Use(accommodationHandler.MiddlewareRateDeserialization)
+	uploadImages := router.Methods(http.MethodPost).Subrouter()
+	uploadImages.HandleFunc("/upload/{folderName}", accommodationHandler.UploadImages)
 	updateRateForHost := router.Methods(http.MethodPatch).Subrouter()
 	updateRateForHost.HandleFunc("/updateRate/{rateID}", accommodationHandler.UpdateRateForHost)
 	updateRateForHost.Use(accommodationHandler.MiddlewareRateDeserialization)

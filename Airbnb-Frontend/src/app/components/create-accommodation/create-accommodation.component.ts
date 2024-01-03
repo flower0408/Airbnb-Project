@@ -24,6 +24,7 @@ export class CreateAccommodationComponent implements OnInit{
 
   accommodationForm!: FormGroup;
   responseId: any;
+  imageFiles: File[] = [];
 
   @ViewChild('datapicker') dateInput!: ElementRef;
 
@@ -88,7 +89,9 @@ export class CreateAccommodationComponent implements OnInit{
 
       this.accommodationService.createAccommodation(newAccommodation).subscribe(
         (id:any) => {
-          this.responseId = id;
+          this.responseId = id.id;
+          this.uploadImages();
+
           let elements = document.getElementsByClassName("drp-selected");
           let dateRange: any;
           for (var i = 0; i < elements.length; i++) {
@@ -104,7 +107,7 @@ export class CreateAccommodationComponent implements OnInit{
           const newAppointment: Appointment = {
             id: "",
             available: datesInRange,
-            accommodationId: this.responseId.id,
+            accommodationId: this.responseId,
             pricePerGuest: 0,
             pricePerAccommodation: 0
           };
@@ -122,7 +125,7 @@ export class CreateAccommodationComponent implements OnInit{
             () => {
               this.openSnackBar("Accommodation created successfully!", "");
               console.log('Appointment created successfully!');
-              this.router.navigate(['/Main-Page']);
+              // this.router.navigate(['/Main-Page']);
             },
             (error) => {
               this.openSnackBar("Error creating accommodation!", "");
@@ -151,6 +154,41 @@ export class CreateAccommodationComponent implements OnInit{
       );
     }
   }
+
+  onFileChange(event: any): void {
+    // Handle file input change
+    const files: FileList = event.target.files;
+    for (let i = 0; i < files.length; i++) {
+      this.imageFiles.push(files[i]);
+    }
+  }
+
+  uploadImages(): void {
+    if (this.imageFiles.length === 0) {
+      this.openSnackBar("No images selected for upload!", "");
+      console.warn('No images selected for upload.');
+      return;
+    }
+
+    // Use FormData to send files to the backend
+    const formData = new FormData();
+    for (const file of this.imageFiles) {
+      formData.append('images', file);
+    }
+
+    // Call the service method to upload images
+    this.accommodationService.uploadImages(this.responseId, formData).subscribe(
+      () => {
+        console.log('Images uploaded successfully!');
+        this.openSnackBar("Images uploaded successfully!", "");
+      },
+      (error) => {
+        console.error('Error uploading images:', error);
+        this.openSnackBar("Error uploading images!", "");
+      }
+    );
+  }
+
 
   openSnackBar(message: string, action: string) {
     this._snackBar.open(message, action,  {

@@ -4,6 +4,7 @@ import (
 	"accommodations_service/authorization"
 	"accommodations_service/data"
 	"accommodations_service/errors"
+	"accommodations_service/storage"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -44,24 +45,26 @@ var (
 type KeyProduct struct{}
 
 type AccommodationHandler struct {
-	logger *log.Logger
-	repo   *data.AccommodationRepo
-	cb     *gobreaker.CircuitBreaker
-	cb2    *gobreaker.CircuitBreaker
-	tracer trace.Tracer
+	logger  *log.Logger
+	repo    *data.AccommodationRepo
+	cb      *gobreaker.CircuitBreaker
+	cb2     *gobreaker.CircuitBreaker
+	tracer  trace.Tracer
+	storage *storage.FileStorage
 }
 
 type ValidationError struct {
 	Message string `json:"message"`
 }
 
-func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo, t trace.Tracer) *AccommodationHandler {
+func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo, t trace.Tracer, s *storage.FileStorage) *AccommodationHandler {
 	return &AccommodationHandler{
-		logger: l,
-		repo:   r,
-		cb:     CircuitBreaker("accommodationService"),
-		cb2:    CircuitBreaker("reservationService2"),
-		tracer: t,
+		logger:  l,
+		repo:    r,
+		cb:      CircuitBreaker("accommodationService"),
+		cb2:     CircuitBreaker("reservationService2"),
+		tracer:  t,
+		storage: s,
 	}
 }
 
@@ -1174,6 +1177,67 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 	if result != nil {
 		fmt.Println("Received meaningful data:", result)
 	}
+}
+
+func (s *AccommodationHandler) GetImageURLS(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	folderName := vars["folderName"]
+
+	imageURLs, err := s.storage.GetImageURLS(folderName)
+	if err != nil {
+		s.logger.Println("Error getting image URLs:", err)
+		http.Error(rw, "Error getting image URLs", http.StatusInternalServerError)
+		return
+	}
+
+	// Return the list of image URLs as JSON
+	json.NewEncoder(rw).Encode(imageURLs)
+}
+
+func (s *AccommodationHandler) UploadImages(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	folderName := vars["folderName"]
+
+	// Parse the multipart form with a MB limit
+	err := h.ParseMultipartForm(40 << 20)
+	if err != nil {
+		s.logger.Println("Error parsing form:", err)
+		http.Error(rw, "Error parsing form", http.StatusBadRequest)
+		return
+	}
+
+	// Retrieve the files from the form data
+	files := h.MultipartForm.File["images"]
+
+	for _, file := range files {
+		// Open each file and get its content
+		src, err := file.Open()
+		if err != nil {
+			s.logger.Println("Error opening file:", err)
+			http.Error(rw, "Error opening file", http.StatusInternalServerError)
+			return
+		}
+		defer src.Close()
+
+		// Read the content of the file
+		imageContent, err := ioutil.ReadAll(src)
+		if err != nil {
+			s.logger.Println("Error reading file:", err)
+			http.Error(rw, "Error reading file", http.StatusInternalServerError)
+			return
+		}
+
+		// Save the image using the SaveImage function
+		err = s.storage.SaveImage(folderName, file.Filename, imageContent)
+		if err != nil {
+			s.logger.Println("Error saving file:", err)
+			http.Error(rw, "Error saving file", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Return a success response
+	rw.WriteHeader(http.StatusOK)
 }
 
 type StatusError struct {

@@ -240,6 +240,12 @@
           </div>
         </div>
 
+        <input type="file" (change)="onFileChange($event)" multiple />
+        <p>Images:</p>
+        <div *ngFor="let file of imageFiles">
+            {{ file.name }}
+        </div>
+
         <div>
           <button type="submit" class="formbold-btn">Create accommodation</button>
         </div>
