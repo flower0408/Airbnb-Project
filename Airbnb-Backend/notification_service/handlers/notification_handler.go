@@ -65,7 +65,7 @@ func (handler *NotificationHandler) CreateNotification(writer http.ResponseWrite
 	err := json.NewDecoder(req.Body).Decode(&notification)
 	if err != nil {
 		log.Println(err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Status bad request")
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -75,10 +75,10 @@ func (handler *NotificationHandler) CreateNotification(writer http.ResponseWrite
 	err = handler.service.CreateNotification(ctx, &notification)
 	if err != nil {
 		if err.Error() == "Database error" {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Internal server error")
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		} else {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Status bad request")
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 		}
 		return
@@ -93,7 +93,7 @@ func (handler *NotificationHandler) GetAllNotifications(writer http.ResponseWrit
 
 	users, err := handler.service.GetAllNotifications(ctx)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting all notifications")
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -113,7 +113,7 @@ func (handler *NotificationHandler) GetNotificationByHostId(writer http.Response
 
 	notification, err := handler.service.GetNotificationByHostId(ctx, id)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting notifications for host")
 		writer.WriteHeader(http.StatusNotFound)
 		return
 	}

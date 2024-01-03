@@ -63,7 +63,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 	reservation := h.Context().Value(KeyProduct{}).(*data.Reservation)
 	createdReservation, err := s.reservationRepo.InsertReservation(ctx, reservation)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error creating reservation")
 		if err.Error() == "Reservation already exists for the specified dates and accommodation." {
 			s.logger.Print("No one else can book accommodation for the reserved dates. ")
 			rw.WriteHeader(http.StatusMethodNotAllowed)
@@ -97,7 +97,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationDetailsRequest.Header))
 		accommodationDetailsResponse, err := http.DefaultClient.Do(accommodationDetailsRequest)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error fetching accommodation details")
 			return nil, fmt.Errorf("Error fetching accommodation details: %v", err)
 		}
 		defer accommodationDetailsResponse.Body.Close()
@@ -109,14 +109,14 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 
 		body, err := ioutil.ReadAll(accommodationDetailsResponse.Body)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error reading accommodation details response")
 			return nil, fmt.Errorf("Error reading accommodation details response: %v", err)
 		}
 
 		var accommodationDetails AccommodationDetails
 		err = json.Unmarshal(body, &accommodationDetails)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error unmarshaling accommodation details JSON")
 			return nil, fmt.Errorf("Error unmarshaling accommodation details JSON: %v", err)
 		}
 
@@ -124,7 +124,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 	})
 
 	if breakerErrAccommodation != nil {
-		span.SetStatus(codes.Error, breakerErrAccommodation.Error())
+		span.SetStatus(codes.Error, "Circuit breaker error")
 		log.Printf("Circuit breaker error: %v", breakerErrAccommodation)
 		log.Println("Before http.Error")
 
@@ -136,7 +136,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 
 		err := s.reservationRepo.DeleteReservation(ctx, createdReservationID)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error deleting reservation after circuit breaker error")
 			log.Printf("Error deleting reservation after circuit breaker error: %v", err)
 		}
 
@@ -159,7 +159,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 
 		body, err := json.Marshal(requestBody)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error marshaling requestBody details JSON")
 			return nil, fmt.Errorf("Error marshaling requestBody details JSON: %v", err)
 		}
 
@@ -168,7 +168,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(notificationServiceRequest.Header))
 		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error fetching notification service")
 			return nil, fmt.Errorf("Error fetching notification service: %v", err)
 		}
 		defer responseUser.Body.Close()
@@ -184,7 +184,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 	})
 
 	if breakerErrNotification != nil {
-		span.SetStatus(codes.Error, breakerErrNotification.Error())
+		span.SetStatus(codes.Error, "Circuit breaker error")
 		log.Printf("Circuit breaker error: %v", breakerErrNotification)
 		log.Println("Before http.Error")
 
@@ -196,7 +196,7 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 
 		err := s.reservationRepo.DeleteReservation(ctx, createdReservationID)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error deleting reservation after circuit breaker error")
 			log.Printf("Error deleting reservation after circuit breaker error: %v", err)
 		}
 
@@ -240,7 +240,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 
 	reservation, err := s.reservationRepo.GetReservationByID(ctx, reservationID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error retrieving reservation.")
 		s.logger.Print("Error retrieving reservation: ", err)
 		rw.WriteHeader(http.StatusInternalServerError)
 		rw.Write([]byte("Error retrieving reservation."))
@@ -256,7 +256,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationDetailsRequest.Header))
 		accommodationDetailsResponse, err := http.DefaultClient.Do(accommodationDetailsRequest)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error fetching accommodation details")
 			return nil, fmt.Errorf("Error fetching accommodation details: %v", err)
 		}
 		defer accommodationDetailsResponse.Body.Close()
@@ -268,14 +268,14 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 
 		body, err := ioutil.ReadAll(accommodationDetailsResponse.Body)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error reading accommodation details response")
 			return nil, fmt.Errorf("Error reading accommodation details response: %v", err)
 		}
 
 		var accommodationDetails AccommodationDetails
 		err = json.Unmarshal(body, &accommodationDetails)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error unmarshaling accommodation details JSON")
 			return nil, fmt.Errorf("Error unmarshaling accommodation details JSON: %v", err)
 		}
 
@@ -283,7 +283,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 	})
 
 	if breakerErrAccommodation != nil {
-		span.SetStatus(codes.Error, breakerErrAccommodation.Error())
+		span.SetStatus(codes.Error, "Circuit breaker error")
 		log.Printf("Circuit breaker error: %v", breakerErrAccommodation)
 		log.Println("Before http.Error")
 
@@ -303,7 +303,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 
 	err = s.reservationRepo.CancelReservation(ctx, reservationID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error canceling reservation")
 		if err.Error() == "Can not cancel reservation. You can only cancel it before it starts." {
 			s.logger.Print("Can not cancel reservation. You can only cancel it before it starts. ")
 			rw.WriteHeader(http.StatusBadRequest)
@@ -336,7 +336,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(notificationServiceRequest.Header))
 		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error fetching notification service")
 			return nil, fmt.Errorf("Error fetching notification service: %v", err)
 		}
 		defer responseUser.Body.Close()
@@ -352,7 +352,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 	})
 
 	if breakerErrNotification != nil {
-		span.SetStatus(codes.Error, breakerErrNotification.Error())
+		span.SetStatus(codes.Error, "Circuit breaker error")
 		log.Printf("Circuit breaker error: %v", breakerErrNotification)
 		log.Println("Before http.Error")
 
@@ -416,7 +416,7 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 
 	token, err := jwt.Parse([]byte(tokenString), verifier)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Token parsing error")
 		log.Println("Token parsing error:", err)
 		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -434,7 +434,7 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 	})
 
 	if breakerErr != nil {
-		span.SetStatus(codes.Error, breakerErr.Error())
+		span.SetStatus(codes.Error, "Service Unavailable")
 		log.Println("Circuit breaker open:", breakerErr)
 		http.Error(rw, "Service Unavailable", http.StatusServiceUnavailable)
 		return
@@ -465,7 +465,7 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 	}
 
 	if err, ok := resultMap["err"].(error); ok && err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error from user service")
 		log.Println("Error from user service:", err)
 		http.Error(rw, err.Error(), statusCode)
 		return
@@ -473,7 +473,7 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 
 	reservationByUser, err := s.reservationRepo.GetReservationByUser(ctx, userID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting reservations")
 		s.logger.Print("Database exception: ", err)
 		http.Error(rw, "Error getting reservations", http.StatusInternalServerError)
 		return
@@ -487,7 +487,7 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 
 	err = reservationByUser.ToJSON(rw)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Unable to convert to json")
 		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
 		s.logger.Fatal("Unable to convert to json :", err)
 		return
@@ -504,7 +504,7 @@ func (s *ReservationHandler) getUserIDFromUserService(ctx context.Context, usern
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
 	response, err := http.DefaultClient.Do(userServiceRequest)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Interval server error")
 		return "", http.StatusInternalServerError, err
 	}
 	defer response.Body.Close()
@@ -516,7 +516,7 @@ func (s *ReservationHandler) getUserIDFromUserService(ctx context.Context, usern
 
 	var user map[string]interface{}
 	if err := json.NewDecoder(response.Body).Decode(&user); err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error decoding user response")
 		return "", http.StatusInternalServerError, err
 	}
 
@@ -538,7 +538,7 @@ func (s *ReservationHandler) GetReservationByAccommodation(rw http.ResponseWrite
 
 	reservationByUser, err := s.reservationRepo.GetReservationByAccommodation(ctx, id)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting reservations by user")
 		s.logger.Print("Database exception: ", err)
 	}
 
@@ -548,7 +548,7 @@ func (s *ReservationHandler) GetReservationByAccommodation(rw http.ResponseWrite
 
 	err = reservationByUser.ToJSON(rw)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Unable to convert to json")
 		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
 		s.logger.Fatal("Unable to convert to json :", err)
 		return
@@ -587,7 +587,7 @@ func (s *ReservationHandler) CheckReservation(rw http.ResponseWriter, h *http.Re
 
 	err := json.NewDecoder(h.Body).Decode(&requestBody)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Unable to decode JSON")
 		http.Error(rw, "Unable to decode JSON", http.StatusBadRequest)
 		s.logger.Println("Error decoding JSON:", err)
 		return
@@ -598,7 +598,7 @@ func (s *ReservationHandler) CheckReservation(rw http.ResponseWriter, h *http.Re
 	for _, t := range requestBody.Available {
 		parsedTime, err := time.Parse(time.RFC3339, t)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Invalid time format in JSON")
 			http.Error(rw, "Invalid time format in JSON", http.StatusBadRequest)
 			s.logger.Println("Error parsing time:", err)
 			return
@@ -609,7 +609,7 @@ func (s *ReservationHandler) CheckReservation(rw http.ResponseWriter, h *http.Re
 
 	exists, err := s.reservationRepo.ReservationExistsForAppointment(ctx, requestBody.AccommodationID, available)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error checking reservation")
 		http.Error(rw, "Error checking reservation", http.StatusInternalServerError)
 		s.logger.Println("Error checking reservation:", err)
 		return
@@ -641,14 +641,14 @@ func (s *ReservationHandler) CheckHostReservations(rw http.ResponseWriter, h *ht
 
 	hasReservations, err := s.reservationRepo.HasReservationsForHost(ctx, userID, authToken)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error checking host reservations")
 		s.logger.Println("Error checking host reservations:", err)
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	if err := json.NewEncoder(rw).Encode(hasReservations); err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error encoding JSON response")
 		s.logger.Println("Error encoding JSON response:", err)
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
@@ -675,7 +675,7 @@ func (rh *ReservationHandler) CheckUserPastReservations(w http.ResponseWriter, r
 
 	hasPastReservations, err := rh.reservationRepo.CheckUserPastReservations(ctx, userID, hostID, authToken)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error checking user past reservations")
 		log.Println("Error checking user past reservations:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -707,7 +707,7 @@ func (rh *ReservationHandler) CheckUserPastReservationsInAccommodation(w http.Re
 
 	hasPastReservations, err := rh.reservationRepo.CheckUserPastReservationsInAccommodation(ctx, userID, accommodationID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error checking user past reservations")
 		log.Println("Error checking user past reservations:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return

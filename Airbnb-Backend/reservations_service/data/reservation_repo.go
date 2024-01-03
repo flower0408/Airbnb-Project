@@ -120,7 +120,7 @@ func (sr *ReservationRepo) InsertReservation(ctx context.Context, reservation *R
 
 	exists, err := sr.ReservationExistsForAppointment(ctx, reservation.AccommodationId, reservation.Period)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error reservation exists for appointment")
 		return nil, err
 	}
 	if exists {
@@ -132,7 +132,7 @@ func (sr *ReservationRepo) InsertReservation(ctx context.Context, reservation *R
 
 	appointments, err := sr.getAppointmentsByAccommodation(ctx, reservation.AccommodationId)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting appointments")
 		return nil, err
 	}
 
@@ -194,7 +194,7 @@ func (sr *ReservationRepo) InsertReservation(ctx context.Context, reservation *R
         VALUES (?, ?, ?, ?, ?)`,
 		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price).Exec()
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error insert reservation")
 		sr.logger.Println(err)
 		return nil, err
 	}
@@ -216,7 +216,7 @@ func (sr *ReservationRepo) ReservationExistsForAppointment(ctx context.Context, 
 
 	allReservations, err := sr.GetReservationByAccommodation(ctx, accommodationID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting reservations")
 		return false, err
 	}
 
@@ -241,7 +241,7 @@ func (sr *ReservationRepo) HasReservationsForHost(ctx context.Context, userID st
 	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error creating accommodation request")
 		sr.logger.Println("Error creating accommodation request:", err)
 		return false, err
 	}
@@ -250,7 +250,7 @@ func (sr *ReservationRepo) HasReservationsForHost(ctx context.Context, userID st
 
 	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error sending accommodation request")
 		sr.logger.Println("Error sending accommodation request:", err)
 		return false, err
 	}
@@ -266,7 +266,7 @@ func (sr *ReservationRepo) HasReservationsForHost(ctx context.Context, userID st
 	//err = responseToType(accommodationResponse.Body, accommodations)
 	err = json.NewDecoder(accommodationResponse.Body).Decode(&accommodations)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error decoding accommodation response")
 		sr.logger.Println("Error decoding accommodation response:", err)
 		return false, err
 	}
@@ -275,7 +275,7 @@ func (sr *ReservationRepo) HasReservationsForHost(ctx context.Context, userID st
 	for _, accommodationID := range accommodations {
 		hasReservations, err := sr.HasReservationsForAccommodation(ctx, accommodationID)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error checking reservations for accommodation")
 			sr.logger.Println(err)
 			return false, err
 		}
@@ -300,7 +300,7 @@ func (sr *ReservationRepo) HasReservationsForAccommodation(ctx context.Context, 
 	if scanner.Next() {
 		err := scanner.Scan(&count)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error checking reservations for accommodation")
 			sr.logger.Println(err)
 			return false, err
 		}
@@ -309,7 +309,7 @@ func (sr *ReservationRepo) HasReservationsForAccommodation(ctx context.Context, 
 	}
 
 	if err := scanner.Err(); err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error checking reservations for accommodation")
 		sr.logger.Println(err)
 		return false, err
 	}
@@ -324,7 +324,7 @@ func (sr *ReservationRepo) CheckUserPastReservations(ctx context.Context, userID
 	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error creating accommodation request")
 		sr.logger.Println("Error creating accommodation request:", err)
 		return false, err
 	}
@@ -333,7 +333,7 @@ func (sr *ReservationRepo) CheckUserPastReservations(ctx context.Context, userID
 
 	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error sending accommodation request")
 		sr.logger.Println("Error sending accommodation request:", err)
 		return false, err
 	}
@@ -348,7 +348,7 @@ func (sr *ReservationRepo) CheckUserPastReservations(ctx context.Context, userID
 
 	err = json.NewDecoder(accommodationResponse.Body).Decode(&accommodations)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error decoding accommodation response")
 		sr.logger.Println("Error decoding accommodation response:", err)
 		return false, err
 	}
@@ -357,7 +357,7 @@ func (sr *ReservationRepo) CheckUserPastReservations(ctx context.Context, userID
 
 	reservations, err := sr.GetReservationByUser(ctx, userID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting reservation by user")
 		sr.logger.Println(err)
 		return false, err
 	}
@@ -385,7 +385,7 @@ func (sr *ReservationRepo) CheckUserPastReservationsInAccommodation(ctx context.
 
 	reservations, err := sr.GetReservationByAccommodation(ctx, accommodationID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting reservations by accommodation")
 		sr.logger.Println(err)
 		return false, err
 	}
@@ -411,7 +411,7 @@ func (sr *ReservationRepo) CancelReservation(ctx context.Context, reservationID 
 
 	reservation, err := sr.GetReservationByID(ctx, reservationID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error get reservation by ID")
 		sr.logger.Println(err)
 		return err
 	}
@@ -427,7 +427,7 @@ func (sr *ReservationRepo) CancelReservation(ctx context.Context, reservationID 
 		`DELETE FROM reservation_by_user WHERE reservation_id = ? AND by_userid = ?`,
 		reservation.ID, reservation.ByUserId).Exec()
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error canceling reservation")
 		sr.logger.Println(err)
 		return err
 	}
@@ -435,7 +435,7 @@ func (sr *ReservationRepo) CancelReservation(ctx context.Context, reservationID 
 		`DELETE FROM reservation_by_accommodation WHERE reservation_id = ? AND accommodation_id = ?`,
 		reservation.ID, reservation.AccommodationId).Exec()
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error canceling reservation")
 		sr.logger.Println(err)
 		return err
 	}
@@ -449,7 +449,7 @@ func (sr *ReservationRepo) DeleteReservation(ctx context.Context, reservationID 
 
 	reservation, err := sr.GetReservationByID(ctx, reservationID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting reservation by ID")
 		sr.logger.Println(err)
 		return err
 	}
@@ -458,7 +458,7 @@ func (sr *ReservationRepo) DeleteReservation(ctx context.Context, reservationID 
 		`DELETE FROM reservation_by_user WHERE reservation_id = ? AND by_userid = ?`,
 		reservation.ID, reservation.ByUserId).Exec()
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error deleting reservation")
 		sr.logger.Println(err)
 		return err
 	}
@@ -466,7 +466,7 @@ func (sr *ReservationRepo) DeleteReservation(ctx context.Context, reservationID 
 		`DELETE FROM reservation_by_accommodation WHERE reservation_id = ? AND accommodation_id = ?`,
 		reservation.ID, reservation.AccommodationId).Exec()
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error deleting reservation")
 		sr.logger.Println(err)
 		return err
 	}
@@ -480,7 +480,7 @@ func (sr *ReservationRepo) GetReservationByID(ctx context.Context, reservationID
 
 	parsedUUID, err := gocql.ParseUUID(reservationID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error parsing UUID")
 		fmt.Println("Error parsing UUID:", err, reservationID, " ", parsedUUID)
 		return nil, err
 	}
@@ -499,13 +499,13 @@ func (sr *ReservationRepo) GetReservationByID(ctx context.Context, reservationID
 			&reservation.Price,
 		)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error getting reservation by ID")
 			return nil, err
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting reservation by ID")
 		sr.logger.Println(err)
 		return nil, err
 	}
@@ -530,7 +530,7 @@ func (sr *ReservationRepo) GetReservationByUser(ctx context.Context, id string) 
 			&r.Price,
 		)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error getting reservation by user")
 			sr.logger.Println(err)
 			return nil, err
 		}
@@ -538,7 +538,7 @@ func (sr *ReservationRepo) GetReservationByUser(ctx context.Context, id string) 
 		reservations = append(reservations, &r)
 	}
 	if err := scanner.Err(); err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting reservation by user")
 		sr.logger.Println(err)
 		return nil, err
 	}
@@ -562,7 +562,7 @@ func (sr *ReservationRepo) GetReservationByAccommodation(ctx context.Context, id
 			&r.Price,
 		)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error getting reservation by accommodation")
 			sr.logger.Println(err)
 			return nil, err
 		}
@@ -570,7 +570,7 @@ func (sr *ReservationRepo) GetReservationByAccommodation(ctx context.Context, id
 		reservations = append(reservations, &r)
 	}
 	if err := scanner.Err(); err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting reservation by accommodation")
 		sr.logger.Println(err)
 		return nil, err
 	}
@@ -619,7 +619,7 @@ func (sr *ReservationRepo) getAppointmentsByAccommodation(ctx context.Context, i
 	var appointments Appointments
 	err := responseToType(response.Body, &appointments)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting appointments by accommodation")
 		return nil, err
 	}
 

@@ -91,7 +91,7 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	token, err := jwt.Parse([]byte(tokenString), verifier)
 	if err != nil {
 		log.Println("Token parsing error:", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Status Unauthorized")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -114,7 +114,7 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 
 	if breakerErr != nil {
 		log.Println("Circuit breaker open:", breakerErr)
-		span.SetStatus(codes.Error, breakerErr.Error())
+		span.SetStatus(codes.Error, "Service Unavailable")
 		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -145,7 +145,7 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 
 	if err, ok := resultMap["err"].(error); ok && err != nil {
 		log.Println("Error from user service:", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error from user service")
 		http.Error(writer, err.Error(), statusCode)
 		return
 	}
@@ -163,7 +163,7 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	id, err = s.repo.InsertAccommodation(ctx, accommodation)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Database exception")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -172,7 +172,7 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	responseBytes, err := json.Marshal(responseJSON)
 	if err != nil {
 		s.logger.Print("Error encoding response:", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error encoding response")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -183,7 +183,7 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	_, err = writer.Write(responseBytes)
 	if err != nil {
 		s.logger.Print("Error writing response:", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error writing response")
 	}
 }
 
@@ -213,7 +213,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	token, err := jwt.Parse([]byte(tokenString), verifier)
 	if err != nil {
 		log.Println("Token parsing error:", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Status unauthorized")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -230,7 +230,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 	if breakerErr != nil {
 		log.Println("Circuit breaker open:", breakerErr)
-		span.SetStatus(codes.Error, breakerErr.Error())
+		span.SetStatus(codes.Error, "Service Unavailable")
 		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -261,7 +261,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 	if err, ok := resultMap["err"].(error); ok && err != nil {
 		log.Println("Error from user service:", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error from user service")
 		http.Error(writer, err.Error(), statusCode)
 		return
 	}
@@ -277,7 +277,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 		reservationServiceRequest.Header.Set("Authorization", "Bearer "+tokenString)
 		response, err := http.DefaultClient.Do(reservationServiceRequest)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error communicating with reservation service")
 			return nil, fmt.Errorf("Error communicating with reservation service")
 		}
 		defer response.Body.Close()
@@ -289,7 +289,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 		var hasPastReservations bool
 		if err := json.NewDecoder(response.Body).Decode(&hasPastReservations); err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error decoding past reservations response")
 			return nil, fmt.Errorf("Error decoding past reservations response: %v", err)
 		}
 
@@ -297,7 +297,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	})
 
 	if breakerErr != nil {
-		span.SetStatus(codes.Error, breakerErr.Error())
+		span.SetStatus(codes.Error, "Breaker error")
 		http.Error(writer, breakerErr.Error(), http.StatusServiceUnavailable)
 		return
 	}
@@ -318,7 +318,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 	hasRated, err := s.repo.HasUserRatedAccommodation(ctx, userID, rate.ForAccommodationId)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error checking if user has already rated the host")
 		log.Println("Error checking if user has already rated the host:", err)
 		http.Error(writer, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -336,7 +336,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	// Set the desired time zone (CET)
 	cetLocation, err := time.LoadLocation("Europe/Belgrade")
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error loading location")
 		fmt.Println("Error loading location:", err)
 		return
 	}
@@ -347,7 +347,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	rate.CreatedAt = cetTime.Format(time.RFC3339)
 
 	if err := validateRate(rate); err != nil {
-		span.SetStatus(codes.Error, err.Message)
+		span.SetStatus(codes.Error, "Error validating rate")
 		http.Error(writer, err.Message, http.StatusUnprocessableEntity)
 		return
 	}
@@ -355,13 +355,13 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	_, err = s.repo.InsertRateForAccommodation(ctx, rate)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error insert rate for accommodation")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	accommodationID, err := primitive.ObjectIDFromHex(rate.ForAccommodationId)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Invalid accommodation ID")
 		log.Println("Invalid accommodation ID:", err)
 		http.Error(writer, "Invalid accommodation ID", http.StatusBadRequest)
 		return
@@ -369,7 +369,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 	accommodation, err := s.repo.GetByID(ctx, accommodationID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting accommodation details")
 		log.Println("Error getting accommodation details:", err)
 		http.Error(writer, "Error getting accommodation details", http.StatusInternalServerError)
 		return
@@ -388,7 +388,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 		body, err := json.Marshal(requestBody)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error marshaling requestBody details JSON")
 			return nil, fmt.Errorf("Error marshaling requestBody details JSON: %v", err)
 		}
 
@@ -396,7 +396,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 		notificationServiceRequest, _ := http.NewRequest("POST", notificationServiceEndpoint, bytes.NewReader(body))
 		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error fetching notification service")
 			return nil, fmt.Errorf("Error fetching notification service: %v", err)
 		}
 		defer responseUser.Body.Close()
@@ -423,7 +423,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 		err := s.repo.DeleteRateForHost(ctx, rate.ID.String())
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error deleting rate for accommodation after circuit breaker error")
 			log.Printf("Error deleting rate for accommodation after circuit breaker error: %v", err)
 		}
 
@@ -467,7 +467,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	token, err := jwt.Parse([]byte(tokenString), verifier)
 	if err != nil {
 		log.Println("Token parsing error:", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Status unauthorized")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -483,7 +483,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	})
 
 	if breakerErr != nil {
-		span.SetStatus(codes.Error, breakerErr.Error())
+		span.SetStatus(codes.Error, "Service Unavailable")
 		log.Println("Circuit breaker open:", breakerErr)
 		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 		return
@@ -514,7 +514,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	}
 
 	if err, ok := resultMap["err"].(error); ok && err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error from user service")
 		log.Println("Error from user service:", err)
 		http.Error(writer, err.Error(), statusCode)
 		return
@@ -532,7 +532,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 		reservationServiceRequest.Header.Set("Authorization", "Bearer "+tokenString)
 		response, err := http.DefaultClient.Do(reservationServiceRequest)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error communicating with reservation service")
 			return nil, fmt.Errorf("Error communicating with reservation service")
 		}
 		defer response.Body.Close()
@@ -543,7 +543,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 
 		var hasPastReservations bool
 		if err := json.NewDecoder(response.Body).Decode(&hasPastReservations); err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error decoding past reservations response")
 			return nil, fmt.Errorf("Error decoding past reservations response: %v", err)
 		}
 
@@ -551,7 +551,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	})
 
 	if breakerErr != nil {
-		span.SetStatus(codes.Error, breakerErr.Error())
+		span.SetStatus(codes.Error, "Breaker error")
 		http.Error(writer, breakerErr.Error(), http.StatusServiceUnavailable)
 		return
 	}
@@ -572,7 +572,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 
 	hasRated, err := s.repo.HasUserRatedHost(ctx, userID, rate.ForHostId)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error checking if user has already rated the host")
 		log.Println("Error checking if user has already rated the host:", err)
 		http.Error(writer, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -590,7 +590,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	// Set the desired time zone (CET)
 	cetLocation, err := time.LoadLocation("Europe/Belgrade")
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error loading location")
 		fmt.Println("Error loading location:", err)
 		return
 	}
@@ -601,14 +601,14 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	rate.CreatedAt = cetTime.Format(time.RFC3339)
 
 	if err := validateRate(rate); err != nil {
-		span.SetStatus(codes.Error, err.Message)
+		span.SetStatus(codes.Error, "Error validating rate")
 		http.Error(writer, err.Message, http.StatusUnprocessableEntity)
 		return
 	}
 
 	_, err = s.repo.InsertRateForHost(ctx, rate)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Database exception")
 		s.logger.Print("Database exception: ", err)
 		writer.WriteHeader(http.StatusBadRequest)
 		return
@@ -625,7 +625,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 
 		body, err := json.Marshal(requestBody)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error marshaling requestBody details JSON")
 			return nil, fmt.Errorf("Error marshaling requestBody details JSON: %v", err)
 		}
 
@@ -633,7 +633,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 		notificationServiceRequest, _ := http.NewRequest("POST", notificationServiceEndpoint, bytes.NewReader(body))
 		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error fetching notification service")
 			return nil, fmt.Errorf("Error fetching notification service: %v", err)
 		}
 		defer responseUser.Body.Close()
@@ -660,7 +660,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 
 		err := s.repo.DeleteRateForHost(ctx, rate.ID.String())
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error deleting rate for host after circuit breaker error")
 			log.Printf("Error deleting rate for host after circuit breaker error: %v", err)
 		}
 
@@ -751,7 +751,7 @@ func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWri
 		reservationServiceRequest.Header.Set("Authorization", "Bearer "+authToken)
 		response, err := http.DefaultClient.Do(reservationServiceRequest)
 		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error communicating with reservation service")
 			return nil, fmt.Errorf("Error communicating with reservation service")
 		}
 		defer response.Body.Close()
@@ -769,14 +769,14 @@ func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWri
 	}
 
 	if breakerErr != nil {
-		span.SetStatus(codes.Error, breakerErr.Error())
+		span.SetStatus(codes.Error, "Breaker error")
 		http.Error(rw, breakerErr.Error(), http.StatusServiceUnavailable)
 		return
 	}
 
 	err := s.repo.DeleteAccommodationsByOwner(ctx, ownerID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error deleting accommodations")
 		s.logger.Print("Database exception")
 		http.Error(rw, "Error deleting accommodations", http.StatusInternalServerError)
 		return
@@ -806,7 +806,7 @@ func (s *AccommodationHandler) DeleteRateForHost(rw http.ResponseWriter, h *http
 
 	err := s.repo.DeleteRateForHost(ctx, rateID)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error deleting rate for host")
 		http.Error(rw, "Error deleting rate for host", http.StatusInternalServerError)
 	}
 
@@ -829,7 +829,7 @@ func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http
 	// Set the desired time zone (CET)
 	cetLocation, err := time.LoadLocation("Europe/Belgrade")
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error loading location")
 		fmt.Println("Error loading location:", err)
 		return
 	}
@@ -841,7 +841,7 @@ func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http
 
 	err = s.repo.UpdateRateForHost(ctx, rateID, rate)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error updating rate for host")
 		s.logger.Println("Error updating rate for host:", err)
 		http.Error(rw, "Error updating rate for host", http.StatusInternalServerError)
 		return
@@ -860,7 +860,7 @@ func (s *AccommodationHandler) getUserIDFromUserService(ctx context.Context, use
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
 	response, err := http.DefaultClient.Do(userServiceRequest)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Interval server error")
 		return "", http.StatusInternalServerError, err
 	}
 	defer response.Body.Close()
@@ -872,7 +872,7 @@ func (s *AccommodationHandler) getUserIDFromUserService(ctx context.Context, use
 
 	var user map[string]interface{}
 	if err := json.NewDecoder(response.Body).Decode(&user); err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Interval server error")
 		return "", http.StatusInternalServerError, err
 	}
 
@@ -893,7 +893,7 @@ func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
 	accommodations, err := s.repo.GetAll(ctx)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting all accommodations")
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -911,7 +911,7 @@ func (s *AccommodationHandler) GetAllRate(rw http.ResponseWriter, h *http.Reques
 	rates, err := s.repo.GetAllRate(ctx)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting all rates")
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -929,7 +929,7 @@ func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) 
 	vars := mux.Vars(h)
 	id, err := primitive.ObjectIDFromHex(vars["id"])
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting accommodation by ID")
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -937,7 +937,7 @@ func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) 
 	accommodation, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error accommodation not found")
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -958,7 +958,7 @@ func (s *AccommodationHandler) GetRatesByAccommodation(rw http.ResponseWriter, h
 	rates, err := s.repo.GetRatesByAccommodation(ctx, id)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error get rates by accommodation")
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -979,7 +979,7 @@ func (s *AccommodationHandler) GetRatesByHost(rw http.ResponseWriter, h *http.Re
 	rates, err := s.repo.GetRatesByHost(ctx, id)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error get rates by host")
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -1000,7 +1000,7 @@ func (s *AccommodationHandler) GetAccommodationsByOwner(rw http.ResponseWriter, 
 	accommodations, err := s.repo.GetAccommodationsByOwner(ctx, ownerID)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting accommodations by owner")
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -1025,12 +1025,11 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 
 	minGuestsInt, err := strconv.Atoi(minGuests)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Invalid minGuests parameter")
 		http.Error(rw, "Invalid minGuests parameter", http.StatusBadRequest)
 		return
 	}
 
-	// Check if both start and end dates are empty
 	if startDate == "" && endDate == "" {
 		// Search without calling reservation service
 		filter := bson.M{}
@@ -1047,7 +1046,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 		accommodations, err := s.repo.Search(ctx, filter)
 		if err != nil {
 			s.logger.Print("Database exception: ", err)
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Internal server error")
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -1078,7 +1077,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 
 		if err != nil {
 			log.Println("Error making reservation service request:", err)
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Error making reservation service request")
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
 			return nil, fmt.Errorf("ReservationServiceError")
 		}
@@ -1086,7 +1085,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 
 		if reservationServiceResponse.StatusCode != http.StatusOK {
 			log.Printf("Reservation service responded with status: %d\n", reservationServiceResponse.StatusCode)
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Internal server error")
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
 			return nil, StatusError{Code: http.StatusInternalServerError, Err: "ReservationServiceError"}
 		}
@@ -1094,7 +1093,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 		responseBody1, err := ioutil.ReadAll(reservationServiceResponse.Body)
 		if err != nil {
 			log.Println("Error reading reservation service response body:", err)
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "ReservationServiceError")
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
 			return nil, fmt.Errorf("ReservationServiceError")
 		}
@@ -1106,7 +1105,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 		}
 		if err := json.Unmarshal(responseBody1, &responseBody); err != nil {
 			log.Println("Error decoding reservation service response:", err)
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "ReservationServiceError")
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
 			return nil, fmt.Errorf("ReservationServiceError")
 		}
@@ -1123,14 +1122,14 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 			objectID, err := primitive.ObjectIDFromHex(id)
 			if err != nil {
 				log.Printf("Invalid ObjectID (%s): %v\n", id, err)
-				span.SetStatus(codes.Error, err.Error())
+				span.SetStatus(codes.Error, "Invalid ObjectID")
 				continue
 			}
 
 			accommodation, err := s.repo.GetByID(ctx, objectID)
 			if err != nil {
 				log.Printf("Accommodation not found for ObjectID (%s)\n", id)
-				span.SetStatus(codes.Error, err.Error())
+				span.SetStatus(codes.Error, "Accommodation not found for ObjectID")
 				continue
 			}
 
@@ -1162,10 +1161,10 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 	})
 	if breakerErr != nil {
 		if statusErr, ok := breakerErr.(StatusError); ok {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Breaker error")
 			http.Error(rw, statusErr.Err, statusErr.Code)
 		} else {
-			span.SetStatus(codes.Error, err.Error())
+			span.SetStatus(codes.Error, "Status service unavailable")
 			http.Error(rw, breakerErr.Error(), http.StatusServiceUnavailable)
 		}
 		return
