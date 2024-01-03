@@ -39,7 +39,7 @@ func (store *UserMongoDBStore) Register(ctx context.Context, user *domain.User) 
 	user.ID = primitive.NewObjectID()
 	result, err := store.users.InsertOne(context.TODO(), user)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error register user")
 		return nil, err
 	}
 	user.ID = result.InsertedID.(primitive.ObjectID)
@@ -70,7 +70,7 @@ func (store *UserMongoDBStore) GetOneUser(ctx context.Context, username string) 
 
 	user, err := store.filterOne(ctx, filter)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting user")
 		return nil, err
 	}
 
@@ -92,7 +92,7 @@ func (store *UserMongoDBStore) UpdateUserUsername(ctx context.Context, user *dom
 	fmt.Println(user)
 	newState, err := store.users.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": user})
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error update user username")
 		return err
 	}
 	fmt.Println(newState)
@@ -117,7 +117,7 @@ func (store *UserMongoDBStore) UpdateUser(ctx context.Context, updateUser *domai
 
 	result, err := store.users.UpdateOne(ctx, filter, update)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error update user")
 		return nil, err
 	}
 
@@ -135,7 +135,7 @@ func (store *UserMongoDBStore) DeleteAccount(ctx context.Context, userID primiti
 	filter := bson.M{"_id": userID}
 	result, err := store.users.DeleteOne(ctx, filter)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error deleting user")
 		return err
 	}
 
@@ -154,7 +154,7 @@ func (store *UserMongoDBStore) filter(ctx context.Context, filter interface{}) (
 	defer cursor.Close(ctx)
 
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "No user found for the given filter")
 		return nil, err
 	}
 	return decode(cursor)

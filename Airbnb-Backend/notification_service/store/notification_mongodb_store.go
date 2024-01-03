@@ -38,7 +38,7 @@ func (store *NotificationMongoDBStore) CreateNotification(ctx context.Context, n
 	notification.ID = primitive.NewObjectID()
 	result, err := store.notifications.InsertOne(context.TODO(), notification)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error creating notification")
 		return nil, err
 	}
 	notification.ID = result.InsertedID.(primitive.ObjectID)
@@ -69,7 +69,7 @@ func (store *NotificationMongoDBStore) filter(ctx context.Context, filter interf
 	defer cursor.Close(ctx)
 
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "No notification found for the given filter")
 		return nil, err
 	}
 	return decode(cursor)

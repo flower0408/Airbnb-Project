@@ -46,7 +46,7 @@ func (store *AuthMongoDBStore) Register(ctx context.Context, credentials *domain
 	result, err := store.credentials.InsertOne(context.TODO(), credentials)
 
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error register user")
 		return err
 	}
 	credentials.ID = result.InsertedID.(primitive.ObjectID)
@@ -60,9 +60,8 @@ func (store *AuthMongoDBStore) GetOneUser(ctx context.Context, username string) 
 
 	user, err := store.filterOne2(ctx, filter)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error fetching user")
 		if err == mongo.ErrNoDocuments {
-			// No user found, return nil without an error
 			return nil, nil
 		}
 		log.Println("Error fetching user:", err)
@@ -81,7 +80,7 @@ func (store *AuthMongoDBStore) UpdateUserUsername(ctx context.Context, user *dom
 	fmt.Println(user)
 	newState, err := store.credentials.UpdateOne(ctx, bson.M{"username": user.Username}, bson.M{"$set": user})
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error update user username")
 		return err
 	}
 	fmt.Println(newState)
@@ -95,7 +94,7 @@ func (store *AuthMongoDBStore) UpdateUser(ctx context.Context, user *domain.Cred
 	fmt.Println(user)
 	newState, err := store.credentials.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": user})
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error update user")
 		return err
 	}
 	fmt.Println(newState)
@@ -109,7 +108,7 @@ func (store *AuthMongoDBStore) DeleteUser(ctx context.Context, username string) 
 	filter := bson.M{"username": username}
 	_, err := store.credentials.DeleteOne(ctx, filter)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error deleting user")
 		return err
 	}
 	return nil
@@ -124,7 +123,7 @@ func (store *AuthMongoDBStore) GetOneUserByID(ctx context.Context, id primitive.
 	var user domain.Credentials
 	err := store.credentials.FindOne(ctx, filter, nil).Decode(&user)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting user by ID")
 		return nil
 	}
 
@@ -137,7 +136,7 @@ func (store *AuthMongoDBStore) filter(ctx context.Context, filter interface{}) (
 
 	cursor, err := store.credentials.Find(ctx, filter)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "No user found for the given filter")
 		return nil, err
 	}
 	defer cursor.Close(ctx)
@@ -151,7 +150,7 @@ func (store *AuthMongoDBStore) filter2(ctx context.Context, filter interface{}) 
 
 	cursor, err := store.credentials.Find(ctx, filter)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "No user found for the given filter")
 		return nil, err
 	}
 	defer cursor.Close(ctx)
@@ -172,7 +171,7 @@ func (store *AuthMongoDBStore) filterOne(ctx context.Context, filter interface{}
 			log.Println("No user found for the given filter")
 			return nil, nil
 		}
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error decoding user")
 		log.Println("Error decoding user:", err)
 		return nil, err
 	}

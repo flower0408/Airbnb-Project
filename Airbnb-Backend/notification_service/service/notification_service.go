@@ -71,7 +71,7 @@ func (service *NotificationService) CreateNotification(ctx context.Context, noti
 
 	_, err := service.store.CreateNotification(ctx, &notificationInfo)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error creating notification")
 		return err
 	}
 
@@ -81,7 +81,7 @@ func (service *NotificationService) CreateNotification(ctx context.Context, noti
 	})
 
 	if breakerErr != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Breaker service error")
 		return breakerErr
 	}
 
@@ -102,7 +102,7 @@ func (service *NotificationService) CreateNotification(ctx context.Context, noti
 
 	err = service.sendValidationMail(ctx, notification.Description, email)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error sending mail")
 		return err
 	}
 
@@ -119,14 +119,14 @@ func (service *NotificationService) getUserDetails(ctx context.Context, userID s
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userDetailsRequest.Header))
 	userDetailsResponse, err := http.DefaultClient.Do(userDetailsRequest)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "UserServiceError")
 		return nil, fmt.Errorf("UserServiceError: %v", err)
 	}
 	defer userDetailsResponse.Body.Close()
 
 	body, err := ioutil.ReadAll(userDetailsResponse.Body)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error reading user details response body")
 		return nil, err
 	}
 
@@ -135,8 +135,8 @@ func (service *NotificationService) getUserDetails(ctx context.Context, userID s
 	var userDetails UserDetails
 	err = json.Unmarshal(body, &userDetails)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		fmt.Println("Error unmarshaling JSON:", err)
+		span.SetStatus(codes.Error, "Error unmarshalling JSON")
+		fmt.Println("Error unmarshalling JSON:", err)
 		return nil, err
 	}
 
@@ -170,7 +170,7 @@ func (service *NotificationService) sendValidationMail(ctx context.Context, Desc
 	client := gomail.NewDialer(smtpServer, smtpServerPort, smtpEmail, smtpPassword)
 
 	if err := client.DialAndSend(m); err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Failed to send verification mail")
 		log.Fatalf("Failed to send verification mail because of: %s", err)
 		return err
 	}

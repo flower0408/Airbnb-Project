@@ -28,6 +28,7 @@ func (a *AuthRedisCache) PostCacheData(ctx context.Context, key string, value st
 
 	result := a.client.Set(key, value, 10*time.Minute)
 	if result.Err() != nil {
+		span.SetStatus(codes.Error, "Error posting cached value")
 		log.Printf("redis set error: %s", result.Err())
 		return result.Err()
 	}
@@ -42,7 +43,7 @@ func (a *AuthRedisCache) GetCachedValue(ctx context.Context, key string) (string
 	result := a.client.Get(key)
 	token, err := result.Result()
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
+		span.SetStatus(codes.Error, "Error getting cached value")
 		log.Println(err)
 		return "", err
 	}
@@ -55,6 +56,7 @@ func (a *AuthRedisCache) DelCachedValue(ctx context.Context, key string) error {
 
 	result := a.client.Del(key)
 	if result.Err() != nil {
+		span.SetStatus(codes.Error, "Error deleting cached value")
 		log.Println(result.Err())
 		return result.Err()
 	}
