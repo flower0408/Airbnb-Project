@@ -41,22 +41,6 @@
           </div>
         </div>
         <div class="formbold-mb-5">
-          <label for="images" class="formbold-form-label"> Image </label>
-          <input
-            type="text"
-            name="images"
-            id="images"
-            class="formbold-form-input"
-            formControlName="images"
-            required
-            [ngClass]="{ 'is-invalid': submitted && f['images'].errors }"
-          />
-          <div *ngIf="submitted && f['images'].errors" class="invalid-feedback">
-            <div *ngIf="f['images'].errors['required']">Image is required.</div>
-            <div *ngIf="f['images'].errors['pattern']">Image can only contain letters, numbers, spaces, commas, quotes, and hyphens.</div>
-          </div>
-        </div>
-        <div class="formbold-mb-5">
             <label for="benefits" class="formbold-form-label"> Benefits </label>
             <input
               type="text"

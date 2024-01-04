@@ -49,7 +49,6 @@ export class CreateAccommodationComponent implements OnInit{
    this.accommodationForm = this.fb.group({
      name: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(35), Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,35}$/)]],
      description: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(200), Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,200}$/)]],
-     images: ['', [Validators.required,Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,200}$/)]],
      benefits: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100), Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,100}$/)]],
      Minguest: ['', [Validators.required, Validators.min(1)]],
      Maxguest: ['', [Validators.required,Validators.min(1), MaxGuestValidator(/*this.accommodationForm.get('Minguest')*/)]],
@@ -74,7 +73,6 @@ export class CreateAccommodationComponent implements OnInit{
         id: '',
         name: formValues.name,
         description: formValues.description,
-        images: formValues.images,
         location: {
           country: formValues.country,
           city: formValues.city,

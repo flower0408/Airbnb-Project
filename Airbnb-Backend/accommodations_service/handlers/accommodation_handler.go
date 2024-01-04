@@ -1281,7 +1281,6 @@ func (e StatusError) Error() string {
 func validateAccommodation(accommodation *data.Accommodation) *ValidationError {
 	nameRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,35}$`)
 	descriptionRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,200}$`)
-	imagesRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,200}$`)
 	countryRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,35}$`)
 	cityRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,35}$`)
 	streetRegex := regexp.MustCompile(`^[A-Z][a-zA-Z0-9\s,'-]{2,35}$`)
@@ -1299,13 +1298,6 @@ func validateAccommodation(accommodation *data.Accommodation) *ValidationError {
 	}
 	if !descriptionRegex.MatchString(accommodation.Description) {
 		return &ValidationError{Message: "Invalid 'Description' format. It must be 3-200 characters long and contain only letters, numbers, spaces, commas, apostrophes, and hyphens"}
-	}
-
-	if accommodation.Images == "" {
-		return &ValidationError{Message: "Images cannot be empty"}
-	}
-	if !imagesRegex.MatchString(accommodation.Images) {
-		return &ValidationError{Message: "Invalid 'Images' format. It must be 3-200 characters long and contain only letters, numbers, spaces, commas, apostrophes, and hyphens"}
 	}
 
 	if accommodation.Benefits == "" {
