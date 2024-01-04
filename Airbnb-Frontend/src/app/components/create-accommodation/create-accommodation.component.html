@@ -240,13 +240,16 @@
           </div>
         </div>
 
+        <label class="formbold-form-label formbold-form-label-2" style="margin-bottom: 25px;">
+          Upload image
+        </label>
         <input type="file" (change)="onFileChange($event)" multiple />
-        <p>Images:</p>
+        <p style="margin-top: 20px;">Images:</p>
         <div *ngFor="let file of imageFiles">
             {{ file.name }}
         </div>
 
-        <div>
+        <div style="margin-top: 45px;">
           <button type="submit" class="formbold-btn">Create accommodation</button>
         </div>
       </form>

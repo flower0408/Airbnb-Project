@@ -62,8 +62,9 @@ func main() {
 	//// NoSQL: Initialize File Storage store
 	fileStorage, err := storage.New(storeLogger)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Fatalf("Error initializing FileStorage: %v", err)
 	}
+
 	// Close connection to HDFS on shutdown
 	defer fileStorage.Close()
 
@@ -97,8 +98,10 @@ func main() {
 	getAccommodationId.HandleFunc("/{id}", accommodationHandler.GetByID)
 	getAccommodationsByOwner := router.Methods(http.MethodGet).Subrouter()
 	getAccommodationsByOwner.HandleFunc("/owner/{ownerID}", accommodationHandler.GetAccommodationsByOwner)
+	getImagesUrls := router.Methods(http.MethodGet).Subrouter()
+	getImagesUrls.HandleFunc("/getImagesUrls/{folderName}", accommodationHandler.GetImageURLS)
 	getImages := router.Methods(http.MethodGet).Subrouter()
-	getImages.HandleFunc("/getImages/{folderName}", accommodationHandler.GetImageURLS)
+	getImages.HandleFunc("/getImages/{folderName}/{imageName}", accommodationHandler.GetImageContent)
 	postAccommodation := router.Methods(http.MethodPost).Subrouter()
 	postAccommodation.HandleFunc("/", accommodationHandler.CreateAccommodation)
 	postAccommodation.Use(accommodationHandler.MiddlewareAccommodationDeserialization)

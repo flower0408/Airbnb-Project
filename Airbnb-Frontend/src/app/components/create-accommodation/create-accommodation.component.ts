@@ -125,7 +125,7 @@ export class CreateAccommodationComponent implements OnInit{
             () => {
               this.openSnackBar("Accommodation created successfully!", "");
               console.log('Appointment created successfully!');
-              // this.router.navigate(['/Main-Page']);
+              this.router.navigate(['/Main-Page']);
             },
             (error) => {
               this.openSnackBar("Error creating accommodation!", "");
@@ -180,7 +180,6 @@ export class CreateAccommodationComponent implements OnInit{
     this.accommodationService.uploadImages(this.responseId, formData).subscribe(
       () => {
         console.log('Images uploaded successfully!');
-        this.openSnackBar("Images uploaded successfully!", "");
       },
       (error) => {
         console.error('Error uploading images:', error);

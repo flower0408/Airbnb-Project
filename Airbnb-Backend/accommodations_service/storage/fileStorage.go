@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"github.com/colinmarc/hdfs/v2"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -109,15 +110,15 @@ func (fs *FileStorage) WalkDirectories() []string {
 
 func (fs *FileStorage) GetImageURLS(folderName string) ([]string, error) {
 	folderPath := path.Join(hdfsRoot, folderName)
-	var imageURLs []string
+	var imageNames []string
 
 	callbackFunc := func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() {
-			imageURL := path.Join(folderPath, info.Name())
-			imageURLs = append(imageURLs, imageURL)
+			imageName := path.Base(filePath)
+			imageNames = append(imageNames, imageName)
 		}
 		return nil
 	}
@@ -127,5 +128,22 @@ func (fs *FileStorage) GetImageURLS(folderName string) ([]string, error) {
 		return nil, err
 	}
 
-	return imageURLs, nil
+	return imageNames, nil
+}
+
+func (fs *FileStorage) GetImageContent(imagePath string) ([]byte, error) {
+	fullPath := path.Join(hdfsRoot, "/", imagePath)
+
+	file, err := fs.client.Open(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("error opening file: %v", err)
+	}
+	defer file.Close()
+
+	imageData, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("error reading file: %v", err)
+	}
+
+	return imageData, nil
 }

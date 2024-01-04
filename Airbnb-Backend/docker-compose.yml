@@ -110,7 +110,7 @@ services:
       NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT}
       SECRET_KEY: ${SECRET_KEY}
       JAEGER_ADDRESS: ${JAEGER_ADDRESS}
-      HDFS_URI: namenode:9000
+      HDFS_URI: namenode:${HDFS_PORT}
     volumes:
       - ./files:/usr/bin/files
     depends_on:
@@ -122,11 +122,6 @@ services:
         condition: service_healthy
       datanode3:
         condition: service_healthy
-    extra_hosts:
-      - "namenode:172.18.0.4"
-      - "namenode:172.18.0.5"
-      - "namenode:172.18.0.2"
-      - "namenode:172.18.0.3"
     networks:
       - network
 
@@ -279,13 +274,15 @@ services:
     container_name: namenode
     ports:
       - 9870:9870
-      - 9000:9000
+      - ${HDFS_PORT}:${HDFS_PORT}
     volumes:
       - hadoop_namenode:/hadoop/dfs/name
     environment:
       - CLUSTER_NAME=test
     env_file:
       - ./hdfs.env
+    networks:
+      - network
 
   datanode1:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
@@ -296,6 +293,8 @@ services:
       SERVICE_PRECONDITION: "namenode:9870"
     env_file:
       - ./hdfs.env
+    networks:
+      - network
 
   datanode2:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
@@ -306,6 +305,8 @@ services:
       SERVICE_PRECONDITION: "namenode:9870"
     env_file:
       - ./hdfs.env
+    networks:
+      - network
 
   datanode3:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
@@ -316,6 +317,8 @@ services:
       SERVICE_PRECONDITION: "namenode:9870"
     env_file:
       - ./hdfs.env
+    networks:
+      - network
 
 volumes:
   # Volume na koji se povezuje reservations_db baza podataka

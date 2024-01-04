@@ -79,4 +79,13 @@ export class AccommodationService {
   uploadImages(folderName: string, formData: FormData): Observable<any> {
     return this.http.post<any>(`${environment.baseApiUrl}/${this.url}/upload/${folderName}`, formData);
   }
+
+  getImagesUrls(folderName: string): Observable<any> {
+    return this.http.get<any>(`${environment.baseApiUrl}/${this.url}/getImagesUrls/${folderName}`);
+  }
+
+  getImages(folderName: string, imageName: string): Observable<any> {
+    return this.http.get(`${environment.baseApiUrl}/${this.url}/getImages/${folderName}/${imageName}`, { responseType: 'blob' });
+  }
+  
 }

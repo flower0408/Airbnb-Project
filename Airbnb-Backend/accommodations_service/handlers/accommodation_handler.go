@@ -21,9 +21,12 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -1191,6 +1194,33 @@ func (s *AccommodationHandler) GetImageURLS(rw http.ResponseWriter, h *http.Requ
 
 	// Return the list of image URLs as JSON
 	json.NewEncoder(rw).Encode(imageURLs)
+}
+
+func (s *AccommodationHandler) GetImageContent(rw http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	folderName := vars["folderName"]
+	imageName := vars["imageName"]
+
+	imagePath := path.Join(folderName, imageName)
+	imagePath = strings.TrimPrefix(imagePath, "/") // Ensure there is no leading slash
+
+	imageContent, err := s.storage.GetImageContent(imagePath)
+	if err != nil {
+		http.Error(rw, "Error retrieving image content", http.StatusInternalServerError)
+		http.Error(rw, imagePath, http.StatusInternalServerError)
+		return
+	}
+
+	imageType := mime.TypeByExtension(filepath.Ext(imagePath))
+	if imageType == "" {
+		http.Error(rw, "Error retrieving image type", http.StatusInternalServerError)
+		http.Error(rw, imagePath, http.StatusInternalServerError)
+		return
+	}
+
+	rw.Header().Set("Content-Type", imageType)
+	rw.WriteHeader(http.StatusOK)
+	rw.Write(imageContent)
 }
 
 func (s *AccommodationHandler) UploadImages(rw http.ResponseWriter, h *http.Request) {
