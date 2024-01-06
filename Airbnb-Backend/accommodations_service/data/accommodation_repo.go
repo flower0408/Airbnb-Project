@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
@@ -11,9 +12,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -23,6 +27,11 @@ type AccommodationRepo struct {
 	client *http.Client
 	tracer trace.Tracer
 }
+
+var (
+	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
+	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
+)
 
 func New(ctx context.Context, logger *log.Logger, tracer trace.Tracer) (*AccommodationRepo, error) {
 	dburi := fmt.Sprintf("mongodb://%s:%s/", os.Getenv("ACCOMMODATIONS_DB_HOST"), os.Getenv("ACCOMMODATIONS_DB_PORT"))
@@ -369,6 +378,122 @@ func (rr *AccommodationRepo) HasUserRatedAccommodation(ctx context.Context, user
 	}
 
 	return count > 0, nil
+}
+
+func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params FilterParams) ([]*Accommodation, error) {
+	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.FilterAccommodations")
+	defer span.End()
+
+	var filteredAccommodations []*Accommodation
+
+	if params.MinPrice > 0 || params.MaxPrice > 0 {
+		var reservationServiceEndpoint string
+
+		if params.MinPrice > 0 {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(params.MinPrice))
+		}
+
+		if params.MaxPrice > 0 {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(params.MaxPrice))
+		}
+
+		if params.MinPrice > 0 && params.MaxPrice > 0 {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s&maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(params.MinPrice), strconv.Itoa(params.MaxPrice))
+		}
+
+		reservationServiceRequest, _ := http.NewRequest("GET", reservationServiceEndpoint, nil)
+		responseAppointments, err := http.DefaultClient.Do(reservationServiceRequest)
+		if err != nil {
+			span.SetStatus(codes.Error, "Error fetching reservation service")
+			return nil, fmt.Errorf("Error fetching reservation service: %v", err)
+		}
+		defer responseAppointments.Body.Close()
+
+		var accommodationIds []struct {
+			AccommodationID string `json:"accommodationId"`
+		}
+
+		if responseAppointments.StatusCode == http.StatusOK {
+			if err := json.NewDecoder(responseAppointments.Body).Decode(&accommodationIds); err != nil {
+				return nil, fmt.Errorf("Error decoding appointment data: %v", err)
+			}
+		} else if responseAppointments.StatusCode == http.StatusNoContent {
+			accommodationIds = nil
+		} else {
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, responseAppointments.Body)
+			errorMessage := fmt.Sprintf("ReservationServiceError: %s", buf.String())
+			return nil, fmt.Errorf(errorMessage)
+		}
+
+		if accommodationIds != nil {
+			var accommodationIDsFound []string
+			for _, responseAccommodation := range accommodationIds {
+				accommodationIDsFound = append(accommodationIDsFound, responseAccommodation.AccommodationID)
+			}
+
+			var accommodations []*Accommodation
+			for _, id := range accommodationIDsFound {
+				objectID, err := primitive.ObjectIDFromHex(id)
+				if err != nil {
+					log.Printf("Invalid ObjectID (%s): %v\n", id, err)
+					span.SetStatus(codes.Error, "Invalid ObjectID")
+					continue
+				}
+
+				accommodation, err := rr.GetByID(ctx, objectID)
+				if err != nil {
+					log.Printf("Accommodation not found for ObjectID (%s)\n", id)
+					span.SetStatus(codes.Error, "Accommodation not found for ObjectID")
+					continue
+				}
+
+				accommodations = append(accommodations, accommodation)
+				if len(params.DesiredBenefits) <= 0 {
+					filteredAccommodations = append(filteredAccommodations, accommodation)
+				}
+			}
+
+			if len(params.DesiredBenefits) > 0 {
+				for _, accommodation := range accommodations {
+					existingBenefits := strings.Split(accommodation.Benefits, ", ")
+					for _, desiredBenefit := range params.DesiredBenefits {
+						for _, existingBenefit := range existingBenefits {
+							if existingBenefit == desiredBenefit {
+								filteredAccommodations = append(filteredAccommodations, accommodation)
+								break
+							}
+						}
+					}
+				}
+				return filteredAccommodations, nil
+			}
+		}
+		return filteredAccommodations, nil
+	}
+
+	accommodations, err := rr.GetAll(ctx)
+	if err != nil {
+		rr.logger.Print("Database exception: ", err)
+		span.SetStatus(codes.Error, "Error getting all accommodations")
+	}
+
+	if len(params.DesiredBenefits) > 0 {
+		for _, accommodation := range accommodations {
+			existingBenefits := strings.Split(accommodation.Benefits, ", ")
+			for _, desiredBenefit := range params.DesiredBenefits {
+				for _, existingBenefit := range existingBenefits {
+					if existingBenefit == desiredBenefit {
+						filteredAccommodations = append(filteredAccommodations, accommodation)
+						break
+					}
+				}
+			}
+		}
+		return filteredAccommodations, nil
+	}
+
+	return filteredAccommodations, nil
 }
 
 func (rr *AccommodationRepo) filterIDs(ctx context.Context, filter interface{}) ([]primitive.ObjectID, error) {

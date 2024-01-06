@@ -137,6 +137,9 @@ func main() {
 	deleteAppointment := router.Methods(http.MethodDelete).Subrouter()
 	deleteAppointment.HandleFunc("/deleteAppointments/{id}", appointmentHandler.DeleteAppointmentsByAccommodationIDs)
 
+	filterAppointments := router.Methods(http.MethodGet).Subrouter()
+	filterAppointments.HandleFunc("/filterByPrice", appointmentHandler.FilterAppointmentsByPrice)
+
 	//Initialize the server
 	server := http.Server{
 		Addr:         ":" + port,

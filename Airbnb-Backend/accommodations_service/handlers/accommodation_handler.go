@@ -1272,6 +1272,33 @@ func validateRate(rate *data.Rate) *ValidationError {
 	return nil
 }
 
+func (s *AccommodationHandler) FilterAccommodationsHandler(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.FilterAccommodationsHandler")
+	defer span.End()
+
+	var filterParams data.FilterParams
+	if err := json.NewDecoder(h.Body).Decode(&filterParams); err != nil {
+		s.logger.Println("Error decoding filter parameters: ", err)
+		span.SetStatus(codes.Error, "Error decoding filter parameters")
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	accommodations, err := s.repo.FilterAccommodations(ctx, filterParams)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		span.SetStatus(codes.Error, "Error filtering accommodations")
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(accommodations)
+
+	span.SetStatus(codes.Ok, "")
+	rw.WriteHeader(http.StatusOK)
+}
+
 func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
 		accommodations := &data.Accommodation{}

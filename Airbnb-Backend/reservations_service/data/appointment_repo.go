@@ -262,6 +262,68 @@ func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, app
 	return nil
 }
 
+func (rr *AppointmentRepo) FilterAppointmentsByPrice(ctx context.Context, minPrice, maxPrice int) (Appointments, error) {
+	ctx, span := rr.tracer.Start(ctx, "AppointmentRepository.FilterAppointmentsByPrice")
+	defer span.End()
+
+	appointmentsCollection := rr.getCollection()
+
+	var filter bson.M
+
+	if minPrice != -1 && maxPrice != -1 {
+		filter = bson.M{
+			"$or": []bson.M{
+				{"pricePerGuest": bson.M{"$gte": minPrice, "$lte": maxPrice}},
+				{"pricePerAccommodation": bson.M{"$gte": minPrice, "$lte": maxPrice}},
+			},
+		}
+	} else if maxPrice == -1 {
+		filter = bson.M{
+			"$or": []bson.M{
+				{"pricePerGuest": bson.M{"$gte": minPrice}},
+				{"pricePerAccommodation": bson.M{"$gte": minPrice}},
+			},
+		}
+	} else if minPrice == -1 {
+		filter = bson.M{
+			"$or": []bson.M{
+				{"pricePerGuest": bson.M{"$lte": maxPrice}},
+				{"pricePerAccommodation": bson.M{"$lte": maxPrice}},
+			},
+		}
+	} else {
+		return nil, nil
+	}
+
+	cursor, err := appointmentsCollection.Find(ctx, filter)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error getting appointments by price")
+		rr.logger.Printf("Error querying MongoDB: %v\n", err)
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var appointments Appointments
+	for cursor.Next(ctx) {
+		var appointment Appointment
+		if err := cursor.Decode(&appointment); err != nil {
+			span.SetStatus(codes.Error, "Error decoding")
+			rr.logger.Printf("Error decoding result: %v\n", err)
+			return nil, err
+		}
+
+		appointments = append(appointments, &appointment)
+	}
+
+	if err := cursor.Err(); err != nil {
+		span.SetStatus(codes.Error, "Error getting appointments by price")
+		rr.logger.Printf("Cursor error: %v\n", err)
+		return nil, err
+	}
+
+	return appointments, nil
+}
+
 func (rr *AppointmentRepo) DeleteAppointmentsByAccommodationID(ctx context.Context, accommodationID string) error {
 	ctx, span := rr.tracer.Start(ctx, "AppointmentRepository.DeleteAppointmentsByAccommodationID")
 	defer span.End()
