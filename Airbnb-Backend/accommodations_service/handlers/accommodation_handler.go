@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"accommodations_service/authorization"
+	"accommodations_service/cache"
 	"accommodations_service/data"
 	"accommodations_service/errors"
 	"accommodations_service/storage"
@@ -54,13 +55,14 @@ type AccommodationHandler struct {
 	cb2     *gobreaker.CircuitBreaker
 	tracer  trace.Tracer
 	storage *storage.FileStorage
+	cache   *cache.ImageCache
 }
 
 type ValidationError struct {
 	Message string `json:"message"`
 }
 
-func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo, t trace.Tracer, s *storage.FileStorage) *AccommodationHandler {
+func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo, t trace.Tracer, s *storage.FileStorage, c *cache.ImageCache) *AccommodationHandler {
 	return &AccommodationHandler{
 		logger:  l,
 		repo:    r,
@@ -68,6 +70,7 @@ func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo, t trace.T
 		cb2:     CircuitBreaker("reservationService2"),
 		tracer:  t,
 		storage: s,
+		cache:   c,
 	}
 }
 
@@ -1185,11 +1188,25 @@ func (s *AccommodationHandler) GetImageURLS(rw http.ResponseWriter, h *http.Requ
 	vars := mux.Vars(h)
 	folderName := vars["folderName"]
 
-	imageURLs, err := s.storage.GetImageURLS(folderName)
+	// Check if the image urls is in the cache
+	imageURLs, err := s.cache.GetUrls(folderName)
+	if err == nil {
+		// Return the list of image URLs as JSON
+		json.NewEncoder(rw).Encode(imageURLs)
+		return
+	}
+
+	imageURLs, err = s.storage.GetImageURLS(folderName)
 	if err != nil {
 		s.logger.Println("Error getting image URLs:", err)
 		http.Error(rw, "Error getting image URLs", http.StatusInternalServerError)
 		return
+	}
+
+	// Store the image url in the cache for future requests
+	err = s.cache.PostUrls(folderName, imageURLs)
+	if err != nil {
+		log.Println("Failed to store image URLs in cache:", err)
 	}
 
 	// Return the list of image URLs as JSON
@@ -1204,18 +1221,34 @@ func (s *AccommodationHandler) GetImageContent(rw http.ResponseWriter, req *http
 	imagePath := path.Join(folderName, imageName)
 	imagePath = strings.TrimPrefix(imagePath, "/") // Ensure there is no leading slash
 
-	imageContent, err := s.storage.GetImageContent(imagePath)
+	imageType := mime.TypeByExtension(filepath.Ext(imagePath))
+	if imageType == "" {
+		http.Error(rw, "Error retrieving image type", http.StatusInternalServerError)
+		http.Error(rw, imagePath, http.StatusInternalServerError)
+		return
+	}
+
+	// Check if the image is in the cache
+	imageContent, err := s.cache.Get(folderName, imageName)
+	if err == nil {
+		// Image found in cache, serve it
+		rw.Header().Set("Content-Type", imageType)
+		rw.WriteHeader(http.StatusOK)
+		rw.Write(imageContent)
+		return
+	}
+
+	imageContent, err = s.storage.GetImageContent(imagePath)
 	if err != nil {
 		http.Error(rw, "Error retrieving image content", http.StatusInternalServerError)
 		http.Error(rw, imagePath, http.StatusInternalServerError)
 		return
 	}
 
-	imageType := mime.TypeByExtension(filepath.Ext(imagePath))
-	if imageType == "" {
-		http.Error(rw, "Error retrieving image type", http.StatusInternalServerError)
-		http.Error(rw, imagePath, http.StatusInternalServerError)
-		return
+	// Store the image in the cache for future requests
+	err = s.cache.Post(folderName, imageName, imageContent)
+	if err != nil {
+		log.Println("Failed to store image in cache:", err)
 	}
 
 	rw.Header().Set("Content-Type", imageType)

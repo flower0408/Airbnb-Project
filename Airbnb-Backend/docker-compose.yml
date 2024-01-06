@@ -111,6 +111,8 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       JAEGER_ADDRESS: ${JAEGER_ADDRESS}
       HDFS_URI: namenode:${HDFS_PORT}
+      IMAGE_CACHE_HOST: ${IMAGE_CACHE_HOST}
+      IMAGE_CACHE_PORT: ${IMAGE_CACHE_PORT}
     volumes:
       - ./files:/usr/bin/files
     depends_on:
@@ -269,6 +271,19 @@ services:
     networks:
       - network
 
+  image_cache:
+    image: redis
+    restart: always
+    environment:
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL,CONFIG
+    ports:
+      - ${IMAGE_CACHE_INPUT_OUTPUT_PORT}
+    command: redis-server --save 20 1 --loglevel warning
+    networks:
+      - network
+    volumes:
+      - image_cache:/data
+
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: namenode
@@ -324,6 +339,8 @@ volumes:
   # Volume na koji se povezuje reservations_db baza podataka
   reservations_db_store:
   auth_cache:
+    driver: local
+  image_cache:
     driver: local
   hadoop_namenode:
   hadoop_datanode1:

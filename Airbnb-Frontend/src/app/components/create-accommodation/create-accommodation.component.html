@@ -227,7 +227,7 @@
         <label class="formbold-form-label formbold-form-label-2" style="margin-bottom: 25px;">
           Upload image
         </label>
-        <input type="file" (change)="onFileChange($event)" multiple />
+        <input type="file" (change)="onFileChange($event)" multiple accept="image/jpeg, image/jpg, image/png"/>
         <p style="margin-top: 20px;">Images:</p>
         <div *ngFor="let file of imageFiles">
             {{ file.name }}

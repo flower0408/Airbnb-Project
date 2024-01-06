@@ -1,6 +1,7 @@
 package main
 
 import (
+	"accommodations_service/cache"
 	"accommodations_service/data"
 	"accommodations_service/handlers"
 	"accommodations_service/storage"
@@ -51,7 +52,7 @@ func main() {
 	logger := log.New(os.Stdout, "[acc-api] ", log.LstdFlags)
 	storeLogger := log.New(os.Stdout, "[acc-store] ", log.LstdFlags)
 
-	// NoSQL: Initialize Product Repository store
+	// NoSQL: Initialize Repository store
 	store, err := data.New(timeoutContext, storeLogger, tracer)
 	if err != nil {
 		logger.Fatal(err)
@@ -71,7 +72,14 @@ func main() {
 	//// Create directory tree on HDFS
 	_ = fileStorage.CreateDirectoriesStart()
 
-	accommodationHandler := handlers.NewAccommodationHandler(logger, store, tracer, fileStorage)
+	// NoSQL: Initialize Cache store
+	imageCache, err := cache.New(storeLogger)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	imageCache.Ping()
+
+	accommodationHandler := handlers.NewAccommodationHandler(logger, store, tracer, fileStorage, imageCache)
 
 	//Initialize the router and add a middleware for all the requests
 	router := mux.NewRouter()

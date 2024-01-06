@@ -85,7 +85,8 @@ export class CreateAccommodationComponent implements OnInit{
         ownerId: '',
       };
 
-      this.accommodationService.createAccommodation(newAccommodation).subscribe(
+      if (this.imageFiles.length !== 0) {
+        this.accommodationService.createAccommodation(newAccommodation).subscribe(
         (id:any) => {
           this.responseId = id.id;
           this.uploadImages();
@@ -150,6 +151,11 @@ export class CreateAccommodationComponent implements OnInit{
           }
         }
       );
+      }else{
+        this.openSnackBar("No images selected for upload!", "");
+        console.warn('No images selected for upload.');
+      }
+
     }
   }
 
