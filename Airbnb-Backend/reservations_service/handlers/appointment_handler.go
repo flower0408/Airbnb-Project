@@ -292,7 +292,7 @@ func (r *AppointmentHandler) FilterAppointmentsByPrice(rw http.ResponseWriter, h
 		}
 	}
 
-	if minPriceStr != "" {
+	if maxPriceStr != "" {
 		maxPrice, err = strconv.ParseFloat(maxPriceStr, 64)
 		if err != nil {
 			span.SetStatus(codes.Error, "Invalid maxPrice parameter")
@@ -353,20 +353,6 @@ func (r *AppointmentHandler) FilterAppointmentsByPrice(rw http.ResponseWriter, h
 	}
 
 	if minPriceStr != "" && maxPriceStr != "" {
-		if minPrice < 0 || maxPrice < 0 {
-			span.SetStatus(codes.Error, "minPrice and maxPrice must be non-negative")
-			http.Error(rw, "minPrice and maxPrice must be non-negative", http.StatusBadRequest)
-			rw.Write([]byte("minPrice and maxPrice must be non-negative"))
-			return
-		}
-
-		if minPrice > maxPrice {
-			span.SetStatus(codes.Error, "minPrice must be less than or equal to maxPrice")
-			http.Error(rw, "minPrice must be less than or equal to maxPrice", http.StatusBadRequest)
-			rw.Write([]byte("minPrice must be less than or equal to maxPrice"))
-			return
-		}
-
 		appointments, err := r.appointmentRepo.FilterAppointmentsByPrice(ctx, int(minPrice), int(maxPrice))
 		if err != nil {
 			span.SetStatus(codes.Error, "Unable to retrieve filtered appointments")

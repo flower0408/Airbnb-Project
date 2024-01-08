@@ -37,17 +37,9 @@ type Rate struct {
 
 type FilterParams struct {
 	DesiredBenefits []string `json:"desiredBenefits"`
-	MinPrice        int      `json:"minPrice"`
-	MaxPrice        int      `json:"maxPrice"`
+	MinPrice        string   `json:"minPrice"`
+	MaxPrice        string   `json:"maxPrice"`
 }
-
-/*
-type FilterParams struct {
-	DesiredBenefits []string `json:"desiredBenefits"`
-	MinPrice        int      `json:"minPrice,omitempty"`
-	MaxPrice        int      `json:"maxPrice,omitempty"`
-}
-*/
 
 func (o *Accommodation) ToJSON(w io.Writer) error {
 	e := json.NewEncoder(w)

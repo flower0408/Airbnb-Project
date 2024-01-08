@@ -380,25 +380,25 @@ func (rr *AccommodationRepo) HasUserRatedAccommodation(ctx context.Context, user
 	return count > 0, nil
 }
 
-func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params FilterParams) ([]*Accommodation, error) {
+func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params FilterParams, minPrice int, maxPrice int) ([]*Accommodation, error) {
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.FilterAccommodations")
 	defer span.End()
 
 	var filteredAccommodations []*Accommodation
 
-	if params.MinPrice > 0 || params.MaxPrice > 0 {
+	if minPrice > 0 || maxPrice > 0 {
 		var reservationServiceEndpoint string
 
-		if params.MinPrice > 0 {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(params.MinPrice))
+		if minPrice > 0 {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice))
 		}
 
-		if params.MaxPrice > 0 {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(params.MaxPrice))
+		if maxPrice > 0 {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(maxPrice))
 		}
 
-		if params.MinPrice > 0 && params.MaxPrice > 0 {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s&maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(params.MinPrice), strconv.Itoa(params.MaxPrice))
+		if minPrice > 0 && maxPrice > 0 {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s&maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice), strconv.Itoa(maxPrice))
 		}
 
 		reservationServiceRequest, _ := http.NewRequest("GET", reservationServiceEndpoint, nil)
@@ -433,6 +433,7 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params Fi
 			}
 
 			var accommodations []*Accommodation
+			addedAccommodations := make(map[string]bool)
 			for _, id := range accommodationIDsFound {
 				objectID, err := primitive.ObjectIDFromHex(id)
 				if err != nil {
@@ -441,16 +442,20 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params Fi
 					continue
 				}
 
-				accommodation, err := rr.GetByID(ctx, objectID)
-				if err != nil {
-					log.Printf("Accommodation not found for ObjectID (%s)\n", id)
-					span.SetStatus(codes.Error, "Accommodation not found for ObjectID")
-					continue
-				}
+				if _, ok := addedAccommodations[id]; !ok {
+					accommodation, err := rr.GetByID(ctx, objectID)
+					if err != nil {
+						log.Printf("Accommodation not found for ObjectID (%s)\n", id)
+						span.SetStatus(codes.Error, "Accommodation not found for ObjectID")
+						continue
+					}
 
-				accommodations = append(accommodations, accommodation)
-				if len(params.DesiredBenefits) <= 0 {
-					filteredAccommodations = append(filteredAccommodations, accommodation)
+					accommodations = append(accommodations, accommodation)
+					if len(params.DesiredBenefits) <= 0 {
+						filteredAccommodations = append(filteredAccommodations, accommodation)
+					}
+
+					addedAccommodations[id] = true
 				}
 			}
 
@@ -478,14 +483,20 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params Fi
 		span.SetStatus(codes.Error, "Error getting all accommodations")
 	}
 
+	addedAccommodations2 := make(map[string]bool)
+
 	if len(params.DesiredBenefits) > 0 {
 		for _, accommodation := range accommodations {
 			existingBenefits := strings.Split(accommodation.Benefits, ", ")
+
 			for _, desiredBenefit := range params.DesiredBenefits {
 				for _, existingBenefit := range existingBenefits {
 					if existingBenefit == desiredBenefit {
-						filteredAccommodations = append(filteredAccommodations, accommodation)
-						break
+						if _, exists := addedAccommodations2[accommodation.ID.Hex()]; !exists {
+							filteredAccommodations = append(filteredAccommodations, accommodation)
+							addedAccommodations2[accommodation.ID.Hex()] = true
+							break
+						}
 					}
 				}
 			}

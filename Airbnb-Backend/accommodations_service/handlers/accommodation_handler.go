@@ -1277,6 +1277,7 @@ func (s *AccommodationHandler) FilterAccommodationsHandler(rw http.ResponseWrite
 	defer span.End()
 
 	var filterParams data.FilterParams
+
 	if err := json.NewDecoder(h.Body).Decode(&filterParams); err != nil {
 		s.logger.Println("Error decoding filter parameters: ", err)
 		span.SetStatus(codes.Error, "Error decoding filter parameters")
@@ -1284,7 +1285,63 @@ func (s *AccommodationHandler) FilterAccommodationsHandler(rw http.ResponseWrite
 		return
 	}
 
-	accommodations, err := s.repo.FilterAccommodations(ctx, filterParams)
+	var minPrice int
+	var maxPrice int
+	var err error
+
+	if filterParams.MinPrice != "" {
+		minPrice, err = strconv.Atoi(filterParams.MinPrice)
+		if err != nil {
+			errorMessage := "minPrice must be a valid integer"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+		if minPrice < 0 {
+			errorMessage := "minPrice must be non-negative"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			//rw.WriteHeader(http.StatusBadRequest)
+			//rw.Write([]byte(errorMessage))
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+	}
+
+	if filterParams.MaxPrice != "" {
+		maxPrice, err = strconv.Atoi(filterParams.MaxPrice)
+		if err != nil {
+			errorMessage := "maxPrice must be a valid integer"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+		if maxPrice < 0 {
+			errorMessage := "maxPrice must be non-negative"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			//rw.WriteHeader(http.StatusBadRequest)
+			//rw.Write([]byte(errorMessage))
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+	}
+
+	if filterParams.MinPrice != "" && filterParams.MaxPrice != "" {
+		if minPrice >= 0 && maxPrice >= 0 {
+			if minPrice > maxPrice {
+				errorMessage := "minPrice must be less than or equal to maxPrice"
+				span.SetStatus(codes.Error, errorMessage)
+				http.Error(rw, errorMessage, http.StatusBadRequest)
+				fmt.Println("Error:", errorMessage)
+				return
+			}
+		}
+	}
+
+	accommodations, err := s.repo.FilterAccommodations(ctx, filterParams, minPrice, maxPrice)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		span.SetStatus(codes.Error, "Error filtering accommodations")
