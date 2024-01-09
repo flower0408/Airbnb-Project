@@ -1287,6 +1287,8 @@ func (s *AccommodationHandler) FilterAccommodationsHandler(rw http.ResponseWrite
 
 	var minPrice int
 	var maxPrice int
+	var minPriceBool bool
+	var maxPriceBool bool
 	var err error
 
 	if filterParams.MinPrice != "" {
@@ -1307,6 +1309,7 @@ func (s *AccommodationHandler) FilterAccommodationsHandler(rw http.ResponseWrite
 			fmt.Println("Error:", errorMessage)
 			return
 		}
+		minPriceBool = true
 	}
 
 	if filterParams.MaxPrice != "" {
@@ -1327,6 +1330,7 @@ func (s *AccommodationHandler) FilterAccommodationsHandler(rw http.ResponseWrite
 			fmt.Println("Error:", errorMessage)
 			return
 		}
+		maxPriceBool = true
 	}
 
 	if filterParams.MinPrice != "" && filterParams.MaxPrice != "" {
@@ -1341,7 +1345,7 @@ func (s *AccommodationHandler) FilterAccommodationsHandler(rw http.ResponseWrite
 		}
 	}
 
-	accommodations, err := s.repo.FilterAccommodations(ctx, filterParams, minPrice, maxPrice)
+	accommodations, err := s.repo.FilterAccommodations(ctx, filterParams, minPrice, maxPrice, minPriceBool, maxPriceBool)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		span.SetStatus(codes.Error, "Error filtering accommodations")

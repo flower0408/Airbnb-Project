@@ -44,6 +44,12 @@ export class MainPageComponent implements OnInit {
   locationFilter: string = '';
   minGuestsFilter: number | undefined;
   searchForm: FormGroup;
+  filterParams = {
+      desiredBenefits: [] as string[],
+      minPrice: '',
+      maxPrice: ''
+    };
+  newBenefit: string = '';
 
   startDateFilter = (date: Date | null): boolean => {
     if (!date) {
@@ -110,6 +116,43 @@ export class MainPageComponent implements OnInit {
       (error) => {
         console.error(error);
       }
+    );
+  }
+  addBenefit() {
+    if (this.newBenefit.trim() !== '') {
+      this.filterParams.desiredBenefits.push(this.newBenefit.trim());
+      this.newBenefit = '';
+    }
+  }
+
+  removeBenefit(benefit: string) {
+    const index = this.filterParams.desiredBenefits.indexOf(benefit);
+    if (index !== -1) {
+      this.filterParams.desiredBenefits.splice(index, 1);
+    }
+  }
+
+  filterAccommodations() {
+    if (this.filterParamsIsEmpty()) {
+       this.getAccommodations();
+    } else {
+      console.log(this.filterParams);
+      this.accommodationService.filterAccommodations(this.filterParams).subscribe(
+        (data) => {
+          this.accommodations = data;
+        },
+        (error) => {
+          console.error('Error fetching accommodations:', error);
+        }
+      );
+    }
+  }
+
+  filterParamsIsEmpty(): boolean {
+    return (
+      !this.filterParams.desiredBenefits.length &&
+      !this.filterParams.minPrice &&
+      !this.filterParams.maxPrice
     );
   }
 

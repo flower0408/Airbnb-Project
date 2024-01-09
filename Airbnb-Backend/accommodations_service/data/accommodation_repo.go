@@ -380,16 +380,20 @@ func (rr *AccommodationRepo) HasUserRatedAccommodation(ctx context.Context, user
 	return count > 0, nil
 }
 
-func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params FilterParams, minPrice int, maxPrice int) ([]*Accommodation, error) {
+func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params FilterParams, minPrice int, maxPrice int, minPriceBool bool, maxPriceBool bool) ([]*Accommodation, error) {
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.FilterAccommodations")
 	defer span.End()
 
 	var filteredAccommodations []*Accommodation
 
-	if minPrice > 0 || maxPrice > 0 {
+	if minPrice >= 0 || maxPrice >= 0 {
 		var reservationServiceEndpoint string
 
 		if minPrice > 0 {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice))
+		}
+
+		if minPrice == 0 && minPriceBool {
 			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice))
 		}
 
@@ -397,7 +401,15 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params Fi
 			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(maxPrice))
 		}
 
+		if maxPrice == 0 && maxPriceBool {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(maxPrice))
+		}
+
 		if minPrice > 0 && maxPrice > 0 {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s&maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice), strconv.Itoa(maxPrice))
+		}
+
+		if minPrice == 0 && maxPrice == 0 && minPriceBool && maxPriceBool {
 			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s&maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice), strconv.Itoa(maxPrice))
 		}
 
