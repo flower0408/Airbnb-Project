@@ -389,104 +389,96 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params Fi
 	if minPrice >= 0 || maxPrice >= 0 {
 		var reservationServiceEndpoint string
 
-		if minPrice > 0 {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice))
-		}
-
-		if minPrice == 0 && minPriceBool {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice))
-		}
-
-		if maxPrice > 0 {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(maxPrice))
-		}
-
-		if maxPrice == 0 && maxPriceBool {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(maxPrice))
-		}
-
 		if minPrice > 0 && maxPrice > 0 {
 			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s&maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice), strconv.Itoa(maxPrice))
-		}
-
-		if minPrice == 0 && maxPrice == 0 && minPriceBool && maxPriceBool {
+		} else if minPrice == 0 && maxPrice == 0 && minPriceBool && maxPriceBool {
 			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s&maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice), strconv.Itoa(maxPrice))
+		} else if maxPrice > 0 {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(maxPrice))
+		} else if maxPrice == 0 && maxPriceBool {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(maxPrice))
+		} else if minPrice > 0 {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice))
+		} else if minPrice == 0 && minPriceBool {
+			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice))
 		}
 
-		reservationServiceRequest, _ := http.NewRequest("GET", reservationServiceEndpoint, nil)
-		responseAppointments, err := http.DefaultClient.Do(reservationServiceRequest)
-		if err != nil {
-			span.SetStatus(codes.Error, "Error fetching reservation service")
-			return nil, fmt.Errorf("Error fetching reservation service: %v", err)
-		}
-		defer responseAppointments.Body.Close()
-
-		var accommodationIds []struct {
-			AccommodationID string `json:"accommodationId"`
-		}
-
-		if responseAppointments.StatusCode == http.StatusOK {
-			if err := json.NewDecoder(responseAppointments.Body).Decode(&accommodationIds); err != nil {
-				return nil, fmt.Errorf("Error decoding appointment data: %v", err)
+		if reservationServiceEndpoint != "" {
+			reservationServiceRequest, _ := http.NewRequest("GET", reservationServiceEndpoint, nil)
+			responseAppointments, err := http.DefaultClient.Do(reservationServiceRequest)
+			if err != nil {
+				span.SetStatus(codes.Error, "Error fetching reservation service")
+				return nil, fmt.Errorf("Error fetching reservation service: %v", err)
 			}
-		} else if responseAppointments.StatusCode == http.StatusNoContent {
-			accommodationIds = nil
-		} else {
-			buf := new(strings.Builder)
-			_, _ = io.Copy(buf, responseAppointments.Body)
-			errorMessage := fmt.Sprintf("ReservationServiceError: %s", buf.String())
-			return nil, fmt.Errorf(errorMessage)
-		}
+			defer responseAppointments.Body.Close()
 
-		if accommodationIds != nil {
-			var accommodationIDsFound []string
-			for _, responseAccommodation := range accommodationIds {
-				accommodationIDsFound = append(accommodationIDsFound, responseAccommodation.AccommodationID)
+			var accommodationIds []struct {
+				AccommodationID string `json:"accommodationId"`
 			}
 
-			var accommodations []*Accommodation
-			addedAccommodations := make(map[string]bool)
-			for _, id := range accommodationIDsFound {
-				objectID, err := primitive.ObjectIDFromHex(id)
-				if err != nil {
-					log.Printf("Invalid ObjectID (%s): %v\n", id, err)
-					span.SetStatus(codes.Error, "Invalid ObjectID")
-					continue
+			if responseAppointments.StatusCode == http.StatusOK {
+				if err := json.NewDecoder(responseAppointments.Body).Decode(&accommodationIds); err != nil {
+					return nil, fmt.Errorf("Error decoding appointment data: %v", err)
+				}
+			} else if responseAppointments.StatusCode == http.StatusNoContent {
+				accommodationIds = nil
+			} else {
+				buf := new(strings.Builder)
+				_, _ = io.Copy(buf, responseAppointments.Body)
+				errorMessage := fmt.Sprintf("ReservationServiceError: %s", buf.String())
+				return nil, fmt.Errorf(errorMessage)
+			}
+
+			if accommodationIds != nil {
+				var accommodationIDsFound []string
+				for _, responseAccommodation := range accommodationIds {
+					accommodationIDsFound = append(accommodationIDsFound, responseAccommodation.AccommodationID)
 				}
 
-				if _, ok := addedAccommodations[id]; !ok {
-					accommodation, err := rr.GetByID(ctx, objectID)
+				var accommodations []*Accommodation
+				addedAccommodations := make(map[string]bool)
+				for _, id := range accommodationIDsFound {
+					objectID, err := primitive.ObjectIDFromHex(id)
 					if err != nil {
-						log.Printf("Accommodation not found for ObjectID (%s)\n", id)
-						span.SetStatus(codes.Error, "Accommodation not found for ObjectID")
+						log.Printf("Invalid ObjectID (%s): %v\n", id, err)
+						span.SetStatus(codes.Error, "Invalid ObjectID")
 						continue
 					}
 
-					accommodations = append(accommodations, accommodation)
-					if len(params.DesiredBenefits) <= 0 {
-						filteredAccommodations = append(filteredAccommodations, accommodation)
+					if _, ok := addedAccommodations[id]; !ok {
+						accommodation, err := rr.GetByID(ctx, objectID)
+						if err != nil {
+							log.Printf("Accommodation not found for ObjectID (%s)\n", id)
+							span.SetStatus(codes.Error, "Accommodation not found for ObjectID")
+							continue
+						}
+
+						accommodations = append(accommodations, accommodation)
+						if len(params.DesiredBenefits) <= 0 {
+							filteredAccommodations = append(filteredAccommodations, accommodation)
+						}
+
+						addedAccommodations[id] = true
 					}
-
-					addedAccommodations[id] = true
 				}
-			}
 
-			if len(params.DesiredBenefits) > 0 {
-				for _, accommodation := range accommodations {
-					existingBenefits := strings.Split(accommodation.Benefits, ", ")
-					for _, desiredBenefit := range params.DesiredBenefits {
-						for _, existingBenefit := range existingBenefits {
-							if existingBenefit == desiredBenefit {
-								filteredAccommodations = append(filteredAccommodations, accommodation)
-								break
+				if len(params.DesiredBenefits) > 0 {
+					for _, accommodation := range accommodations {
+						existingBenefits := strings.Split(accommodation.Benefits, ", ")
+						for _, desiredBenefit := range params.DesiredBenefits {
+							for _, existingBenefit := range existingBenefits {
+								if existingBenefit == desiredBenefit {
+									filteredAccommodations = append(filteredAccommodations, accommodation)
+									break
+								}
 							}
 						}
 					}
+					return filteredAccommodations, nil
 				}
-				return filteredAccommodations, nil
 			}
+			return filteredAccommodations, nil
 		}
-		return filteredAccommodations, nil
 	}
 
 	accommodations, err := rr.GetAll(ctx)

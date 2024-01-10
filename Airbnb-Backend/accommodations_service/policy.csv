@@ -15,5 +15,6 @@ p, Guest, /getRatesByHost/*, GET
 p, Guest, /updateRate/*, PATCH
 p, Guest, /deleteRateForHost/*, DELETE
 p, Host, /delete_accommodations/*, DELETE
+p, Unauthenticated, /filterAccommodations, POST
 p, Host, /filterAccommodations, POST
 p, Guest, /filterAccommodations, POST
