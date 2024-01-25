@@ -3,6 +3,7 @@ package startup
 import (
 	"context"
 	"fmt"
+	"github.com/andjelabjekovic/logovi"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
@@ -70,6 +71,9 @@ func (server *Server) start(notificationHandler *handlers.NotificationHandler) {
 	router := mux.NewRouter()
 	router.Use(MiddlewareContentTypeSet)
 	notificationHandler.Init(router)
+
+	_, loggingMiddleware, _, _, _ := logovi.LogInit("logfile.log", "notification_service")
+	router.Use(loggingMiddleware)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", server.config.Port),

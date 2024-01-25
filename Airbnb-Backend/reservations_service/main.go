@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/andjelabjekovic/logovi"
 	"github.com/casbin/casbin"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
@@ -52,6 +53,9 @@ func main() {
 	//Initialize the router and add a middleware for all the requests
 	router := mux.NewRouter()
 	router.Use(MiddlewareContentTypeSet)
+
+	_, loggingMiddleware, _, _, _ := logovi.LogInit("logfile.log", "reservation_service")
+	router.Use(loggingMiddleware)
 
 	casbinMiddleware, err := InitializeCasbinMiddleware("./rbac_model.conf", "./policy.csv")
 	if err != nil {

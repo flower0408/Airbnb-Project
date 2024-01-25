@@ -8,6 +8,7 @@ import (
 	store2 "auth_service/store"
 	"context"
 	"fmt"
+	"github.com/andjelabjekovic/logovi"
 	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -94,6 +95,9 @@ func (server *Server) start(authHandler *handlers.AuthHandler) {
 	router := mux.NewRouter()
 	router.Use(MiddlewareContentTypeSet)
 	authHandler.Init(router)
+
+	_, loggingMiddleware, _, _, _ := logovi.LogInit("logfile.log", "auth_service")
+	router.Use(loggingMiddleware)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", server.config.Port),

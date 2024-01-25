@@ -1,22 +1,23 @@
 module auth_service
 
-go 1.20
+go 1.21.5
 
 require (
 	github.com/casbin/casbin v1.9.1
 	github.com/cristalhq/jwt/v4 v4.0.2
 	github.com/go-playground/validator/v10 v10.16.0
 	github.com/go-redis/redis v6.15.9+incompatible
-	github.com/google/uuid v1.4.0
+	github.com/google/uuid v1.5.0
 	github.com/gorilla/handlers v1.5.2
-	github.com/gorilla/mux v1.8.0
-	go.mongodb.org/mongo-driver v1.13.0
+	github.com/gorilla/mux v1.8.1
+	go.mongodb.org/mongo-driver v1.13.1
 	golang.org/x/crypto v0.14.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
 
 require (
 	github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible // indirect
+	github.com/andjelabjekovic/logovi v0.0.0-20240125211708-04b8cd85c9b1 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
@@ -30,6 +31,7 @@ require (
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.30.0 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sony/gobreaker v0.5.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
@@ -43,4 +45,5 @@ require (
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )

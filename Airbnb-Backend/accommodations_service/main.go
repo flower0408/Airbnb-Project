@@ -5,10 +5,11 @@ import (
 	"accommodations_service/handlers"
 	"context"
 	"errors"
+	"github.com/andjelabjekovic/logovi"
 	"github.com/casbin/casbin"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"os/signal"
@@ -22,12 +23,29 @@ func main() {
 
 	timeoutContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-
-	//Initialize the logger we are going to use, with prefix and datetime for every log
-	logger := log.New(os.Stdout, "[acc-api] ", log.LstdFlags)
-	storeLogger := log.New(os.Stdout, "[acc-store] ", log.LstdFlags)
+	/*
+		//Initialize the logger we are going to use, with prefix and datetime for every log
+		logger := log.New(os.Stdout, "[acc-api] ", log.LstdFlags)
+		storeLogger := log.New(os.Stdout, "[acc-store] ", log.LstdFlags)
+	*/
+	//logger := log.New()
+	storeLogger := log.New()
+	//ovo sam dodala
+	/*log.SetFormatter(&log.JSONFormatter{})
+	//
+	log.SetReportCaller(true)
+	file, err := os.OpenFile("logfile.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err == nil {
+		log.SetOutput(file)
+	} else {
+		log.Error("Ne mogu postaviti fajl za čuvanje logova. Koristiću osnovni izlaz.")
+	}
+	log.Info("oooo")*/
 
 	// NoSQL: Initialize Product Repository store
+	//ovde
+	logger, loggingMiddleware, _, _, _ := logovi.LogInit("logfile.log", "accommodation_service")
+
 	store, err := data.New(timeoutContext, storeLogger)
 	if err != nil {
 		logger.Fatal(err)
@@ -40,7 +58,8 @@ func main() {
 	//Initialize the router and add a middleware for all the requests
 	router := mux.NewRouter()
 	router.Use(MiddlewareContentTypeSet)
-
+	//ovde
+	router.Use(loggingMiddleware)
 	casbinMiddleware, err := InitializeCasbinMiddleware("./rbac_model.conf", "./policy.csv")
 	if err != nil {
 		log.Fatal(err)
@@ -186,6 +205,7 @@ func InitializeCasbinMiddleware(modelPath, policyPath string) (func(http.Handler
 
 			res, err := e.EnforceSafe(userRole, r.URL.Path, r.Method)
 			if err != nil {
+				//writeFatal(r, "Poruka!")
 				log.Println("Enforce error:", err)
 				http.Error(w, "Unauthorized user", http.StatusUnauthorized)
 				return

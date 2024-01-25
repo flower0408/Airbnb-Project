@@ -59,6 +59,7 @@ func CasbinMiddleware(e *casbin.Enforcer) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			userRole, err := extractUserType(r)
+
 			if err != nil {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
