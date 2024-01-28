@@ -14,4 +14,5 @@ type UserStore interface {
 	UpdateUserUsername(ctx context.Context, user *User) error
 	UpdateUser(ctx context.Context, updateUser *User) (*User, error)
 	DeleteAccount(ctx context.Context, userID primitive.ObjectID) error
+	IsHighlighted(ctx context.Context, host string, authToken string) (bool, error)
 }

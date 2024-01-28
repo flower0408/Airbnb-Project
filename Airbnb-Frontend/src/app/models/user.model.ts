@@ -9,8 +9,9 @@ export class User {
     password: string = "";
     email: string = "";
     userType: string = "";
+    highlighted: boolean = false;
 
-    User(id:string,firstName: string, lastName: string, gender: string, age: number, residence: string, username: string, password: string, email: string, userType: string) {
+    User(id:string,firstName: string, lastName: string, gender: string, age: number, residence: string, username: string, password: string, email: string, userType: string, highlighted: boolean) {
         this.id = id;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -21,5 +22,6 @@ export class User {
         this.password = password;
         this.email = email;
         this.userType = userType;
+        this.highlighted = highlighted;
     }
 }

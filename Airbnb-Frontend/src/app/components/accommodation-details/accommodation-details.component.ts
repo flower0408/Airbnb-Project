@@ -274,7 +274,7 @@ export class AccommodationDetailsComponent implements OnInit {
               );
             });
           }
-          
+
         },
         (error) => {
           console.error(error);
@@ -289,6 +289,13 @@ export class AccommodationDetailsComponent implements OnInit {
       this.accommodationService.getAccommodationById(accommodationId).subscribe(
         (data: Accommodation) => {
           this.accommodation = data;
+
+          this.userService.getUserById(this.accommodation.ownerId).subscribe(
+            (host: User) => {
+              this.accommodation.highlighted = host.highlighted;
+          });
+
+          console.log("Accommodation highlighted:", this.accommodation.highlighted)
           this.userService.getUserById(this.accommodation.ownerId).subscribe(
             (user: User) => {
               this.host = user;
@@ -604,7 +611,7 @@ export class AccommodationDetailsComponent implements OnInit {
 
       const newRate: any = {
         forAccommodationId: this.accommodation.id,
-        rate: Number(formValues.rate) 
+        rate: Number(formValues.rate)
       };
 
       this.accommodationService.createRateAccommodation(newRate).subscribe(
@@ -640,7 +647,7 @@ export class AccommodationDetailsComponent implements OnInit {
       const formValues = this.editRateForm.value;
 
       const newRate: any = {
-        rate: Number(formValues.editedRate) 
+        rate: Number(formValues.editedRate)
       };
 
       this.accommodationService.updateRate(id,newRate).subscribe(

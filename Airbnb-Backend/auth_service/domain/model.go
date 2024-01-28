@@ -10,16 +10,17 @@ import (
 )
 
 type User struct {
-	ID        primitive.ObjectID `bson:"_id" json:"id"`
-	FirstName string             `bson:"firstName,omitempty" json:"firstName,omitempty"`
-	LastName  string             `bson:"lastName,omitempty" json:"lastName,omitempty"`
-	Gender    Gender             `bson:"gender,omitempty" json:"gender,omitempty"`
-	Age       int                `bson:"age,omitempty" json:"age,omitempty"`
-	Residence string             `bson:"residence,omitempty" json:"residence,omitempty"`
-	Email     string             `bson:"email" json:"email"`
-	Username  string             `bson:"username" json:"username"`
-	Password  string             `bson:"password" json:"password"`
-	UserType  UserType           `bson:"userType" json:"userType"`
+	ID          primitive.ObjectID `bson:"_id" json:"id"`
+	FirstName   string             `bson:"firstName,omitempty" json:"firstName,omitempty"`
+	LastName    string             `bson:"lastName,omitempty" json:"lastName,omitempty"`
+	Gender      Gender             `bson:"gender,omitempty" json:"gender,omitempty"`
+	Age         int                `bson:"age,omitempty" json:"age,omitempty"`
+	Residence   string             `bson:"residence,omitempty" json:"residence,omitempty"`
+	Email       string             `bson:"email" json:"email"`
+	Username    string             `bson:"username" json:"username"`
+	Password    string             `bson:"password" json:"password"`
+	UserType    UserType           `bson:"userType" json:"userType"`
+	Highlighted bool               `bson:"highlighted" json:"highlighted"`
 }
 
 type Gender string

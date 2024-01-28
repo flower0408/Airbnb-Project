@@ -103,6 +103,13 @@ func (service *UserService) UpdateUser(ctx context.Context, updateUser *domain.U
 	return service.store.UpdateUser(ctx, updateUser)
 }
 
+func (service *UserService) IsHighlighted(ctx context.Context, host string, authToken string) (bool, error) {
+	ctx, span := service.tracer.Start(ctx, "UserService.IsHighlighted")
+	defer span.End()
+
+	return service.store.IsHighlighted(ctx, host, authToken)
+}
+
 func (service *UserService) DeleteAccount(ctx context.Context, userID primitive.ObjectID) error {
 	ctx, span := service.tracer.Start(ctx, "UserService.DeleteAccount")
 	defer span.End()
