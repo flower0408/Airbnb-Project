@@ -100,12 +100,6 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	log.Printf("Token Claims: %+v\n", claims)
 	username := claims["username"]
 
-	/*userID, statusCode, err := s.getUserIDFromUserService(username)
-	if err != nil {
-		http.Error(writer, err.Error(), statusCode)
-		return
-	}*/
-
 	// Circuit breaker for user service
 	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
 		userID, statusCode, err := s.getUserIDFromUserService(ctx, username)
