@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import {AccommodationService} from "../../services/accommodation.service";
+import { UserService } from '../../services/user.service';
 import { Location } from '../../models/location.model';
 import {Router} from "@angular/router";
 import { FormControl, FormGroup, Validators } from '@angular/forms';
@@ -29,6 +30,35 @@ interface Accommodation {
   minGuest: number;
   maxGuest: number;
   ownerId: string;
+  highlighted?: boolean;
+}
+
+export class User {
+    id: string = "";
+    firstName: string = "";
+    lastName: string = "";
+    gender: string = "";
+    age: number = 0;
+    residence: string = "";
+    username: string = "";
+    password: string = "";
+    email: string = "";
+    userType: string = "";
+    highlighted: boolean = false;
+
+    User(id:string,firstName: string, lastName: string, gender: string, age: number, residence: string, username: string, password: string, email: string, userType: string, highlighted: boolean) {
+        this.id = id;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.gender = gender;
+        this.age = age;
+        this.residence = residence;
+        this.username = username;
+        this.password = password;
+        this.email = email;
+        this.userType = userType;
+        this.highlighted = highlighted;
+    }
 }
 
 @Component({
@@ -73,7 +103,7 @@ export class MainPageComponent implements OnInit {
 
 
 
-  constructor(/*private dateAdapter: DateAdapter<Date>,*/private accommodationService: AccommodationService, private router: Router, private _snackBar: MatSnackBar,) {
+  constructor(/*private dateAdapter: DateAdapter<Date>,*/private accommodationService: AccommodationService, private router: Router, private _snackBar: MatSnackBar, private userService: UserService) {
     this.searchForm = new FormGroup({
       location: new FormControl(''),
       minGuests: new FormControl(1),
@@ -100,12 +130,31 @@ export class MainPageComponent implements OnInit {
   getAccommodations(): void {
     this.accommodationService.getAllAccommodations().subscribe(
       (data) => {
-        this.accommodations = data.sort((a: Accommodation, b: Accommodation) => {
-          const idA = a.id ?? '';
-          const idB = b.id ?? '';
-          return idA > idB ? -1 : 1;
+        this.accommodations = data;
+
+        this.accommodations.forEach((accommodation) => {
+          this.userService.getUserById(accommodation.ownerId).subscribe(
+            (host: User) => {
+              accommodation.highlighted = host.highlighted;
+
+              this.accommodations.sort((a, b) => {
+                const highlightedA = a?.highlighted || false;
+                const highlightedB = b?.highlighted || false;
+
+                if (highlightedA === highlightedB) {
+                  const idA = a.id ?? '';
+                  const idB = b.id ?? '';
+                  return idA > idB ? -1 : 1;
+                } else {
+                  return highlightedB ? 1 : -1;
+                }
+              });
+            },
+            (error) => {
+              console.error('Error fetching host:', error);
+            }
+          );
         });
-        //console.log(data);
       },
       (error) => {
         console.error(error);

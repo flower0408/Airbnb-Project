@@ -167,7 +167,7 @@
 .accommodation-card {
   width: 20%;
   float: left;
-  
+
 }
 
 .clearfix::after {
@@ -175,4 +175,21 @@
   clear: both;
   display: table;
 }
+
+.highlighted-host {
+  background-color: yellow;
+  border: 2px solid #ffcc00;
+  border-radius: 10px;
+  margin-bottom: 3px;
+  padding-left: 6px;
+}
+
+.highlight-label {
+  color: #ffcc00;
+  font-weight: bold;
+  margin-left: 5px;
+  margin-right: 5px;
+}
+
+
 

@@ -137,6 +137,15 @@ func main() {
 	deleteAppointment := router.Methods(http.MethodDelete).Subrouter()
 	deleteAppointment.HandleFunc("/deleteAppointments/{id}", appointmentHandler.DeleteAppointmentsByAccommodationIDs)
 
+	cancellationRate := router.Methods(http.MethodGet).Subrouter()
+	cancellationRate.HandleFunc("/cancellationRate/{id}", reservationHandler.CheckCancellationRateBelowThreshold)
+
+	numOfReservations := router.Methods(http.MethodGet).Subrouter()
+	numOfReservations.HandleFunc("/numOfReservations/{id}", reservationHandler.HasEnoughCompletedReservations)
+
+	durationOfReservations := router.Methods(http.MethodGet).Subrouter()
+	durationOfReservations.HandleFunc("/durationOfReservations/{id}", reservationHandler.CheckReservationsMoreThan50Days)
+
 	//Initialize the server
 	server := http.Server{
 		Addr:         ":" + port,

@@ -24,6 +24,7 @@ type Reservation struct {
 	ByUserId        string      `json:"byUserId" db:"by_userId"`
 	AccommodationId string      `json:"accommodationId" db:"accommodation_id"`
 	Price           int         `json:"price" db:"price"`
+	Canceled        bool        `json:"canceled" db:"canceled"`
 }
 
 type Appointments []*Appointment
