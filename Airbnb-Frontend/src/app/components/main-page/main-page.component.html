@@ -40,6 +40,9 @@
     <label for="maxPrice" class="form-label">Max Price:</label>
     <input type="text" class="form-input" id="maxPrice" [(ngModel)]="filterParams.maxPrice" name="maxPrice">
 
+    <label for="highlightedHost" class="form-label">Highlighted Host:</label>
+    <input type="checkbox" id="highlightedHost" [(ngModel)]="filterParams.highlightedHost" name="highlightedHost">
+
     <button type="button" class="btn btn-danger" (click)="filterAccommodations()">Filter</button>
   </div>
 </form>

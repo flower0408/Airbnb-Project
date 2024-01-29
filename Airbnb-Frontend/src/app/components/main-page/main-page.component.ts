@@ -77,7 +77,8 @@ export class MainPageComponent implements OnInit {
   filterParams = {
       desiredBenefits: [] as string[],
       minPrice: '',
-      maxPrice: ''
+      maxPrice: '',
+      highlightedHost: false,
     };
   newBenefit: string = '';
 
@@ -182,6 +183,10 @@ export class MainPageComponent implements OnInit {
   }
 
   filterAccommodations() {
+    if (this.isHighlightedHostChecked()) {
+        this.filterParams.highlightedHost = true;
+    }
+
     if (this.filterParamsIsEmpty()) {
        this.getAccommodations();
     } else {
@@ -189,6 +194,32 @@ export class MainPageComponent implements OnInit {
       this.accommodationService.filterAccommodations(this.filterParams).subscribe(
         (data) => {
           this.accommodations = data;
+
+          if (this.accommodations && this.accommodations.length > 0) {
+            this.accommodations.forEach((accommodation) => {
+              this.userService.getUserById(accommodation.ownerId).subscribe(
+                (host: User) => {
+                  accommodation.highlighted = host.highlighted;
+
+                  this.accommodations.sort((a, b) => {
+                    const highlightedA = a?.highlighted || false;
+                    const highlightedB = b?.highlighted || false;
+
+                    if (highlightedA === highlightedB) {
+                      const idA = a.id ?? '';
+                      const idB = b.id ?? '';
+                      return idA > idB ? -1 : 1;
+                    } else {
+                      return highlightedB ? 1 : -1;
+                    }
+                  });
+                },
+                (error) => {
+                  console.error('Error fetching host:', error);
+                }
+              );
+            });
+          }
         },
         (error) => {
           console.error('Error fetching accommodations:', error);
@@ -197,11 +228,18 @@ export class MainPageComponent implements OnInit {
     }
   }
 
+  isHighlightedHostChecked() {
+    const highlightedHostCheckbox = document.getElementById('highlightedHost') as HTMLInputElement;
+
+    return highlightedHostCheckbox.checked;
+  }
+
   filterParamsIsEmpty(): boolean {
     return (
       !this.filterParams.desiredBenefits.length &&
       !this.filterParams.minPrice &&
-      !this.filterParams.maxPrice
+      !this.filterParams.maxPrice &&
+      !this.filterParams.highlightedHost
     );
   }
 

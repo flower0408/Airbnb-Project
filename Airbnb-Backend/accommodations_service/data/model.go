@@ -39,6 +39,7 @@ type FilterParams struct {
 	DesiredBenefits []string `json:"desiredBenefits"`
 	MinPrice        string   `json:"minPrice"`
 	MaxPrice        string   `json:"maxPrice"`
+	HighlightedHost bool     `json:"highlightedHost"`
 }
 
 func (o *Accommodation) ToJSON(w io.Writer) error {

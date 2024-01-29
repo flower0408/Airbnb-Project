@@ -1309,6 +1309,16 @@ func (s *AccommodationHandler) FilterAccommodationsHandler(rw http.ResponseWrite
 
 	var filterParams data.FilterParams
 
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		span.AddEvent("Error extracting Bearer token")
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	if err := json.NewDecoder(h.Body).Decode(&filterParams); err != nil {
 		s.logger.Println("Error decoding filter parameters: ", err)
 		span.SetStatus(codes.Error, "Error decoding filter parameters")
@@ -1376,7 +1386,7 @@ func (s *AccommodationHandler) FilterAccommodationsHandler(rw http.ResponseWrite
 		}
 	}
 
-	accommodations, err := s.repo.FilterAccommodations(ctx, filterParams, minPrice, maxPrice, minPriceBool, maxPriceBool)
+	accommodations, err := s.repo.FilterAccommodations(ctx, authToken, filterParams, minPrice, maxPrice, minPriceBool, maxPriceBool)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
 		span.SetStatus(codes.Error, "Error filtering accommodations")

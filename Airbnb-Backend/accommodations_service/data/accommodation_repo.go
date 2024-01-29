@@ -509,7 +509,7 @@ func (rr *AccommodationRepo) HasUserRatedAccommodation(ctx context.Context, user
 	return count > 0, nil
 }
 
-func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params FilterParams, minPrice int, maxPrice int, minPriceBool bool, maxPriceBool bool) ([]*Accommodation, error) {
+func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken string, params FilterParams, minPrice int, maxPrice int, minPriceBool bool, maxPriceBool bool) ([]*Accommodation, error) {
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.FilterAccommodations")
 	defer span.End()
 
@@ -603,9 +603,60 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params Fi
 							}
 						}
 					}
-					return filteredAccommodations, nil
+					//return filteredAccommodations, nil
 				}
 			}
+
+			if params.HighlightedHost {
+				var filteredAccommodationsWithHighlightedHost []*Accommodation
+
+				if len(filteredAccommodations) > 0 {
+					for _, accommodation := range filteredAccommodations {
+						usersEndpoint := fmt.Sprintf("http://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
+						usersRequest, err := http.NewRequest("GET", usersEndpoint, nil)
+						otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(usersRequest.Header))
+						if err != nil {
+							span.SetStatus(codes.Error, "Error creating users request")
+							fmt.Println("Error creating users request:", err)
+							return nil, err
+						}
+
+						usersRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+						usersResponse, err := http.DefaultClient.Do(usersRequest)
+						if err != nil {
+							span.SetStatus(codes.Error, "Error sending users request")
+							fmt.Println("Error sending users request:", err)
+							return nil, err
+						}
+
+						if usersResponse.StatusCode != http.StatusOK {
+							span.SetStatus(codes.Error, "Users service returned an error")
+							fmt.Println("Users service returned an error:", usersResponse.Status)
+							return nil, errors.New("Users service returned an error")
+						}
+
+						var highlighted bool
+
+						//err = responseToType(accommodationResponse.Body, accommodations)
+						err = json.NewDecoder(usersResponse.Body).Decode(&highlighted)
+						if err != nil {
+							span.SetStatus(codes.Error, "Error decoding users response")
+							fmt.Println("Error decoding users response:", err)
+							return nil, err
+						}
+
+						defer usersResponse.Body.Close()
+
+						if highlighted {
+							filteredAccommodationsWithHighlightedHost = append(filteredAccommodationsWithHighlightedHost, accommodation)
+						}
+					}
+				}
+
+				return filteredAccommodationsWithHighlightedHost, nil
+			}
+
 			return filteredAccommodations, nil
 		}
 	}
@@ -634,7 +685,109 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, params Fi
 				}
 			}
 		}
+
+		if params.HighlightedHost {
+			var filteredAccommodationsWithHighlightedHost []*Accommodation
+
+			if len(filteredAccommodations) > 0 {
+				for _, accommodation := range filteredAccommodations {
+					usersEndpoint := fmt.Sprintf("http://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
+					usersRequest, err := http.NewRequest("GET", usersEndpoint, nil)
+					otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(usersRequest.Header))
+					if err != nil {
+						span.SetStatus(codes.Error, "Error creating users request")
+						fmt.Println("Error creating users request:", err)
+						return nil, err
+					}
+
+					usersRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+					usersResponse, err := http.DefaultClient.Do(usersRequest)
+					if err != nil {
+						span.SetStatus(codes.Error, "Error sending users request")
+						fmt.Println("Error sending users request:", err)
+						return nil, err
+					}
+
+					if usersResponse.StatusCode != http.StatusOK {
+						span.SetStatus(codes.Error, "Users service returned an error")
+						fmt.Println("Users service returned an error:", usersResponse.Status)
+						return nil, errors.New("Users service returned an error")
+					}
+
+					var highlighted bool
+
+					//err = responseToType(accommodationResponse.Body, accommodations)
+					err = json.NewDecoder(usersResponse.Body).Decode(&highlighted)
+					if err != nil {
+						span.SetStatus(codes.Error, "Error decoding users response")
+						fmt.Println("Error decoding users response:", err)
+						return nil, err
+					}
+
+					defer usersResponse.Body.Close()
+
+					if highlighted {
+						filteredAccommodationsWithHighlightedHost = append(filteredAccommodationsWithHighlightedHost, accommodation)
+					}
+				}
+			}
+
+			return filteredAccommodationsWithHighlightedHost, nil
+		}
+
 		return filteredAccommodations, nil
+	}
+
+	if params.HighlightedHost {
+		var filteredAccommodationsWithHighlightedHost []*Accommodation
+
+		for _, accommodation := range accommodations {
+			usersEndpoint := fmt.Sprintf("http://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
+			usersRequest, err := http.NewRequest("GET", usersEndpoint, nil)
+			otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(usersRequest.Header))
+			if err != nil {
+				span.SetStatus(codes.Error, "Error creating users request")
+				fmt.Println("Error creating users request:", err)
+				return nil, err
+			}
+
+			usersRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+			usersResponse, err := http.DefaultClient.Do(usersRequest)
+			if err != nil {
+				span.SetStatus(codes.Error, "Error sending users request")
+				fmt.Println("Error sending users request:", err)
+				return nil, err
+			}
+
+			if usersResponse.StatusCode != http.StatusOK {
+				span.SetStatus(codes.Error, "Users service returned an error")
+				fmt.Println("Users service returned an error:", usersResponse.Status)
+				return nil, errors.New("Users service returned an error")
+			}
+
+			var highlighted bool
+
+			//err = responseToType(accommodationResponse.Body, accommodations)
+			err = json.NewDecoder(usersResponse.Body).Decode(&highlighted)
+			if err != nil {
+				span.SetStatus(codes.Error, "Error decoding users response")
+				fmt.Println("Error decoding users response:", err)
+				return nil, err
+			}
+
+			defer usersResponse.Body.Close()
+
+			if highlighted {
+				if _, exists := addedAccommodations2[accommodation.ID.Hex()]; !exists {
+					filteredAccommodationsWithHighlightedHost = append(filteredAccommodationsWithHighlightedHost, accommodation)
+					addedAccommodations2[accommodation.ID.Hex()] = true
+				}
+			}
+		}
+
+		return filteredAccommodationsWithHighlightedHost, nil
 	}
 
 	return filteredAccommodations, nil
