@@ -66,6 +66,9 @@ export class AccommodationDetailsComponent implements OnInit {
   rateSum: number = 0;
   host!: User | undefined;
   showEditRateBool = false;
+  imagesUrl: any[] = [];
+  images: any[] = [];
+  currentSlideIndex = 0;
 
 
   constructor(/*private dateAdapter: DateAdapter<Date>,*/private userService:UserService, private _snackBar: MatSnackBar, private router: Router, private reservationService:ReservationService, private appointmentService:AppointmentService, private fb: FormBuilder,private accommodationService: AccommodationService, private route: ActivatedRoute) {
@@ -297,13 +300,31 @@ export class AccommodationDetailsComponent implements OnInit {
               console.error('Error getting user:', error);
             }
           );
+          this.accommodationService.getImagesUrls(this.accommodation.id).subscribe(
+            (images: any) => {
+              this.imagesUrl = images;
+              console.log('Received images:', this.imagesUrl);
+              
+              if(this.imagesUrl.length !== 0){
+                this.imagesUrl.forEach(imageName => this.loadImageContent(this.accommodation.id,imageName));
+                console.log('Images:', this.images);
+              }
+
+            },
+            (error) => {
+              console.error('Error getting accommodation images:', error);
+            }
+          );
+      
         },
         (error) => {
           console.error(error);
         }
       );
     }
-  }  getAppoitmentsByAccommodation(): void {
+  }  
+  
+  getAppoitmentsByAccommodation(): void {
     const accommodationId = this.route.snapshot.paramMap.get('id');
     if (accommodationId) {
       this.appointmentService.getAppointmentsByAccommodation(accommodationId).subscribe(
@@ -337,9 +358,6 @@ export class AccommodationDetailsComponent implements OnInit {
       );
     }
   }
-
-
-
 
 
   getReservationsByAccommodation(): void {
@@ -759,7 +777,38 @@ export class AccommodationDetailsComponent implements OnInit {
     }
   }
 
+  loadImageContent(folderName: string, imageName: string): void {
+    this.accommodationService.getImages(folderName,imageName).subscribe(
+      (imageContent: any) => {
+        this.displayImage(imageContent);
+      },
+      (error) => {
+        console.error('Error getting images:', error);
+      }
+    );
+  }
 
+  displayImage(blob: Blob) {
+    const reader = new FileReader();
+    reader.onload = (e: any) => {
+      this.images.push(e.target.result);
+    };
+    reader.readAsDataURL(blob);
+  }
+  
+  prevSlide() {
+    if (this.currentSlideIndex !== 0) {
+      this.currentSlideIndex = this.currentSlideIndex - 1;
+    }
+  }
+  
+  nextSlide() {
+    if (this.currentSlideIndex < this.images.length - 1) {
+      this.currentSlideIndex = this.currentSlideIndex + 1;
+    }
+  }
+  
+  
 }
 
 function getDatesInRange(startDate: string, endDate: string): Date[] {
@@ -773,6 +822,7 @@ function getDatesInRange(startDate: string, endDate: string): Date[] {
 
   return dateList;
 }
+
 
 
 
