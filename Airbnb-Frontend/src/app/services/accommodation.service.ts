@@ -50,6 +50,10 @@ export class AccommodationService {
     return this.http.get<Accommodation[]>(`${environment.baseApiUrl}/${this.url}/search`, { params });
   }
 
+  filterAccommodations(filterParams:any): Observable<any> {
+    return this.http.post<any>(`${environment.baseApiUrl}/${this.url}/filterAccommodations`, filterParams);
+  }
+
   getRatesByAccommodation(id: string): Observable<any> {
     const url = `${environment.baseApiUrl}/${this.url}/getRatesByAccommodation/${id}`;
     return this.http.get<any>(url);

@@ -25,3 +25,15 @@ p, Guest, /deleteAppointments/*, DELETE
 p, Unauthenticated, /deleteAppointments/*, DELETE
 p, Guest, /checkUserPastReservations/*/*, GET
 p, Guest, /checkUserPastReservationsInAccommodation/*/*, GET
+p, Unauthenticated, /filterByPrice, GET
+p, Host, /filterByPrice, GET
+p, Guest, /filterByPrice, GET
+p, Guest, /cancellationRate/*, GET
+p, Host, /cancellationRate/*, GET
+p, Unauthenticated, /cancellationRate/*, GET
+p, Unauthenticated, /numOfReservations/*, GET
+p, Guest, /numOfReservations/*, GET
+p, Host, /numOfReservations/*, GET
+p, Unauthenticated, /durationOfReservations/*, GET
+p, Guest, /durationOfReservations/*, GET
+p, Host, /durationOfReservations/*, GET

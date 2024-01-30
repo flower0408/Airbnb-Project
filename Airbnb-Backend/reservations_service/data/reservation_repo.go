@@ -25,6 +25,8 @@ var (
 	reservationServicePort   = os.Getenv("RESERVATIONS_SERVICE_PORT")
 	accommodationServiceHost = os.Getenv("ACCOMMODATIONS_SERVICE_HOST")
 	accommodationServicePort = os.Getenv("ACCOMMODATIONS_SERVICE_PORT")
+	usersServiceHost         = os.Getenv("USER_SERVICE_HOST")
+	usersServicePort         = os.Getenv("USER_SERVICE_PORT")
 )
 
 type ReservationRepo struct {
@@ -95,7 +97,7 @@ func (sr *ReservationRepo) CreateTables() {
 
 	err := sr.session.Query(
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s 
-					(by_userId text,reservation_id UUID, periodd LIST<TIMESTAMP>, accommodation_id text, price int,
+					(by_userId text,reservation_id UUID, periodd LIST<TIMESTAMP>, accommodation_id text, price int, canceled boolean,
 					PRIMARY KEY ((by_userId), reservation_id)) 
 					WITH CLUSTERING ORDER BY (reservation_id ASC)`, "reservation_by_user")).Exec()
 	if err != nil {
@@ -104,7 +106,7 @@ func (sr *ReservationRepo) CreateTables() {
 
 	err = sr.session.Query(
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s 
-					(by_userId text,reservation_id UUID, periodd LIST<TIMESTAMP>, accommodation_id text, price int,
+					(by_userId text,reservation_id UUID, periodd LIST<TIMESTAMP>, accommodation_id text, price int, canceled boolean,
 					PRIMARY KEY ((accommodation_id), reservation_id)) 
 					WITH CLUSTERING ORDER BY (reservation_id ASC)`, "reservation_by_accommodation")).Exec()
 	if err != nil {
@@ -114,7 +116,7 @@ func (sr *ReservationRepo) CreateTables() {
 }
 
 // cassandra
-func (sr *ReservationRepo) InsertReservation(ctx context.Context, reservation *Reservation) (*Reservation, error) {
+func (sr *ReservationRepo) InsertReservation(ctx context.Context, reservation *Reservation, authToken string) (*Reservation, error) {
 	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.InsertReservation")
 	defer span.End()
 
@@ -179,20 +181,21 @@ func (sr *ReservationRepo) InsertReservation(ctx context.Context, reservation *R
 	}
 
 	reservation.Price = sum
+	reservation.Canceled = false
 
 	err = sr.session.Query(
-		`INSERT INTO reservation_by_user (by_userId, reservation_id, periodd, accommodation_id, price) 
-        VALUES (?, ?, ?, ?, ?)`,
-		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price).Exec()
+		`INSERT INTO reservation_by_user (by_userId, reservation_id, periodd, accommodation_id, price, canceled) 
+        VALUES (?, ?, ?, ?, ?, ?)`,
+		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price, reservation.Canceled).Exec()
 	if err != nil {
 		sr.logger.Println(err)
 		return nil, err
 	}
 
 	err = sr.session.Query(
-		`INSERT INTO reservation_by_accommodation (by_userId, reservation_id, periodd, accommodation_id, price) 
-        VALUES (?, ?, ?, ?, ?)`,
-		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price).Exec()
+		`INSERT INTO reservation_by_accommodation (by_userId, reservation_id, periodd, accommodation_id, price, canceled) 
+        VALUES (?, ?, ?, ?, ?, ?)`,
+		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price, reservation.Canceled).Exec()
 	if err != nil {
 		span.SetStatus(codes.Error, "Error insert reservation")
 		sr.logger.Println(err)
@@ -205,7 +208,83 @@ func (sr *ReservationRepo) InsertReservation(ctx context.Context, reservation *R
 		Period:          reservation.Period,
 		AccommodationId: reservation.AccommodationId,
 		Price:           reservation.Price,
+		Canceled:        reservation.Canceled,
 	}
+
+	accommodationEndpoint := fmt.Sprintf("http://%s:%s/%s", accommodationServiceHost, accommodationServicePort, reservation.AccommodationId)
+	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
+	if err != nil {
+		span.SetStatus(codes.Error, "Error creating accommodation request")
+		fmt.Println("Error creating accommodation request:", err)
+		return nil, err
+	}
+
+	accommodationRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error sending accommodation request")
+		fmt.Println("Error sending accommodation request:", err)
+		return nil, err
+	}
+
+	if accommodationResponse.StatusCode != http.StatusOK {
+		span.SetStatus(codes.Error, "Accommodation service returned an error")
+		fmt.Println("Accommodation service returned an error:", accommodationResponse.Status)
+		return nil, errors.New("Accommodation service returned an error")
+	}
+
+	type AccommodationResponse struct {
+		OwnerID string `json:"ownerId"`
+	}
+
+	var response AccommodationResponse
+
+	//err = responseToType(accommodationResponse.Body, accommodations)
+	err = json.NewDecoder(accommodationResponse.Body).Decode(&response)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error decoding accommodation response")
+		fmt.Println("Error decoding accommodation response:", err)
+		return nil, err
+	}
+
+	defer accommodationResponse.Body.Close()
+
+	usersEndpoint := fmt.Sprintf("http://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, response.OwnerID)
+	usersRequest, err := http.NewRequest("GET", usersEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(usersRequest.Header))
+	if err != nil {
+		span.SetStatus(codes.Error, "Error creating users request")
+		fmt.Println("Error creating users request:", err)
+		return nil, err
+	}
+
+	usersRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	usersResponse, err := http.DefaultClient.Do(usersRequest)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error sending users request")
+		fmt.Println("Error sending users request:", err)
+		return nil, err
+	}
+
+	if usersResponse.StatusCode != http.StatusOK {
+		span.SetStatus(codes.Error, "Users service returned an error")
+		fmt.Println("Users service returned an error:", usersResponse.Status)
+		return nil, errors.New("Users service returned an error")
+	}
+
+	var response2 bool
+
+	err = json.NewDecoder(usersResponse.Body).Decode(&response2)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error decoding users response")
+		fmt.Println("Error decoding users response:", err)
+		return nil, err
+	}
+
+	defer usersResponse.Body.Close()
 
 	return createdReservation, nil
 }
@@ -286,6 +365,183 @@ func (sr *ReservationRepo) HasReservationsForHost(ctx context.Context, userID st
 	}
 
 	return false, nil
+}
+
+func (sr *ReservationRepo) GetCancelledReservationsByHost(ctx context.Context, userID string, authToken string) (Reservations, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.GetCancelledReservationsByHost")
+	defer span.End()
+
+	accommodationEndpoint := fmt.Sprintf("http://%s:%s/owner/%s", accommodationServiceHost, accommodationServicePort, userID)
+	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
+	if err != nil {
+		span.SetStatus(codes.Error, "Error creating accommodation request")
+		sr.logger.Println("Error creating accommodation request:", err)
+		return nil, err
+	}
+
+	accommodationRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error sending accommodation request")
+		sr.logger.Println("Error sending accommodation request:", err)
+		return nil, err
+	}
+
+	if accommodationResponse.StatusCode != http.StatusOK {
+		span.SetStatus(codes.Error, "Accommodation service returned an error")
+		sr.logger.Println("Accommodation service returned an error:", accommodationResponse.Status)
+		return nil, errors.New("Accommodation service returned an error")
+	}
+
+	var accommodations []primitive.ObjectID
+
+	//err = responseToType(accommodationResponse.Body, accommodations)
+	err = json.NewDecoder(accommodationResponse.Body).Decode(&accommodations)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error decoding accommodation response")
+		sr.logger.Println("Error decoding accommodation response:", err)
+		return nil, err
+	}
+
+	defer accommodationResponse.Body.Close()
+
+	var cancelledReservations Reservations
+	for _, accommodationID := range accommodations {
+		reservations, err := sr.GetReservationByAccommodation(ctx, accommodationID.Hex())
+		if err != nil {
+			span.SetStatus(codes.Error, "Error getting reservations for accommodation")
+			sr.logger.Println(err)
+			return nil, err
+		}
+
+		for _, reservation := range reservations {
+			if reservation.Canceled {
+				cancelledReservations = append(cancelledReservations, reservation)
+			}
+		}
+	}
+
+	return cancelledReservations, nil
+}
+
+func (sr *ReservationRepo) GetAllReservationsByHost(ctx context.Context, userID string, authToken string) (Reservations, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.GetCancelledReservationsByHost")
+	defer span.End()
+
+	accommodationEndpoint := fmt.Sprintf("http://%s:%s/owner/%s", accommodationServiceHost, accommodationServicePort, userID)
+	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
+	if err != nil {
+		span.SetStatus(codes.Error, "Error creating accommodation request")
+		sr.logger.Println("Error creating accommodation request:", err)
+		return nil, err
+	}
+
+	accommodationRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error sending accommodation request")
+		sr.logger.Println("Error sending accommodation request:", err)
+		return nil, err
+	}
+
+	if accommodationResponse.StatusCode != http.StatusOK {
+		span.SetStatus(codes.Error, "Accommodation service returned an error")
+		sr.logger.Println("Accommodation service returned an error:", accommodationResponse.Status)
+		return nil, errors.New("Accommodation service returned an error")
+	}
+
+	var accommodations []primitive.ObjectID
+
+	//err = responseToType(accommodationResponse.Body, accommodations)
+	err = json.NewDecoder(accommodationResponse.Body).Decode(&accommodations)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error decoding accommodation response")
+		sr.logger.Println("Error decoding accommodation response:", err)
+		return nil, err
+	}
+
+	defer accommodationResponse.Body.Close()
+
+	var reservations Reservations
+	for _, accommodationID := range accommodations {
+		reservationsByAccommodation, err := sr.GetReservationByAccommodation(ctx, accommodationID.Hex())
+		if err != nil {
+			span.SetStatus(codes.Error, "Error getting reservations for accommodation")
+			sr.logger.Println(err)
+			return nil, err
+		}
+
+		for _, reservation := range reservationsByAccommodation {
+			//if !reservation.Canceled {
+			reservations = append(reservations, reservation)
+			//}
+		}
+	}
+
+	return reservations, nil
+}
+
+func (sr *ReservationRepo) GetReservationsByHost(ctx context.Context, userID string, authToken string) (Reservations, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.GetCancelledReservationsByHost")
+	defer span.End()
+
+	accommodationEndpoint := fmt.Sprintf("http://%s:%s/owner/%s", accommodationServiceHost, accommodationServicePort, userID)
+	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
+	if err != nil {
+		span.SetStatus(codes.Error, "Error creating accommodation request")
+		sr.logger.Println("Error creating accommodation request:", err)
+		return nil, err
+	}
+
+	accommodationRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error sending accommodation request")
+		sr.logger.Println("Error sending accommodation request:", err)
+		return nil, err
+	}
+
+	if accommodationResponse.StatusCode != http.StatusOK {
+		span.SetStatus(codes.Error, "Accommodation service returned an error")
+		sr.logger.Println("Accommodation service returned an error:", accommodationResponse.Status)
+		return nil, errors.New("Accommodation service returned an error")
+	}
+
+	var accommodations []primitive.ObjectID
+
+	//err = responseToType(accommodationResponse.Body, accommodations)
+	err = json.NewDecoder(accommodationResponse.Body).Decode(&accommodations)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error decoding accommodation response")
+		sr.logger.Println("Error decoding accommodation response:", err)
+		return nil, err
+	}
+
+	defer accommodationResponse.Body.Close()
+
+	var reservations Reservations
+	for _, accommodationID := range accommodations {
+		reservationsByAccommodation, err := sr.GetReservationByAccommodation(ctx, accommodationID.Hex())
+		if err != nil {
+			span.SetStatus(codes.Error, "Error getting reservations for accommodation")
+			sr.logger.Println(err)
+			return nil, err
+		}
+
+		for _, reservation := range reservationsByAccommodation {
+			if !reservation.Canceled {
+				reservations = append(reservations, reservation)
+			}
+		}
+	}
+
+	return reservations, nil
 }
 
 func (sr *ReservationRepo) HasReservationsForAccommodation(ctx context.Context, accommodationID primitive.ObjectID) (bool, error) {
@@ -405,7 +661,228 @@ func (sr *ReservationRepo) CheckUserPastReservationsInAccommodation(ctx context.
 	return false, nil
 }
 
-func (sr *ReservationRepo) CancelReservation(ctx context.Context, reservationID string) error {
+func (sr *ReservationRepo) IsCancellationRateBelowThreshold(ctx context.Context, userID string, authToken string) (bool, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.IsCancellationRateBelowThreshold")
+	defer span.End()
+
+	allReservations, err := sr.GetAllReservationsByHost(ctx, userID, authToken)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error getting all reservations by host")
+		sr.logger.Println(err)
+		return false, err
+	}
+
+	cancelledReservations, err := sr.GetCancelledReservationsByHost(ctx, userID, authToken)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error getting cancelled reservations by host")
+		sr.logger.Println(err)
+		return false, err
+	}
+
+	totalReservations := len(allReservations)
+	totalCancelledReservations := len(cancelledReservations)
+
+	if totalReservations == 0 {
+		sr.logger.Println("Total reservations = 0")
+		return false, nil
+	}
+
+	cancellationRate := float64(totalCancelledReservations) / float64(totalReservations)
+
+	const threshold = 0.05 // 5%
+
+	return cancellationRate < threshold, nil
+}
+
+func (sr *ReservationRepo) HasEnoughCompletedReservations(ctx context.Context, userID string, authToken string) (bool, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.HasEnoughCompletedReservations")
+	defer span.End()
+
+	allReservations, err := sr.GetReservationsByHost(ctx, userID, authToken)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error getting all reservations by host")
+		sr.logger.Println(err)
+		return false, err
+	}
+
+	var completedReservations Reservations
+	currentTime := time.Now().Truncate(24 * time.Hour)
+
+	for _, reservation := range allReservations {
+		allDatesBeforeCurrent := true
+
+		for _, reservationDate := range reservation.Period {
+			if !reservationDate.Before(currentTime) {
+				allDatesBeforeCurrent = false
+				break
+			}
+		}
+
+		if allDatesBeforeCurrent {
+			completedReservations = append(completedReservations, reservation)
+		}
+	}
+
+	if len(completedReservations) >= 5 {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (sr *ReservationRepo) HasReservationsMoreThan50Days(ctx context.Context, userID string, authToken string) (bool, error) {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.HasReservationsMoreThan50Days")
+	defer span.End()
+
+	allReservations, err := sr.GetReservationsByHost(ctx, userID, authToken)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error getting all reservations by host")
+		sr.logger.Println(err)
+		return false, err
+	}
+
+	totalDuration := 0
+	currentTime := time.Now()
+
+	for _, reservation := range allReservations {
+		allDatesBeforeCurrent := true
+
+		for _, reservationDate := range reservation.Period {
+			if !reservationDate.Before(currentTime) {
+				allDatesBeforeCurrent = false
+				break
+			}
+		}
+
+		if allDatesBeforeCurrent {
+			totalDuration += len(reservation.Period)
+		}
+
+		//for _, reservationDate := range reservation.Period {
+		//	if reservationDate.Before(currentTime) {
+		//		totalDuration += int(currentTime.Sub(reservationDate).Hours() / 24)
+		//	}
+		//}
+	}
+
+	return totalDuration > 50, nil
+}
+
+func (sr *ReservationRepo) CancelReservation(ctx context.Context, reservationID string, authToken string) error {
+	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.CancelReservation")
+	defer span.End()
+
+	reservation, err := sr.GetReservationByID(ctx, reservationID)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error getting reservation by ID")
+		sr.logger.Println(err)
+		return err
+	}
+
+	for _, date := range reservation.Period {
+		if time.Now().After(date) || time.Now().Equal(date) {
+			span.SetStatus(codes.Error, "Can not cancel reservation. You can only cancel it before it starts.")
+			return errors.New("Can not cancel reservation. You can only cancel it before it starts.")
+		}
+	}
+
+	err = sr.session.Query(
+		`UPDATE reservation_by_user SET canceled = true WHERE reservation_id = ? AND by_userid = ?`,
+		reservation.ID, reservation.ByUserId).Exec()
+	if err != nil {
+		span.SetStatus(codes.Error, "Error updating reservation status")
+		sr.logger.Println(err)
+		return err
+	}
+
+	err = sr.session.Query(
+		`UPDATE reservation_by_accommodation SET canceled = true WHERE reservation_id = ? AND accommodation_id = ?`,
+		reservation.ID, reservation.AccommodationId).Exec()
+	if err != nil {
+		span.SetStatus(codes.Error, "Error updating reservation status")
+		sr.logger.Println(err)
+		return err
+	}
+
+	accommodationEndpoint := fmt.Sprintf("http://%s:%s/%s", accommodationServiceHost, accommodationServicePort, reservation.AccommodationId)
+	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
+	if err != nil {
+		span.SetStatus(codes.Error, "Error creating accommodation request")
+		fmt.Println("Error creating accommodation request:", err)
+		return err
+	}
+
+	accommodationRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error sending accommodation request")
+		fmt.Println("Error sending accommodation request:", err)
+		return err
+	}
+
+	if accommodationResponse.StatusCode != http.StatusOK {
+		span.SetStatus(codes.Error, "Accommodation service returned an error")
+		fmt.Println("Accommodation service returned an error:", accommodationResponse.Status)
+		return errors.New("Accommodation service returned an error")
+	}
+
+	type AccommodationResponse struct {
+		OwnerID string `json:"ownerId"`
+	}
+
+	var response AccommodationResponse
+
+	//err = responseToType(accommodationResponse.Body, accommodations)
+	err = json.NewDecoder(accommodationResponse.Body).Decode(&response)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error decoding accommodation response")
+		fmt.Println("Error decoding accommodation response:", err)
+		return err
+	}
+
+	defer accommodationResponse.Body.Close()
+
+	usersEndpoint := fmt.Sprintf("http://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, response.OwnerID)
+	usersRequest, err := http.NewRequest("GET", usersEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(usersRequest.Header))
+	if err != nil {
+		span.SetStatus(codes.Error, "Error creating users request")
+		fmt.Println("Error creating users request:", err)
+		return err
+	}
+
+	usersRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	usersResponse, err := http.DefaultClient.Do(usersRequest)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error sending users request")
+		fmt.Println("Error sending users request:", err)
+		return err
+	}
+
+	if usersResponse.StatusCode != http.StatusOK {
+		span.SetStatus(codes.Error, "Users service returned an error")
+		fmt.Println("Users service returned an error:", usersResponse.Status)
+		return errors.New("Users service returned an error")
+	}
+
+	var response2 bool
+
+	//err = responseToType(accommodationResponse.Body, accommodations)
+	err = json.NewDecoder(usersResponse.Body).Decode(&response2)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error decoding users response")
+		fmt.Println("Error decoding users response:", err)
+		return err
+	}
+
+	defer usersResponse.Body.Close()
+	return nil
+}
+
+func (sr *ReservationRepo) CancelReservation2(ctx context.Context, reservationID string) error {
 	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.CancelReservation")
 	defer span.End()
 
@@ -517,7 +994,7 @@ func (sr *ReservationRepo) GetReservationByUser(ctx context.Context, id string) 
 	ctx, span := sr.tracer.Start(ctx, "ReservationRepo.GetReservationByUser")
 	defer span.End()
 
-	scanner := sr.session.Query(`SELECT by_userId, reservation_id, periodd, accommodation_id, price FROM reservation_by_user WHERE by_userId = ?`, id).Iter().Scanner()
+	scanner := sr.session.Query(`SELECT by_userId, reservation_id, periodd, accommodation_id, price, canceled FROM reservation_by_user WHERE by_userId = ?`, id).Iter().Scanner()
 
 	var reservations Reservations
 	for scanner.Next() {
@@ -528,6 +1005,7 @@ func (sr *ReservationRepo) GetReservationByUser(ctx context.Context, id string) 
 			&r.Period,
 			&r.AccommodationId,
 			&r.Price,
+			&r.Canceled,
 		)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error getting reservation by user")
@@ -535,7 +1013,9 @@ func (sr *ReservationRepo) GetReservationByUser(ctx context.Context, id string) 
 			return nil, err
 		}
 
-		reservations = append(reservations, &r)
+		if !r.Canceled {
+			reservations = append(reservations, &r)
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		span.SetStatus(codes.Error, "Error getting reservation by user")

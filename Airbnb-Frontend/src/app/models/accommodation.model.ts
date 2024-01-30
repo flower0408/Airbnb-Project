@@ -9,4 +9,5 @@ export interface Accommodation {
     minGuest: number;
     maxGuest: number;
     ownerId: string;
+    highlighted?: boolean;
 }

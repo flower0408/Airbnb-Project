@@ -34,6 +34,13 @@ type Rate struct {
 	Rate               int                `bson:"rate,omitempty" json:"rate"`
 }
 
+type FilterParams struct {
+	DesiredBenefits []string `json:"desiredBenefits"`
+	MinPrice        string   `json:"minPrice"`
+	MaxPrice        string   `json:"maxPrice"`
+	HighlightedHost bool     `json:"highlightedHost"`
+}
+
 func (o *Accommodation) ToJSON(w io.Writer) error {
 	e := json.NewEncoder(w)
 	return e.Encode(o)

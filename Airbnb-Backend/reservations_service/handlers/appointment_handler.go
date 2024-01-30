@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"reservations_service/data"
+	"strconv"
 	"time"
 )
 
@@ -269,6 +270,110 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte("Appointments deleted successfully"))
+}
+
+func (r *AppointmentHandler) FilterAppointmentsByPrice(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.FilterAppointmentsByPrice")
+	defer span.End()
+
+	minPriceStr := h.URL.Query().Get("minPrice")
+	maxPriceStr := h.URL.Query().Get("maxPrice")
+
+	var minPrice, maxPrice float64
+	var err error
+
+	if minPriceStr != "" {
+		minPrice, err = strconv.ParseFloat(minPriceStr, 64)
+		if err != nil {
+			span.SetStatus(codes.Error, "Invalid minPrice parameter")
+			http.Error(rw, "Invalid minPrice parameter", http.StatusBadRequest)
+			rw.Write([]byte("Invalid minPrice parameter"))
+			return
+		}
+	}
+
+	if maxPriceStr != "" {
+		maxPrice, err = strconv.ParseFloat(maxPriceStr, 64)
+		if err != nil {
+			span.SetStatus(codes.Error, "Invalid maxPrice parameter")
+			http.Error(rw, "Invalid maxPrice parameter", http.StatusBadRequest)
+			rw.Write([]byte("Invalid maxPrice parameter"))
+			return
+		}
+	}
+
+	if minPriceStr == "" {
+		appointments, err := r.appointmentRepo.FilterAppointmentsByPrice(ctx, -1, int(maxPrice))
+		if err != nil {
+			span.SetStatus(codes.Error, "Unable to retrieve filtered appointments")
+			r.logger.Print("Database exception")
+			http.Error(rw, "Unable to retrieve filtered appointments", http.StatusInternalServerError)
+			return
+		}
+
+		if len(appointments) == 0 {
+			rw.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		err = appointments.ToJSON(rw)
+		if err != nil {
+			span.SetStatus(codes.Error, "Unable to convert to JSON")
+			http.Error(rw, "Unable to convert to JSON", http.StatusInternalServerError)
+			r.logger.Fatal("Unable to convert to JSON")
+			return
+		}
+
+		return
+	}
+
+	if maxPriceStr == "" {
+		appointments, err := r.appointmentRepo.FilterAppointmentsByPrice(ctx, int(minPrice), -1)
+		if err != nil {
+			span.SetStatus(codes.Error, "Unable to retrieve filtered appointments")
+			r.logger.Print("Database exception")
+			http.Error(rw, "Unable to retrieve filtered appointments", http.StatusInternalServerError)
+			return
+		}
+
+		if len(appointments) == 0 {
+			rw.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		err = appointments.ToJSON(rw)
+		if err != nil {
+			span.SetStatus(codes.Error, "Unable to convert to JSON")
+			http.Error(rw, "Unable to convert to JSON", http.StatusInternalServerError)
+			r.logger.Fatal("Unable to convert to JSON")
+			return
+		}
+
+		return
+	}
+
+	if minPriceStr != "" && maxPriceStr != "" {
+		appointments, err := r.appointmentRepo.FilterAppointmentsByPrice(ctx, int(minPrice), int(maxPrice))
+		if err != nil {
+			span.SetStatus(codes.Error, "Unable to retrieve filtered appointments")
+			r.logger.Print("Database exception")
+			http.Error(rw, "Unable to retrieve filtered appointments", http.StatusInternalServerError)
+			return
+		}
+
+		if len(appointments) == 0 {
+			rw.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		err = appointments.ToJSON(rw)
+		if err != nil {
+			span.SetStatus(codes.Error, "Unable to convert to JSON")
+			http.Error(rw, "Unable to convert to JSON", http.StatusInternalServerError)
+			r.logger.Fatal("Unable to convert to JSON")
+			return
+		}
+	}
 }
 
 func (s *AppointmentHandler) MiddlewareAppointmentDeserialization(next http.Handler) http.Handler {

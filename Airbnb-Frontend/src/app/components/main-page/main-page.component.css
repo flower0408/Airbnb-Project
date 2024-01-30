@@ -58,7 +58,14 @@
   margin-top: 20px;
   gap: 16px;
 }
-
+.filter-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  margin-top: 20px;
+  gap: 16px;
+}
 .form-label{
   color:#F88379;
   font-size: 15px;

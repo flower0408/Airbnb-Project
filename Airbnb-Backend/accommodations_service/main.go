@@ -128,6 +128,10 @@ func main() {
 	deleteAccommodationsByOwner.HandleFunc("/delete_accommodations/{ownerID}", accommodationHandler.DeleteAccommodationsByOwnerID)
 	deleteRateForHost := router.Methods(http.MethodDelete).Subrouter()
 	deleteRateForHost.HandleFunc("/deleteRate/{rateID}", accommodationHandler.DeleteRateForHost)
+	filterAccommodations := router.Methods(http.MethodPost).Subrouter()
+	filterAccommodations.HandleFunc("/filterAccommodations", accommodationHandler.FilterAccommodationsHandler)
+	averageRateForHost := router.Methods(http.MethodGet).Subrouter()
+	averageRateForHost.HandleFunc("/averageRate/{id}", accommodationHandler.GetAverageRateForHost)
 
 	//Initialize the server
 	server := http.Server{

@@ -60,8 +60,18 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 		createdReservationID string
 	)
 
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		span.SetStatus(codes.Error, "Error extracting Bearer token")
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	reservation := h.Context().Value(KeyProduct{}).(*data.Reservation)
-	createdReservation, err := s.reservationRepo.InsertReservation(ctx, reservation)
+	createdReservation, err := s.reservationRepo.InsertReservation(ctx, reservation, authToken)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error creating reservation")
 		if err.Error() == "Reservation already exists for the specified dates and accommodation." {
@@ -238,6 +248,16 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 	vars := mux.Vars(h)
 	reservationID := vars["id"]
 
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		span.SetStatus(codes.Error, "Error extracting Bearer token")
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	reservation, err := s.reservationRepo.GetReservationByID(ctx, reservationID)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error retrieving reservation.")
@@ -246,8 +266,6 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 		rw.Write([]byte("Error retrieving reservation."))
 		return
 	}
-
-	s.logger.Print("AccommodationId: ", reservation.AccommodationId)
 
 	// Circuit breaker for accommodation service
 	resultAccommodation, breakerErrAccommodation := s.cb.Execute(func() (interface{}, error) {
@@ -299,9 +317,9 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 	accommodationDetails := resultAccommodation.(*AccommodationDetails)
 
 	fmt.Println("OwnerId:", accommodationDetails.OwnerId)
-	fmt.Println("OwnerId:", accommodationDetails.Name)
+	fmt.Println("Name:", accommodationDetails.Name)
 
-	err = s.reservationRepo.CancelReservation(ctx, reservationID)
+	err = s.reservationRepo.CancelReservation(ctx, reservationID, authToken)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error canceling reservation")
 		if err.Error() == "Can not cancel reservation. You can only cancel it before it starts." {
@@ -718,6 +736,118 @@ func (rh *ReservationHandler) CheckUserPastReservationsInAccommodation(w http.Re
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(hasPastReservations)
+}
+
+func (s *ReservationHandler) CheckCancellationRateBelowThreshold(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "ReservationHandler.CheckCancellationRateBelowThreshold")
+	defer span.End()
+
+	vars := mux.Vars(h)
+	userID := vars["id"]
+
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		span.SetStatus(codes.Error, "Error extracting Bearer token")
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	isBelowThreshold, err := s.reservationRepo.IsCancellationRateBelowThreshold(ctx, userID, authToken)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error checking cancellation rate")
+		s.logger.Println("Error checking cancellation rate:", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]bool{"isBelowThreshold": isBelowThreshold}
+
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(rw).Encode(response); err != nil {
+		span.SetStatus(codes.Error, "Error encoding JSON response")
+		s.logger.Println("Error encoding JSON response:", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *ReservationHandler) HasEnoughCompletedReservations(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "ReservationHandler.HasEnoughCompletedReservations")
+	defer span.End()
+
+	// Extract user ID from request or any other necessary information
+	vars := mux.Vars(h)
+	userID := vars["id"]
+
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		span.SetStatus(codes.Error, "Error extracting Bearer token")
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Call the repository method to check if the user has enough completed reservations
+	hasEnoughReservations, err := s.reservationRepo.HasEnoughCompletedReservations(ctx, userID, authToken)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error checking completed reservations")
+		s.logger.Println("Error checking completed reservations:", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with the result
+	response := map[string]bool{"hasEnoughReservations": hasEnoughReservations}
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(rw).Encode(response); err != nil {
+		span.SetStatus(codes.Error, "Error encoding JSON response")
+		s.logger.Println("Error encoding JSON response:", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *ReservationHandler) CheckReservationsMoreThan50Days(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "ReservationHandler.CheckReservationsMoreThan50Days")
+	defer span.End()
+
+	vars := mux.Vars(h)
+	userID := vars["id"]
+
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		span.SetStatus(codes.Error, "Error extracting Bearer token")
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	hasMoreThan50Days, err := s.reservationRepo.HasReservationsMoreThan50Days(ctx, userID, authToken)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error checking reservations more than 50 days")
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with the result
+	response := map[string]bool{"hasMoreThan50Days": hasMoreThan50Days}
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(rw).Encode(response); err != nil {
+		span.SetStatus(codes.Error, "Error encoding JSON response")
+		s.logger.Println("Error encoding JSON response:", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }
 
 func extractBearerToken(authHeader string) string {

@@ -201,15 +201,16 @@
 
 </div>
 
-<div class="card" style="padding-bottom: 10px;" class="container" style="padding-top: 30px; padding-bottom: 100px;">                            
+<div class="card" style="padding-bottom: 10px;" class="container" style="padding-top: 30px; padding-bottom: 100px;">
   <div class="d-flex">
     <img width="52px" height="52px" src="assets\host.png" class="rounded-circle" [routerLink]="['/hostProfile', host?.username]" />
     <div class="ms-2">
-      <h3>Hosted by {{host?.firstName}} {{host?.lastName}} <img width="15px" height="15px" src="assets\verified.png" class="rounded-circle" /></h3>
+      <h3 [ngClass]="{'highlighted-host': accommodation && accommodation.highlighted}">Hosted by {{host?.firstName}} {{host?.lastName}} <img width="15px" height="15px" src="assets\verified.png" class="rounded-circle" />
+        <span *ngIf="accommodation && accommodation.highlighted" class="highlight-label">Recommended host</span></h3>
       <p class="text-muted mb-0">Username: {{host?.username}}</p>
       <p class="text-muted mb-0">Email: {{host?.email}}</p>
-    </div>                  
-  </div>                          
+    </div>
+  </div>
 </div>
 
 <div *ngIf="userRole === 'Guest' && rateSum !== 0" style="width: 100%; text-align: center; padding-top: 50px; padding-bottom: 50px;">
@@ -224,7 +225,7 @@
 <form *ngIf="userRole === 'Guest'"  [formGroup]="addRateForm" (ngSubmit)="onSubmitAddRate()">
 
   <div class="formbold-mb-5" class="container" style="padding-bottom: 20px;">
-    <img  width="20px" height="20px" src="assets\star.webp" style="margin-right: 5px;"> 
+    <img  width="20px" height="20px" src="assets\star.webp" style="margin-right: 5px;">
     <select class="form-select" aria-label="Default select example" style="width: 5%;" formControlName="rate">
       <option value="1">1</option>
       <option value="2">2</option>
@@ -241,48 +242,48 @@
 </form>
 
 <div *ngIf="userRole === 'Guest'" class="container2" style="padding-top: 50px;">
-  
+
 <div *ngFor="let rate of rates; let i = index" class="accommodation-card" [ngClass]="{'new-row': i % 3 === 0 && i !== 0}">
-  
-  <div class="card" style="padding-bottom: 10px;">                            
+
+  <div class="card" style="padding-bottom: 10px;">
         <div class="d-flex">
           <img width="32px" height="32px" src="assets\user.jpg" class="rounded-circle" />
           <div class="ms-2">
             <p class="text-muted mb-0">{{rate?.user?.username}}</p>
-          </div>                  
-        </div>                          
+          </div>
+        </div>
   </div>
 
     <div *ngIf="rate?.rate === 5" style="text-align: left;">
-      <img  width="13px" height="13px" src="assets\star.webp"> 
-      <img  width="13px" height="13px" src="assets\star.webp"> 
-      <img  width="13px" height="13px" src="assets\star.webp"> 
-      <img  width="13px" height="13px" src="assets\star.webp"> 
-      <img  width="13px" height="13px" src="assets\star.webp"> 
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
     </div>
 
     <div *ngIf="rate?.rate === 4" style="text-align: left;">
-      <img  width="13px" height="13px" src="assets\star.webp"> 
-      <img  width="13px" height="13px" src="assets\star.webp"> 
-      <img  width="13px" height="13px" src="assets\star.webp"> 
-      <img  width="13px" height="13px" src="assets\star.webp"> 
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
     </div>
 
     <div *ngIf="rate?.rate === 3" style="text-align: left;">
-      <img  width="13px" height="13px" src="assets\star.webp"> 
-      <img  width="13px" height="13px" src="assets\star.webp"> 
-      <img  width="13px" height="13px" src="assets\star.webp"> 
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
     </div>
 
     <div *ngIf="rate?.rate === 2" style="text-align: left;">
-      <img  width="13px" height="13px" src="assets\star.webp"> 
-      <img  width="13px" height="13px" src="assets\star.webp"> 
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
     </div>
 
     <div *ngIf="rate?.rate === 1" style="text-align: left;">
-      <img  width="13px" height="13px" src="assets\star.webp"> 
+      <img  width="13px" height="13px" src="assets\star.webp">
     </div>
-  
+
   <div style="padding-top: 10px;">
     <div style="text-align: left;" *ngIf="!rate?.updatedAt">
       <span style="color: #6773ab;">Created at:</span>

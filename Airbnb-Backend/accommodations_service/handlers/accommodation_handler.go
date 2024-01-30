@@ -109,12 +109,6 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	log.Printf("Token Claims: %+v\n", claims)
 	username := claims["username"]
 
-	/*userID, statusCode, err := s.getUserIDFromUserService(username)
-	if err != nil {
-		http.Error(writer, err.Error(), statusCode)
-		return
-	}*/
-
 	// Circuit breaker for user service
 	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
 		userID, statusCode, err := s.getUserIDFromUserService(ctx, username)
@@ -430,7 +424,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 		log.Println("After http.Error")
 
-		err := s.repo.DeleteRateForHost(ctx, rate.ID.String())
+		err := s.repo.DeleteRateForHost(ctx, rate.ID.String(), tokenString)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error deleting rate for accommodation after circuit breaker error")
 			log.Printf("Error deleting rate for accommodation after circuit breaker error: %v", err)
@@ -615,7 +609,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 		return
 	}
 
-	_, err = s.repo.InsertRateForHost(ctx, rate)
+	_, err = s.repo.InsertRateForHost(ctx, rate, tokenString)
 	if err != nil {
 		span.SetStatus(codes.Error, "Database exception")
 		s.logger.Print("Database exception: ", err)
@@ -667,7 +661,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 
 		log.Println("After http.Error")
 
-		err := s.repo.DeleteRateForHost(ctx, rate.ID.String())
+		err := s.repo.DeleteRateForHost(ctx, rate.ID.String(), tokenString)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error deleting rate for host after circuit breaker error")
 			log.Printf("Error deleting rate for host after circuit breaker error: %v", err)
@@ -813,7 +807,7 @@ func (s *AccommodationHandler) DeleteRateForHost(rw http.ResponseWriter, h *http
 		return
 	}
 
-	err := s.repo.DeleteRateForHost(ctx, rateID)
+	err := s.repo.DeleteRateForHost(ctx, rateID, authToken)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error deleting rate for host")
 		http.Error(rw, "Error deleting rate for host", http.StatusInternalServerError)
@@ -829,6 +823,15 @@ func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http
 
 	vars := mux.Vars(h)
 	rateID := vars["rateID"]
+
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	rate := h.Context().Value(KeyProduct{}).(*data.Rate)
 
@@ -848,7 +851,7 @@ func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http
 
 	rate.UpdatedAt = cetTime.Format(time.RFC3339)
 
-	err = s.repo.UpdateRateForHost(ctx, rateID, rate)
+	err = s.repo.UpdateRateForHost(ctx, rateID, rate, authToken)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error updating rate for host")
 		s.logger.Println("Error updating rate for host:", err)
@@ -1184,6 +1187,34 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 	}
 }
 
+func (s *AccommodationHandler) GetAverageRateForHost(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.GetAverageRateByHost")
+	defer span.End()
+
+	vars := mux.Vars(h)
+	hostID := vars["id"]
+
+	averageRate, err := s.repo.AverageRate(ctx, hostID)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		span.SetStatus(codes.Error, "Error calculating average rate")
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]float64{"averageRate": averageRate}
+
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(rw).Encode(response); err != nil {
+		span.SetStatus(codes.Error, "Error encoding JSON response")
+		s.logger.Println("Error encoding JSON response:", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	span.SetStatus(codes.Ok, "")
+}
+
 func (s *AccommodationHandler) GetImageURLS(rw http.ResponseWriter, h *http.Request) {
 	vars := mux.Vars(h)
 	folderName := vars["folderName"]
@@ -1389,6 +1420,104 @@ func validateRate(rate *data.Rate) *ValidationError {
 	}
 
 	return nil
+}
+
+func (s *AccommodationHandler) FilterAccommodationsHandler(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.FilterAccommodationsHandler")
+	defer span.End()
+
+	var filterParams data.FilterParams
+
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		span.AddEvent("Error extracting Bearer token")
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if err := json.NewDecoder(h.Body).Decode(&filterParams); err != nil {
+		s.logger.Println("Error decoding filter parameters: ", err)
+		span.SetStatus(codes.Error, "Error decoding filter parameters")
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var minPrice int
+	var maxPrice int
+	var minPriceBool bool
+	var maxPriceBool bool
+	var err error
+
+	if filterParams.MinPrice != "" {
+		minPrice, err = strconv.Atoi(filterParams.MinPrice)
+		if err != nil {
+			errorMessage := "minPrice must be a valid integer"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+		if minPrice < 0 {
+			errorMessage := "minPrice must be non-negative"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			//rw.WriteHeader(http.StatusBadRequest)
+			//rw.Write([]byte(errorMessage))
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+		minPriceBool = true
+	}
+
+	if filterParams.MaxPrice != "" {
+		maxPrice, err = strconv.Atoi(filterParams.MaxPrice)
+		if err != nil {
+			errorMessage := "maxPrice must be a valid integer"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+		if maxPrice < 0 {
+			errorMessage := "maxPrice must be non-negative"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			//rw.WriteHeader(http.StatusBadRequest)
+			//rw.Write([]byte(errorMessage))
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+		maxPriceBool = true
+	}
+
+	if filterParams.MinPrice != "" && filterParams.MaxPrice != "" {
+		if minPrice >= 0 && maxPrice >= 0 {
+			if minPrice > maxPrice {
+				errorMessage := "minPrice must be less than or equal to maxPrice"
+				span.SetStatus(codes.Error, errorMessage)
+				http.Error(rw, errorMessage, http.StatusBadRequest)
+				fmt.Println("Error:", errorMessage)
+				return
+			}
+		}
+	}
+
+	accommodations, err := s.repo.FilterAccommodations(ctx, authToken, filterParams, minPrice, maxPrice, minPriceBool, maxPriceBool)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		span.SetStatus(codes.Error, "Error filtering accommodations")
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(accommodations)
+
+	span.SetStatus(codes.Ok, "")
+	rw.WriteHeader(http.StatusOK)
 }
 
 func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.Handler) http.Handler {
