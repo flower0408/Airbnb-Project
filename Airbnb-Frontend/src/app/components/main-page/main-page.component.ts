@@ -24,7 +24,6 @@ interface Accommodation {
   id?: string;
   name: string;
   description?: string;
-  images: string;
   location: Location;
   benefits: string;
   minGuest: number;

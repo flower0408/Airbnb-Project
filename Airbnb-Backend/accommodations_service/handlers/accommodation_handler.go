@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"accommodations_service/authorization"
+	"accommodations_service/cache"
 	"accommodations_service/data"
 	"accommodations_service/errors"
+	"accommodations_service/storage"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -20,9 +22,12 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -44,24 +49,28 @@ var (
 type KeyProduct struct{}
 
 type AccommodationHandler struct {
-	logger *log.Logger
-	repo   *data.AccommodationRepo
-	cb     *gobreaker.CircuitBreaker
-	cb2    *gobreaker.CircuitBreaker
-	tracer trace.Tracer
+	logger  *log.Logger
+	repo    *data.AccommodationRepo
+	cb      *gobreaker.CircuitBreaker
+	cb2     *gobreaker.CircuitBreaker
+	tracer  trace.Tracer
+	storage *storage.FileStorage
+	cache   *cache.ImageCache
 }
 
 type ValidationError struct {
 	Message string `json:"message"`
 }
 
-func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo, t trace.Tracer) *AccommodationHandler {
+func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo, t trace.Tracer, s *storage.FileStorage, c *cache.ImageCache) *AccommodationHandler {
 	return &AccommodationHandler{
-		logger: l,
-		repo:   r,
-		cb:     CircuitBreaker("accommodationService"),
-		cb2:    CircuitBreaker("reservationService2"),
-		tracer: t,
+		logger:  l,
+		repo:    r,
+		cb:      CircuitBreaker("accommodationService"),
+		cb2:     CircuitBreaker("reservationService2"),
+		tracer:  t,
+		storage: s,
+		cache:   c,
 	}
 }
 
@@ -99,6 +108,12 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	claims := authorization.GetMapClaims(token.Bytes())
 	log.Printf("Token Claims: %+v\n", claims)
 	username := claims["username"]
+
+	/*userID, statusCode, err := s.getUserIDFromUserService(username)
+	if err != nil {
+		http.Error(writer, err.Error(), statusCode)
+		return
+	}*/
 
 	// Circuit breaker for user service
 	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
@@ -1206,6 +1221,124 @@ func (s *AccommodationHandler) GetAverageRateForHost(rw http.ResponseWriter, h *
 	span.SetStatus(codes.Ok, "")
 }
 
+func (s *AccommodationHandler) GetImageURLS(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	folderName := vars["folderName"]
+
+	// Check if the image urls is in the cache
+	imageURLs, err := s.cache.GetUrls(folderName)
+	if err == nil {
+		// Return the list of image URLs as JSON
+		json.NewEncoder(rw).Encode(imageURLs)
+		return
+	}
+
+	imageURLs, err = s.storage.GetImageURLS(folderName)
+	if err != nil {
+		s.logger.Println("Error getting image URLs:", err)
+		http.Error(rw, "Error getting image URLs", http.StatusInternalServerError)
+		return
+	}
+
+	// Store the image url in the cache for future requests
+	err = s.cache.PostUrls(folderName, imageURLs)
+	if err != nil {
+		log.Println("Failed to store image URLs in cache:", err)
+	}
+
+	// Return the list of image URLs as JSON
+	json.NewEncoder(rw).Encode(imageURLs)
+}
+
+func (s *AccommodationHandler) GetImageContent(rw http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	folderName := vars["folderName"]
+	imageName := vars["imageName"]
+
+	imagePath := path.Join(folderName, imageName)
+	imagePath = strings.TrimPrefix(imagePath, "/") // Ensure there is no leading slash
+
+	imageType := mime.TypeByExtension(filepath.Ext(imagePath))
+	if imageType == "" {
+		http.Error(rw, "Error retrieving image type", http.StatusInternalServerError)
+		http.Error(rw, imagePath, http.StatusInternalServerError)
+		return
+	}
+
+	// Check if the image is in the cache
+	imageContent, err := s.cache.Get(folderName, imageName)
+	if err == nil {
+		// Image found in cache, serve it
+		rw.Header().Set("Content-Type", imageType)
+		rw.WriteHeader(http.StatusOK)
+		rw.Write(imageContent)
+		return
+	}
+
+	imageContent, err = s.storage.GetImageContent(imagePath)
+	if err != nil {
+		http.Error(rw, "Error retrieving image content", http.StatusInternalServerError)
+		http.Error(rw, imagePath, http.StatusInternalServerError)
+		return
+	}
+
+	// Store the image in the cache for future requests
+	err = s.cache.Post(folderName, imageName, imageContent)
+	if err != nil {
+		log.Println("Failed to store image in cache:", err)
+	}
+
+	rw.Header().Set("Content-Type", imageType)
+	rw.WriteHeader(http.StatusOK)
+	rw.Write(imageContent)
+}
+
+func (s *AccommodationHandler) UploadImages(rw http.ResponseWriter, h *http.Request) {
+	vars := mux.Vars(h)
+	folderName := vars["folderName"]
+
+	// Parse the multipart form with a MB limit
+	err := h.ParseMultipartForm(40 << 20)
+	if err != nil {
+		s.logger.Println("Error parsing form:", err)
+		http.Error(rw, "Error parsing form", http.StatusBadRequest)
+		return
+	}
+
+	// Retrieve the files from the form data
+	files := h.MultipartForm.File["images"]
+
+	for _, file := range files {
+		// Open each file and get its content
+		src, err := file.Open()
+		if err != nil {
+			s.logger.Println("Error opening file:", err)
+			http.Error(rw, "Error opening file", http.StatusInternalServerError)
+			return
+		}
+		defer src.Close()
+
+		// Read the content of the file
+		imageContent, err := ioutil.ReadAll(src)
+		if err != nil {
+			s.logger.Println("Error reading file:", err)
+			http.Error(rw, "Error reading file", http.StatusInternalServerError)
+			return
+		}
+
+		// Save the image using the SaveImage function
+		err = s.storage.SaveImage(folderName, file.Filename, imageContent)
+		if err != nil {
+			s.logger.Println("Error saving file:", err)
+			http.Error(rw, "Error saving file", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Return a success response
+	rw.WriteHeader(http.StatusOK)
+}
+
 type StatusError struct {
 	Code int
 	Err  string
@@ -1218,7 +1351,6 @@ func (e StatusError) Error() string {
 func validateAccommodation(accommodation *data.Accommodation) *ValidationError {
 	nameRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,35}$`)
 	descriptionRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,200}$`)
-	imagesRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,200}$`)
 	countryRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,35}$`)
 	cityRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,35}$`)
 	streetRegex := regexp.MustCompile(`^[A-Z][a-zA-Z0-9\s,'-]{2,35}$`)
@@ -1236,13 +1368,6 @@ func validateAccommodation(accommodation *data.Accommodation) *ValidationError {
 	}
 	if !descriptionRegex.MatchString(accommodation.Description) {
 		return &ValidationError{Message: "Invalid 'Description' format. It must be 3-200 characters long and contain only letters, numbers, spaces, commas, apostrophes, and hyphens"}
-	}
-
-	if accommodation.Images == "" {
-		return &ValidationError{Message: "Images cannot be empty"}
-	}
-	if !imagesRegex.MatchString(accommodation.Images) {
-		return &ValidationError{Message: "Invalid 'Images' format. It must be 3-200 characters long and contain only letters, numbers, spaces, commas, apostrophes, and hyphens"}
 	}
 
 	if accommodation.Benefits == "" {

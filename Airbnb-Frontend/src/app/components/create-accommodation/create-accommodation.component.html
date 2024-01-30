@@ -41,22 +41,6 @@
           </div>
         </div>
         <div class="formbold-mb-5">
-          <label for="images" class="formbold-form-label"> Image </label>
-          <input
-            type="text"
-            name="images"
-            id="images"
-            class="formbold-form-input"
-            formControlName="images"
-            required
-            [ngClass]="{ 'is-invalid': submitted && f['images'].errors }"
-          />
-          <div *ngIf="submitted && f['images'].errors" class="invalid-feedback">
-            <div *ngIf="f['images'].errors['required']">Image is required.</div>
-            <div *ngIf="f['images'].errors['pattern']">Image can only contain letters, numbers, spaces, commas, quotes, and hyphens.</div>
-          </div>
-        </div>
-        <div class="formbold-mb-5">
             <label for="benefits" class="formbold-form-label"> Benefits </label>
             <input
               type="text"
@@ -240,7 +224,16 @@
           </div>
         </div>
 
-        <div>
+        <label class="formbold-form-label formbold-form-label-2" style="margin-bottom: 25px;">
+          Upload image
+        </label>
+        <input type="file" (change)="onFileChange($event)" multiple accept="image/jpeg, image/jpg, image/png"/>
+        <p style="margin-top: 20px;">Images:</p>
+        <div *ngFor="let file of imageFiles">
+            {{ file.name }}
+        </div>
+
+        <div style="margin-top: 45px;">
           <button type="submit" class="formbold-btn">Create accommodation</button>
         </div>
       </form>

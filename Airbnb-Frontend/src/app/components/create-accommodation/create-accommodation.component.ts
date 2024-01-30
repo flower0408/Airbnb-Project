@@ -24,6 +24,7 @@ export class CreateAccommodationComponent implements OnInit{
 
   accommodationForm!: FormGroup;
   responseId: any;
+  imageFiles: File[] = [];
 
   @ViewChild('datapicker') dateInput!: ElementRef;
 
@@ -48,7 +49,6 @@ export class CreateAccommodationComponent implements OnInit{
    this.accommodationForm = this.fb.group({
      name: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(35), Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,35}$/)]],
      description: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(200), Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,200}$/)]],
-     images: ['', [Validators.required,Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,200}$/)]],
      benefits: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(100), Validators.pattern(/^[a-zA-Z0-9\s,'-]{3,100}$/)]],
      Minguest: ['', [Validators.required, Validators.min(1)]],
      Maxguest: ['', [Validators.required,Validators.min(1), MaxGuestValidator(/*this.accommodationForm.get('Minguest')*/)]],
@@ -73,7 +73,6 @@ export class CreateAccommodationComponent implements OnInit{
         id: '',
         name: formValues.name,
         description: formValues.description,
-        images: formValues.images,
         location: {
           country: formValues.country,
           city: formValues.city,
@@ -86,9 +85,12 @@ export class CreateAccommodationComponent implements OnInit{
         ownerId: '',
       };
 
-      this.accommodationService.createAccommodation(newAccommodation).subscribe(
+      if (this.imageFiles.length !== 0) {
+        this.accommodationService.createAccommodation(newAccommodation).subscribe(
         (id:any) => {
-          this.responseId = id;
+          this.responseId = id.id;
+          this.uploadImages();
+
           let elements = document.getElementsByClassName("drp-selected");
           let dateRange: any;
           for (var i = 0; i < elements.length; i++) {
@@ -104,7 +106,7 @@ export class CreateAccommodationComponent implements OnInit{
           const newAppointment: Appointment = {
             id: "",
             available: datesInRange,
-            accommodationId: this.responseId.id,
+            accommodationId: this.responseId,
             pricePerGuest: 0,
             pricePerAccommodation: 0
           };
@@ -149,8 +151,47 @@ export class CreateAccommodationComponent implements OnInit{
           }
         }
       );
+      }else{
+        this.openSnackBar("No images selected for upload!", "");
+        console.warn('No images selected for upload.');
+      }
+
     }
   }
+
+  onFileChange(event: any): void {
+    // Handle file input change
+    const files: FileList = event.target.files;
+    for (let i = 0; i < files.length; i++) {
+      this.imageFiles.push(files[i]);
+    }
+  }
+
+  uploadImages(): void {
+    if (this.imageFiles.length === 0) {
+      this.openSnackBar("No images selected for upload!", "");
+      console.warn('No images selected for upload.');
+      return;
+    }
+
+    // Use FormData to send files to the backend
+    const formData = new FormData();
+    for (const file of this.imageFiles) {
+      formData.append('images', file);
+    }
+
+    // Call the service method to upload images
+    this.accommodationService.uploadImages(this.responseId, formData).subscribe(
+      () => {
+        console.log('Images uploaded successfully!');
+      },
+      (error) => {
+        console.error('Error uploading images:', error);
+        this.openSnackBar("Error uploading images!", "");
+      }
+    );
+  }
+
 
   openSnackBar(message: string, action: string) {
     this._snackBar.open(message, action,  {
