@@ -1216,35 +1216,46 @@ func (s *AccommodationHandler) GetAverageRateForHost(rw http.ResponseWriter, h *
 }
 
 func (s *AccommodationHandler) GetImageURLS(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.GetImageURLS")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	folderName := vars["folderName"]
 
 	// Check if the image urls is in the cache
-	imageURLs, err := s.cache.GetUrls(folderName)
+	imageURLs, err := s.cache.GetUrls(ctx, folderName)
 	if err == nil {
 		// Return the list of image URLs as JSON
+		span.SetStatus(codes.Ok, "")
 		json.NewEncoder(rw).Encode(imageURLs)
 		return
 	}
 
-	imageURLs, err = s.storage.GetImageURLS(folderName)
+	imageURLs, err = s.storage.GetImageURLS(ctx, folderName)
 	if err != nil {
+		span.SetStatus(codes.Error, "Error getting image URLs")
 		s.logger.Println("Error getting image URLs:", err)
 		http.Error(rw, "Error getting image URLs", http.StatusInternalServerError)
 		return
 	}
 
 	// Store the image url in the cache for future requests
-	err = s.cache.PostUrls(folderName, imageURLs)
+	err = s.cache.PostUrls(ctx, folderName, imageURLs)
 	if err != nil {
+		span.SetStatus(codes.Error, "Failed to store image URLs in cache")
+		s.logger.Println("Failed to store image URLs in cache", err)
 		log.Println("Failed to store image URLs in cache:", err)
 	}
 
 	// Return the list of image URLs as JSON
+	span.SetStatus(codes.Ok, "")
 	json.NewEncoder(rw).Encode(imageURLs)
 }
 
 func (s *AccommodationHandler) GetImageContent(rw http.ResponseWriter, req *http.Request) {
+	ctx, span := s.tracer.Start(req.Context(), "AccommodationHandler.GetImageContent")
+	defer span.End()
+
 	vars := mux.Vars(req)
 	folderName := vars["folderName"]
 	imageName := vars["imageName"]
@@ -1254,46 +1265,58 @@ func (s *AccommodationHandler) GetImageContent(rw http.ResponseWriter, req *http
 
 	imageType := mime.TypeByExtension(filepath.Ext(imagePath))
 	if imageType == "" {
+		span.SetStatus(codes.Error, "Error retrieving image type")
+		s.logger.Println("Error retrieving image type")
 		http.Error(rw, "Error retrieving image type", http.StatusInternalServerError)
 		http.Error(rw, imagePath, http.StatusInternalServerError)
 		return
 	}
 
 	// Check if the image is in the cache
-	imageContent, err := s.cache.Get(folderName, imageName)
+	imageContent, err := s.cache.Get(ctx, folderName, imageName)
 	if err == nil {
 		// Image found in cache, serve it
 		rw.Header().Set("Content-Type", imageType)
+		span.SetStatus(codes.Ok, "")
 		rw.WriteHeader(http.StatusOK)
 		rw.Write(imageContent)
 		return
 	}
 
-	imageContent, err = s.storage.GetImageContent(imagePath)
+	imageContent, err = s.storage.GetImageContent(ctx, imagePath)
 	if err != nil {
+		span.SetStatus(codes.Error, "Error retrieving image content")
+		s.logger.Println("Error retrieving image content")
 		http.Error(rw, "Error retrieving image content", http.StatusInternalServerError)
 		http.Error(rw, imagePath, http.StatusInternalServerError)
 		return
 	}
 
 	// Store the image in the cache for future requests
-	err = s.cache.Post(folderName, imageName, imageContent)
+	err = s.cache.Post(ctx, folderName, imageName, imageContent)
 	if err != nil {
+		span.SetStatus(codes.Error, "Failed to store image in cache")
+		s.logger.Println("Failed to store image in cache")
 		log.Println("Failed to store image in cache:", err)
 	}
 
 	rw.Header().Set("Content-Type", imageType)
+	span.SetStatus(codes.Ok, "")
 	rw.WriteHeader(http.StatusOK)
 	rw.Write(imageContent)
 }
 
 func (s *AccommodationHandler) UploadImages(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.UploadImages")
+	defer span.End()
+
 	vars := mux.Vars(h)
 	folderName := vars["folderName"]
 
 	// Parse the multipart form with a MB limit
 	err := h.ParseMultipartForm(40 << 20)
 	if err != nil {
+		span.SetStatus(codes.Error, "Error parsing form")
 		s.logger.Println("Error parsing form:", err)
 		http.Error(rw, "Error parsing form", http.StatusBadRequest)
 		return
@@ -1306,6 +1329,7 @@ func (s *AccommodationHandler) UploadImages(rw http.ResponseWriter, h *http.Requ
 		// Open each file and get its content
 		src, err := file.Open()
 		if err != nil {
+			span.SetStatus(codes.Error, "Error opening file")
 			s.logger.Println("Error opening file:", err)
 			http.Error(rw, "Error opening file", http.StatusInternalServerError)
 			return
@@ -1315,14 +1339,16 @@ func (s *AccommodationHandler) UploadImages(rw http.ResponseWriter, h *http.Requ
 		// Read the content of the file
 		imageContent, err := ioutil.ReadAll(src)
 		if err != nil {
+			span.SetStatus(codes.Error, "Error reading file")
 			s.logger.Println("Error reading file:", err)
 			http.Error(rw, "Error reading file", http.StatusInternalServerError)
 			return
 		}
 
 		// Save the image using the SaveImage function
-		err = s.storage.SaveImage(folderName, file.Filename, imageContent)
+		err = s.storage.SaveImage(ctx, folderName, file.Filename, imageContent)
 		if err != nil {
+			span.SetStatus(codes.Error, "Error saving file")
 			s.logger.Println("Error saving file:", err)
 			http.Error(rw, "Error saving file", http.StatusInternalServerError)
 			return
@@ -1330,6 +1356,7 @@ func (s *AccommodationHandler) UploadImages(rw http.ResponseWriter, h *http.Requ
 	}
 
 	// Return a success response
+	span.SetStatus(codes.Ok, "")
 	rw.WriteHeader(http.StatusOK)
 }
 

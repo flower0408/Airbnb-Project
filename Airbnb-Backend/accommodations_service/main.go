@@ -61,7 +61,7 @@ func main() {
 	store.Ping()
 
 	//// NoSQL: Initialize File Storage store
-	fileStorage, err := storage.New(storeLogger)
+	fileStorage, err := storage.New(storeLogger, tracer)
 	if err != nil {
 		logger.Fatalf("Error initializing FileStorage: %v", err)
 	}
@@ -73,7 +73,7 @@ func main() {
 	_ = fileStorage.CreateDirectoriesStart()
 
 	// NoSQL: Initialize Cache store
-	imageCache, err := cache.New(storeLogger)
+	imageCache, err := cache.New(storeLogger, tracer)
 	if err != nil {
 		logger.Fatal(err)
 	}

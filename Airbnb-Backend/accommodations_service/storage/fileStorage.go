@@ -1,8 +1,11 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"github.com/colinmarc/hdfs/v2"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"io/ioutil"
 	"log"
 	"os"
@@ -12,9 +15,10 @@ import (
 type FileStorage struct {
 	client *hdfs.Client
 	logger *log.Logger
+	tracer trace.Tracer
 }
 
-func New(logger *log.Logger) (*FileStorage, error) {
+func New(logger *log.Logger, tracer trace.Tracer) (*FileStorage, error) {
 
 	hdfsUri := os.Getenv("HDFS_URI")
 	fmt.Println("HDFS_URI:", hdfsUri)
@@ -29,6 +33,7 @@ func New(logger *log.Logger) (*FileStorage, error) {
 	return &FileStorage{
 		client: client,
 		logger: logger,
+		tracer: tracer,
 	}, nil
 }
 
@@ -58,27 +63,34 @@ func (fs *FileStorage) CreateDirectory(folderName string) error {
 	return nil
 }
 
-func (fs *FileStorage) SaveImage(folderName, imageName string, imageContent []byte) error {
+func (fs *FileStorage) SaveImage(ctx context.Context, folderName, imageName string, imageContent []byte) error {
+	ctx, span := fs.tracer.Start(ctx, "FileStorage.SaveImage")
+	defer span.End()
+
 	folderPath := path.Join(hdfsRoot, folderName)
 	imagePath := path.Join(folderPath, imageName)
 
 	if err := fs.CreateDirectory(folderName); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		fs.logger.Printf("Error creating directory: %v", err)
 		return err
 	}
 
 	file, err := fs.client.Create(imagePath)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		fs.logger.Printf("Error creating file %s: %v", imagePath, err)
 		return err
 	}
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
+			span.SetStatus(codes.Error, closeErr.Error())
 			fs.logger.Printf("Error closing file: %v", closeErr)
 		}
 	}()
 
 	if _, err := file.Write(imageContent); err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		fs.logger.Printf("Error writing image content: %v", err)
 		return err
 	}
@@ -108,12 +120,17 @@ func (fs *FileStorage) WalkDirectories() []string {
 	return paths
 }
 
-func (fs *FileStorage) GetImageURLS(folderName string) ([]string, error) {
+func (fs *FileStorage) GetImageURLS(ctx context.Context, folderName string) ([]string, error) {
+	ctx, span := fs.tracer.Start(ctx, "FileStorage.GetImageURLS")
+	defer span.End()
+
 	folderPath := path.Join(hdfsRoot, folderName)
 	var imageNames []string
 
 	callbackFunc := func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
+			fs.logger.Println(err)
 			return err
 		}
 		if !info.IsDir() {
@@ -125,23 +142,32 @@ func (fs *FileStorage) GetImageURLS(folderName string) ([]string, error) {
 
 	err := fs.client.Walk(folderPath, callbackFunc)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		fs.logger.Println(err)
 		return nil, err
 	}
 
 	return imageNames, nil
 }
 
-func (fs *FileStorage) GetImageContent(imagePath string) ([]byte, error) {
+func (fs *FileStorage) GetImageContent(ctx context.Context, imagePath string) ([]byte, error) {
+	ctx, span := fs.tracer.Start(ctx, "FileStorage.GetImageContent")
+	defer span.End()
+
 	fullPath := path.Join(hdfsRoot, "/", imagePath)
 
 	file, err := fs.client.Open(fullPath)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		fs.logger.Println(err)
 		return nil, fmt.Errorf("error opening file: %v", err)
 	}
 	defer file.Close()
 
 	imageData, err := ioutil.ReadAll(file)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		fs.logger.Println(err)
 		return nil, fmt.Errorf("error reading file: %v", err)
 	}
 

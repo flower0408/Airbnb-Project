@@ -1,9 +1,12 @@
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/go-redis/redis"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"log"
 	"os"
 	"time"
@@ -12,10 +15,11 @@ import (
 type ImageCache struct {
 	cli    *redis.Client
 	logger *log.Logger
+	tracer trace.Tracer
 }
 
 // Construct Redis client
-func New(logger *log.Logger) (*ImageCache, error) {
+func New(logger *log.Logger, tracer trace.Tracer) (*ImageCache, error) {
 	redisHost := os.Getenv("IMAGE_CACHE_HOST")
 	redisPort := os.Getenv("IMAGE_CACHE_PORT")
 	redisAddress := fmt.Sprintf("%s:%s", redisHost, redisPort)
@@ -27,6 +31,7 @@ func New(logger *log.Logger) (*ImageCache, error) {
 	return &ImageCache{
 		cli:    client,
 		logger: logger,
+		tracer: tracer,
 	}, nil
 }
 
@@ -37,7 +42,9 @@ func (pc *ImageCache) Ping() {
 }
 
 // Set key-value pair with default expiration
-func (pc *ImageCache) Post(accommodationId string, imageName string, image []byte) error {
+func (pc *ImageCache) Post(ctx context.Context, accommodationId string, imageName string, image []byte) error {
+	ctx, span := pc.tracer.Start(ctx, "ImageCache.Post")
+	defer span.End()
 
 	err := pc.cli.Set(constructKey(accommodationId, imageName), image, 30*time.Minute).Err()
 	if err == nil {
@@ -47,9 +54,14 @@ func (pc *ImageCache) Post(accommodationId string, imageName string, image []byt
 }
 
 // Get value by key
-func (pc *ImageCache) Get(accommodationId string, imageName string) ([]byte, error) {
+func (pc *ImageCache) Get(ctx context.Context, accommodationId string, imageName string) ([]byte, error) {
+	ctx, span := pc.tracer.Start(ctx, "ImageCache.Get")
+	defer span.End()
+
 	value, err := pc.cli.Get(constructKey(accommodationId, imageName)).Bytes()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		pc.logger.Println(err)
 		return nil, err
 	}
 
@@ -57,15 +69,21 @@ func (pc *ImageCache) Get(accommodationId string, imageName string) ([]byte, err
 	return value, nil
 }
 
-func (pc *ImageCache) PostUrls(accommodationId string, urls []string) error {
+func (pc *ImageCache) PostUrls(ctx context.Context, accommodationId string, urls []string) error {
+	ctx, span := pc.tracer.Start(ctx, "ImageCache.PostUrls")
+	defer span.End()
 
 	jsonValue, err := json.Marshal(urls)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		pc.logger.Println(err)
 		return err
 	}
 
 	err = pc.cli.Set(constructKeyUrls(accommodationId), jsonValue, 30*time.Minute).Err()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		pc.logger.Println(err)
 		return err
 	}
 
@@ -73,16 +91,22 @@ func (pc *ImageCache) PostUrls(accommodationId string, urls []string) error {
 	return nil
 }
 
-func (pc *ImageCache) GetUrls(accommodationId string) ([]string, error) {
+func (pc *ImageCache) GetUrls(ctx context.Context, accommodationId string) ([]string, error) {
+	ctx, span := pc.tracer.Start(ctx, "ImageCache.GetUrls")
+	defer span.End()
 
 	jsonValue, err := pc.cli.Get(constructKeyUrls(accommodationId)).Result()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		pc.logger.Println(err)
 		return nil, err
 	}
 
 	var urls []string
 	err = json.Unmarshal([]byte(jsonValue), &urls)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		pc.logger.Println(err)
 		return nil, err
 	}
 
