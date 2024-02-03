@@ -21,6 +21,9 @@ services:
       SMTP_AUTH_PASSWORD: ${SMTP_AUTH_PASSWORD}
       SECRET_KEY: ${SECRET_KEY}
       JAEGER_ADDRESS: ${JAEGER_ADDRESS}
+      CERT: /notification_service-cert.pem
+      KEY: /notification_service-key.pem
+      CA_CERT: /ca-cert.pem
     depends_on:
       - notification_db
       - jaeger
@@ -28,6 +31,10 @@ services:
       - network
     dns:
       - 8.8.8.8
+    volumes:
+      - ./api_gateway/cert/notification_service/notification_service-cert.pem:/notification_service-cert.pem
+      - ./api_gateway/cert/notification_service/notification_service-key.pem:/notification_service-key.pem
+      - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem
 
   user_service:
     image: user_service
@@ -46,11 +53,18 @@ services:
       RESERVATIONS_SERVICE_PORT: ${RESERVATIONS_SERVICE_PORT}
       SECRET_KEY: ${SECRET_KEY}
       JAEGER_ADDRESS: ${JAEGER_ADDRESS}
+      CERT: /user_service-cert.pem
+      KEY: /user_service-key.pem
+      CA_CERT: /ca-cert.pem
     depends_on:
       - user_db
       - jaeger
     networks:
       - network
+    volumes:
+      - ./api_gateway/cert/user_service/user_service-cert.pem:/user_service-cert.pem
+      - ./api_gateway/cert/user_service/user_service-key.pem:/user_service-key.pem
+      - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem
 
 
   auth_service:
@@ -79,6 +93,9 @@ services:
       SMTP_AUTH_MAIL: ${SMTP_AUTH_MAIL}
       SMTP_AUTH_PASSWORD: ${SMTP_AUTH_PASSWORD}
       JAEGER_ADDRESS: ${JAEGER_ADDRESS}
+      CERT: /auth_service-cert.pem
+      KEY: /auth_service-key.pem
+      CA_CERT: /ca-cert.pem
     depends_on:
       - auth_db
       - auth_cache
@@ -87,6 +104,10 @@ services:
       - network
     dns:
       - 8.8.8.8
+    volumes:
+      - ./api_gateway/cert/auth_service/auth_service-cert.pem:/auth_service-cert.pem
+      - ./api_gateway/cert/auth_service/auth_service-key.pem:/auth_service-key.pem
+      - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem
 
 
   accommodations_service:
@@ -110,11 +131,18 @@ services:
       NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT}
       SECRET_KEY: ${SECRET_KEY}
       JAEGER_ADDRESS: ${JAEGER_ADDRESS}
+      CERT: /accommodations_service-cert.pem
+      KEY: /accommodations_service-key.pem
+      CA_CERT: /ca-cert.pem
     depends_on:
       - accommodations_db
       - jaeger
     networks:
       - network
+    volumes:
+      - ./api_gateway/cert/accommodations_service/accommodations_service-cert.pem:/accommodations_service-cert.pem
+      - ./api_gateway/cert/accommodations_service/accommodations_service-key.pem:/accommodations_service-key.pem
+      - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem
 
   reservations_service:
     image: reservations_service
@@ -139,6 +167,9 @@ services:
       NOTIFICATION_SERVICE_HOST: ${NOTIFICATION_SERVICE_HOST}
       NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT}
       JAEGER_ADDRESS: ${JAEGER_ADDRESS}
+      CERT: /reservations_service-cert.pem
+      KEY: /reservations_service-key.pem
+      CA_CERT: /ca-cert.pem
       # depends_on:
       # - reservations_db
     # Pokretanje reservation servisa tek kada je baza uspesno pokrenuta
@@ -151,6 +182,39 @@ services:
 
     networks:
       - network
+    volumes:
+      - ./api_gateway/cert/reservations_service/reservations_service-cert.pem:/reservations_service-cert.pem
+      - ./api_gateway/cert/reservations_service/reservations_service-key.pem:/reservations_service-key.pem
+      - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem
+
+  recommendation_service:
+    image: recommendations_service
+    container_name: recommendations_service
+    build:
+      context: .
+      dockerfile: ./recommendations_service/Dockerfile
+    restart: always
+    ports:
+      - ${RECOMMENDATION_SERVICE_PORT}:${RECOMMENDATION_SERVICE_PORT}
+    environment:
+      RECOMMENDATION_DB_HOST: ${RECOMMENDATION_DB_HOST}
+      RECOMMENDATION_DB_PORT: ${RECOMMENDATION_DB_PORT}
+      RECOMMENDATION_DB_USER: ${RECOMMENDATION_DB_USER}
+      RECOMMENDATION_DB_PASS: ${RECOMMENDATION_DB_PASS}
+      RECOMMENDATION_SERVICE_PORT: ${RECOMMENDATION_SERVICE_PORT}
+      SECRET_KEY: ${SECRET_KEY}
+      CERT: /recommendations_service-cert.pem
+      KEY: /recommendations_service-key.pem
+      CA_CERT: /ca-cert.pem
+    depends_on:
+      - recommendation_db
+      - jaeger
+    networks:
+      - network
+    volumes:
+      - ./api_gateway/cert/recommendations_service/recommendations_service-cert.pem:/recommendations_service-cert.pem
+      - ./api_gateway/cert/recommendations_service/recommendations_service-key.pem:/recommendations_service-key.pem
+      - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem
 
 
   api_gateway:
@@ -167,6 +231,7 @@ services:
       - user_service
       - notification_service
       - accommodations_service
+      - recommendation_service
     networks:
       - network
 
@@ -242,6 +307,35 @@ services:
     volumes:
       - auth_cache:/data
 
+  recommendation_db:
+    image: neo4j
+    restart: always
+    ports:
+      # bolt
+      - "7687:7687"
+      # http
+      - "7474:7474"
+      # https
+      - "7473:7473"
+    # Docker healtcheck - checks if database is "alive"
+    healthcheck:
+      # test: [ "CMD-SHELL", "echo RETURN 1 | cypher-shell -a <NEO4J_dbms_connector_bolt_listen__address> -u <user defined username> -p <user defined password> || exit 1" ]
+      test:
+        [
+          "CMD-SHELL",
+          "echo RETURN 1 | cypher-shell -a bolt://recommendation_db:7687 -u neo4j -p airbnb123 || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      - NEO4J_initial_dbms_default__database=recommendation
+      - NEO4J_AUTH=neo4j/airbnb123
+    networks:
+      - network
+    volumes:
+      - neo4j_data:/data
+
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:
@@ -261,6 +355,7 @@ services:
 volumes:
   # Volume na koji se povezuje reservations_db baza podataka
   reservations_db_store:
+  neo4j_data:
   auth_cache:
     driver: local
 

@@ -2,6 +2,8 @@ package application
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,7 +59,7 @@ func (service *NotificationService) GetAllNotifications(ctx context.Context) ([]
 	return service.store.GetAllNotifications(ctx)
 }
 
-func (service *NotificationService) CreateNotification(ctx context.Context, notification *domain.Notification) error {
+func (service *NotificationService) CreateNotification(ctx context.Context, notification *domain.Notification, token string) error {
 	ctx, span := service.tracer.Start(ctx, "NotificationService.CreateNotification")
 	defer span.End()
 
@@ -76,7 +78,7 @@ func (service *NotificationService) CreateNotification(ctx context.Context, noti
 	}
 
 	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
-		userDetails, err := service.getUserDetails(ctx, notification.ForHostId)
+		userDetails, err := service.getUserDetails(ctx, notification.ForHostId, token)
 		return userDetails, err
 	})
 
@@ -109,15 +111,12 @@ func (service *NotificationService) CreateNotification(ctx context.Context, noti
 	return nil
 }
 
-func (service *NotificationService) getUserDetails(ctx context.Context, userID string) (*UserDetails, error) {
+func (service *NotificationService) getUserDetails(ctx context.Context, userID string, token string) (*UserDetails, error) {
 	ctx, span := service.tracer.Start(ctx, "NotificationService.getUserDetails")
 	defer span.End()
 
-	userDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", userServiceHost, userServicePort, userID)
-	userDetailsRequest, _ := http.NewRequest("GET", userDetailsEndpoint, nil)
-	//userDetailsResponse, err := http.Get(userDetailsEndpoint)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userDetailsRequest.Header))
-	userDetailsResponse, err := http.DefaultClient.Do(userDetailsRequest)
+	userDetailsEndpoint := fmt.Sprintf("https://%s:%s/%s", userServiceHost, userServicePort, userID)
+	userDetailsResponse, err := service.HTTPSRequest(ctx, token, userDetailsEndpoint, "GET")
 	if err != nil {
 		span.SetStatus(codes.Error, "UserServiceError")
 		return nil, fmt.Errorf("UserServiceError: %v", err)
@@ -201,4 +200,49 @@ func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
 			},
 		},
 	)
+}
+
+func (service *NotificationService) HTTPSRequest(ctx context.Context, token string, url string, method string) (*http.Response, error) {
+	clientCertPath := "ca-cert.pem"
+
+	clientCaCert, err := ioutil.ReadFile(clientCertPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(clientCaCert)
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs:    caCertPool,
+		MinVersion: tls.VersionTLS12,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		CurvePreferences: []tls.CurveID{tls.CurveP521,
+			tls.CurveP384, tls.CurveP256},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
+
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }

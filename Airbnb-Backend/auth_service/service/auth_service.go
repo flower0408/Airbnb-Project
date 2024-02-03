@@ -7,6 +7,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -253,10 +255,8 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 
 	// Circuit breaker for email existence check
 	/*result, breakerErr := service.cb.Execute(func() (interface{}, error) {
-		userServiceEndpointMail := fmt.Sprintf("http://%s:%s/mailExist/%s", userServiceHost, userServicePort, user.Email)
-		userServiceRequestMail, _ := http.NewRequest("GET", userServiceEndpointMail, nil)
-		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequestMail.Header))
-		response, err := http.DefaultClient.Do(userServiceRequestMail)
+		userServiceEndpointMail := fmt.Sprintf("https://%s:%s/mailExist/%s", userServiceHost, userServicePort, user.Email)
+		response, err := service.HTTPSRequestGetToken(ctx, userServiceEndpointMail, "GET")
 		if err != nil {
 			span.SetStatus(codes.Error, "Email service error")
 			fmt.Println(err)
@@ -293,19 +293,22 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 	}
 	user.Password = string(hash)
 
-	body, err := json.Marshal(user)
-	if err != nil {
-		span.SetStatus(codes.Error, "Error marshal user")
-		return "", 500, err
+	requestBody := map[string]interface{}{
+		"id":        user.ID,
+		"firstName": user.FirstName,
+		"lastName":  user.LastName,
+		"gender":    user.Gender,
+		"age":       user.Age,
+		"residence": user.Residence,
+		"email":     user.Email,
+		"username":  user.Username,
+		"userType":  user.UserType,
 	}
 
 	// Circuit breaker for user service request
 	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
-
-		userServiceEndpoint := fmt.Sprintf("http://%s:%s/", userServiceHost, userServicePort)
-		userServiceRequest, _ := http.NewRequest("POST", userServiceEndpoint, bytes.NewReader(body))
-		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
-		responseUser, err := http.DefaultClient.Do(userServiceRequest)
+		userServiceEndpoint := fmt.Sprintf("https://%s:%s/", userServiceHost, userServicePort)
+		responseUser, err := service.HTTPSRequestWithoutToken(ctx, userServiceEndpoint, "POST", requestBody)
 		if err != nil {
 			span.SetStatus(codes.Error, "UserServiceError")
 			return nil, fmt.Errorf("UserServiceError")
@@ -473,10 +476,8 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 	defer span.End()
 	// Circuit breaker for communication with user service
 	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
-		userServiceEndpoint := fmt.Sprintf("http://%s:%s/mailExist/%s", userServiceHost, userServicePort, email)
-		userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
-		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
-		response, err := http.DefaultClient.Do(userServiceRequest)
+		url := fmt.Sprintf("https://%s:%s/mailExist/%s", userServiceHost, userServicePort, email)
+		response, err := service.HTTPSRequestGetToken(ctx, url, "GET")
 		if err != nil {
 			span.SetStatus(codes.Error, "EmailServiceError")
 			return nil, fmt.Errorf("EmailServiceError")
@@ -496,10 +497,8 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 		_, _ = io.Copy(buf, response.Body)
 		userID := buf.String()
 
-		userDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", userServiceHost, userServicePort, userID)
-		userDetailsRequest, _ := http.NewRequest("GET", userDetailsEndpoint, nil)
-		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
-		userDetailsResponse, err := http.DefaultClient.Do(userDetailsRequest)
+		userDetailsEndpoint := fmt.Sprintf("https://%s:%s/%s", userServiceHost, userServicePort, userID)
+		userDetailsResponse, err := service.HTTPSRequestGetToken(ctx, userDetailsEndpoint, "GET")
 		if err != nil {
 			span.SetStatus(codes.Error, "UserServiceError")
 			return nil, fmt.Errorf("UserServiceError")
@@ -781,18 +780,10 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 		"new_username": username.NewUsername,
 	}
 
-	body, err := json.Marshal(requestBody)
-	if err != nil {
-		span.SetStatus(codes.Error, "MarshalError")
-		return "MarshalError", http.StatusInternalServerError, err
-	}
-
 	// Circuit breaker for communication with user service
 	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
-		userServiceEndpoint := fmt.Sprintf("http://%s:%s/changeUsername", userServiceHost, userServicePort)
-		userServiceRequest, _ := http.NewRequest("POST", userServiceEndpoint, bytes.NewReader(body))
-		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
-		responseUser, err := http.DefaultClient.Do(userServiceRequest)
+		url := fmt.Sprintf("http://%s:%s/changeUsername", userServiceHost, userServicePort)
+		responseUser, err := service.HTTPSRequest(ctx, token, url, "POST", requestBody)
 
 		if err != nil {
 			fmt.Println(err)
@@ -1009,4 +1000,150 @@ func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
 			},
 		},
 	)
+}
+
+func (service *AuthService) HTTPSRequest(ctx context.Context, token string, url string, method string, requestBody interface{}) (*http.Response, error) {
+	clientCertPath := "ca-cert.pem"
+
+	clientCaCert, err := ioutil.ReadFile(clientCertPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(clientCaCert)
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs: caCertPool,
+		//ServerName: "user_service",
+		MinVersion: tls.VersionTLS12,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		CurvePreferences: []tls.CurveID{tls.CurveP521,
+			tls.CurveP384, tls.CurveP256},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
+
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(method, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (service *AuthService) HTTPSRequestWithoutToken(ctx context.Context, url string, method string, requestBody interface{}) (*http.Response, error) {
+	clientCertPath := "ca-cert.pem"
+
+	clientCaCert, err := ioutil.ReadFile(clientCertPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(clientCaCert)
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs: caCertPool,
+		//ServerName: "user_service",
+		MinVersion: tls.VersionTLS12,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		CurvePreferences: []tls.CurveID{tls.CurveP521,
+			tls.CurveP384, tls.CurveP256},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
+
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(method, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (service *AuthService) HTTPSRequestGetToken(ctx context.Context, url string, method string) (*http.Response, error) {
+	clientCertPath := "ca-cert.pem"
+
+	clientCaCert, err := ioutil.ReadFile(clientCertPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(clientCaCert)
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs: caCertPool,
+		//ServerName: "user_service",
+		MinVersion: tls.VersionTLS12,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		CurvePreferences: []tls.CurveID{tls.CurveP521,
+			tls.CurveP384, tls.CurveP256},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
+
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }

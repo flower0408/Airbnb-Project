@@ -65,7 +65,7 @@ func (handler *UserHandler) Init(router *mux.Router) {
 	router.HandleFunc("/{id}/delete", handler.DeleteAccount).Methods("DELETE")
 
 	http.Handle("/", router)
-	log.Fatal(http.ListenAndServe(":8002", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
+	log.Fatal(http.ListenAndServeTLS(":8002", "user_service-cert.pem", "user_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
 }
 
 type ValidationError struct {

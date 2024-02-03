@@ -35,8 +35,8 @@ func NewServer(config *config.Config) *Server {
 	}
 }
 
-func (server *Server) initMongoClient() *mongo.Client {
-	client, err := store.GetClient(server.config.NotificationDBHost, server.config.NotificationDBPort)
+func (server *Server) initMongoClient(httpClient *http.Client) *mongo.Client {
+	client, err := store.GetClientWithHTTPConfig(server.config.NotificationDBHost, server.config.NotificationDBPort, httpClient)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -50,7 +50,16 @@ func (server *Server) initNotificationStore(client *mongo.Client, tracer trace.T
 }
 
 func (server *Server) Start() {
-	mongoClient := server.initMongoClient()
+
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        10,
+			MaxIdleConnsPerHost: 10,
+			MaxConnsPerHost:     10,
+		},
+	}
+
+	mongoClient := server.initMongoClient(httpClient)
 	defer func(mongoClient *mongo.Client, ctx context.Context) {
 		err := mongoClient.Disconnect(ctx)
 		if err != nil {

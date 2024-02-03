@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -10,10 +12,12 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"reservations_service/data"
+	"strings"
 	"time"
 )
 
@@ -173,7 +177,15 @@ func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.R
 
 	appointment := h.Context().Value(KeyProduct{}).(*data.Appointment)
 
-	err := r.appointmentRepo.UpdateAppointment(ctx, id, appointment)
+	tokenString, err := extractTokenFromHeader(h)
+	if err != nil {
+		span.SetStatus(codes.Error, "No token found")
+		rw.WriteHeader(http.StatusBadRequest)
+		rw.Write([]byte("No token found"))
+		return
+	}
+
+	err = r.appointmentRepo.UpdateAppointment(ctx, id, appointment, tokenString)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error update appointment")
 		if err.Error() == "Reservation exists for the appointment." {
@@ -198,6 +210,22 @@ func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.R
 	rw.WriteHeader(http.StatusOK)
 }
 
+func extractTokenFromHeader(request *http.Request) (string, error) {
+	authHeader := request.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", fmt.Errorf("No Authorization header found")
+	}
+
+	// Check if the header starts with "Bearer "
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return "", fmt.Errorf("Invalid Authorization header format")
+	}
+
+	// Extract the token
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	return tokenString, nil
+}
+
 func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.ResponseWriter, h *http.Request) {
 	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.DeleteAppointmentsByAccommodationIDs")
 	defer span.End()
@@ -215,19 +243,8 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 		return
 	}
 
-	accommodationEndpoint := fmt.Sprintf("http://%s:%s/owner/%s", accommodationServiceHost, accommodationServicePort, userId)
-	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
-	if err != nil {
-		span.SetStatus(codes.Error, "Error creating accommodation request")
-		r.logger.Println("Error creating accommodation request:", err)
-		rw.Write([]byte("Error creating accommodation request"))
-		return
-	}
-
-	accommodationRequest.Header.Set("Authorization", "Bearer "+authToken)
-
-	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
+	accommodationEndpoint := fmt.Sprintf("https://%s:%s/owner/%s", accommodationServiceHost, accommodationServicePort, userId)
+	accommodationResponse, err := r.HTTPSRequestWithouthBody(ctx, authToken, accommodationEndpoint, "GET")
 	if err != nil {
 		span.SetStatus(codes.Error, "Error sending accommodation request")
 		r.logger.Println("Error sending accommodation request:", err)
@@ -284,4 +301,49 @@ func (s *AppointmentHandler) MiddlewareAppointmentDeserialization(next http.Hand
 		h = h.WithContext(ctx)
 		next.ServeHTTP(rw, h)
 	})
+}
+
+func (s *AppointmentHandler) HTTPSRequestWithouthBody(ctx context.Context, token string, url string, method string) (*http.Response, error) {
+	clientCertPath := "ca-cert.pem"
+
+	clientCaCert, err := ioutil.ReadFile(clientCertPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(clientCaCert)
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs:    caCertPool,
+		MinVersion: tls.VersionTLS12,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		CurvePreferences: []tls.CurveID{tls.CurveP521,
+			tls.CurveP384, tls.CurveP256},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
+
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }

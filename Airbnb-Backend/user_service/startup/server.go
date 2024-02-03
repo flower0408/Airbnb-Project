@@ -35,8 +35,8 @@ func NewServer(config *config.Config) *Server {
 	}
 }
 
-func (server *Server) initMongoClient() *mongo.Client {
-	client, err := store.GetClient(server.config.UserDBHost, server.config.UserDBPort)
+func (server *Server) initMongoClient(httpClient *http.Client) *mongo.Client {
+	client, err := store.GetClientWithHTTPConfig(server.config.UserDBHost, server.config.UserDBPort, httpClient)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -50,7 +50,16 @@ func (server *Server) initUserStore(client *mongo.Client, tracer trace.Tracer) d
 }
 
 func (server *Server) Start() {
-	mongoClient := server.initMongoClient()
+
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        10,
+			MaxIdleConnsPerHost: 10,
+			MaxConnsPerHost:     10,
+		},
+	}
+
+	mongoClient := server.initMongoClient(httpClient)
 	defer func(mongoClient *mongo.Client, ctx context.Context) {
 		err := mongoClient.Disconnect(ctx)
 		if err != nil {
@@ -149,7 +158,6 @@ func newTraceProvider(exp sdktrace.SpanExporter) *sdktrace.TracerProvider {
 
 func MiddlewareContentTypeSet(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, h *http.Request) {
-		//s.logger.Println("Method [", h.Method, "] - Hit path :", h.URL.Path)
 
 		rw.Header().Add("Content-Type", "application/json")
 		rw.Header().Set("X-Content-Type-Options", "nosniff")
