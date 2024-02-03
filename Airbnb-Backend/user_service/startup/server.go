@@ -72,7 +72,7 @@ func (server *Server) start(tweetHandler *handlers.UserHandler) {
 	router.Use(MiddlewareContentTypeSet)
 	tweetHandler.Init(router)
 
-	_, loggingMiddleware := logovi.LogInit("logfile.log")
+	_, loggingMiddleware, _, _, _ := logovi.LogInit("logfile.log", "user_service")
 	router.Use(loggingMiddleware)
 
 	srv := &http.Server{
