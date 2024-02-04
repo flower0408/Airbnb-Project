@@ -145,7 +145,7 @@ func main() {
 	logger.Println("Server listening on port", port)
 
 	go func() {
-		err := server.ListenAndServe()
+		err := server.ListenAndServeTLS("accommodations_service-cert.pem", "accommodations_service-key.pem")
 		if err != nil {
 			logger.Fatal(err)
 		}

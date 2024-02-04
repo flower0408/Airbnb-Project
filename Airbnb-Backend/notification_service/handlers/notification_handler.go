@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/casbin/casbin"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
@@ -15,6 +16,7 @@ import (
 	"notification_service/domain"
 	application "notification_service/service"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -50,7 +52,7 @@ func (handler *NotificationHandler) Init(router *mux.Router) {
 	router.HandleFunc("/", handler.CreateNotification).Methods("POST")
 
 	http.Handle("/", router)
-	log.Fatal(http.ListenAndServe(":8005", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
+	log.Fatal(http.ListenAndServeTLS(":8005", "notification_service-cert.pem", "notification_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
 }
 
 type ValidationError struct {
@@ -72,7 +74,15 @@ func (handler *NotificationHandler) CreateNotification(writer http.ResponseWrite
 
 	notification.CreatedAt = time.Now()
 
-	err = handler.service.CreateNotification(ctx, &notification)
+	tokenString, err := extractTokenFromHeader(req)
+	if err != nil {
+		span.SetStatus(codes.Error, "No token found")
+		writer.WriteHeader(http.StatusBadRequest)
+		writer.Write([]byte("No token found"))
+		return
+	}
+
+	err = handler.service.CreateNotification(ctx, &notification, tokenString)
 	if err != nil {
 		if err.Error() == "Database error" {
 			span.SetStatus(codes.Error, "Internal server error")
@@ -85,6 +95,22 @@ func (handler *NotificationHandler) CreateNotification(writer http.ResponseWrite
 	}
 
 	writer.WriteHeader(http.StatusOK)
+}
+
+func extractTokenFromHeader(request *http.Request) (string, error) {
+	authHeader := request.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", fmt.Errorf("No Authorization header found")
+	}
+
+	// Check if the header starts with "Bearer "
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return "", fmt.Errorf("Invalid Authorization header format")
+	}
+
+	// Extract the token
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	return tokenString, nil
 }
 
 func (handler *NotificationHandler) GetAllNotifications(writer http.ResponseWriter, req *http.Request) {

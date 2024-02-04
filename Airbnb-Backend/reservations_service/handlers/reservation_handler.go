@@ -3,6 +3,8 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"github.com/cristalhq/jwt/v4"
@@ -60,18 +62,16 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 		createdReservationID string
 	)
 
-	authHeader := h.Header.Get("Authorization")
-	authToken := extractBearerToken(authHeader)
-
-	if authToken == "" {
-		span.SetStatus(codes.Error, "Error extracting Bearer token")
-		s.logger.Println("Error extracting Bearer token")
-		rw.WriteHeader(http.StatusUnauthorized)
+	tokenString, err := extractTokenFromHeader(h)
+	if err != nil {
+		span.SetStatus(codes.Error, "No token found")
+		rw.WriteHeader(http.StatusBadRequest)
+		rw.Write([]byte("No token found"))
 		return
 	}
 
 	reservation := h.Context().Value(KeyProduct{}).(*data.Reservation)
-	createdReservation, err := s.reservationRepo.InsertReservation(ctx, reservation, authToken)
+	createdReservation, err := s.reservationRepo.InsertReservation(ctx, reservation, tokenString)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error creating reservation")
 		if err.Error() == "Reservation already exists for the specified dates and accommodation." {
@@ -102,10 +102,8 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 	// Circuit breaker for accommodation service
 	resultAccommodation, breakerErrAccommodation := s.cb.Execute(func() (interface{}, error) {
 
-		accommodationDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", accommodationServiceHost, accommodationServicePort, createdReservation.AccommodationId)
-		accommodationDetailsRequest, _ := http.NewRequest("GET", accommodationDetailsEndpoint, nil)
-		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationDetailsRequest.Header))
-		accommodationDetailsResponse, err := http.DefaultClient.Do(accommodationDetailsRequest)
+		accommodationDetailsEndpoint := fmt.Sprintf("https://%s:%s/%s", accommodationServiceHost, accommodationServicePort, createdReservation.AccommodationId)
+		accommodationDetailsResponse, err := s.HTTPSRequestWithouthBody(ctx, tokenString, accommodationDetailsEndpoint, "GET")
 		if err != nil {
 			span.SetStatus(codes.Error, "Error fetching accommodation details")
 			return nil, fmt.Errorf("Error fetching accommodation details: %v", err)
@@ -167,16 +165,8 @@ func (s *ReservationHandler) CreateReservation(rw http.ResponseWriter, h *http.R
 			"Description": fmt.Sprintf("Guest for period %s created reservation for accommodation  %s", createdReservation.Period, accommodationDetails.Name),
 		}
 
-		body, err := json.Marshal(requestBody)
-		if err != nil {
-			span.SetStatus(codes.Error, "Error marshaling requestBody details JSON")
-			return nil, fmt.Errorf("Error marshaling requestBody details JSON: %v", err)
-		}
-
-		notificationServiceEndpoint := fmt.Sprintf("http://%s:%s/", notificationServiceHost, notificationServicePort)
-		notificationServiceRequest, _ := http.NewRequest("POST", notificationServiceEndpoint, bytes.NewReader(body))
-		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(notificationServiceRequest.Header))
-		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
+		notificationServiceEndpoint := fmt.Sprintf("https://%s:%s/", notificationServiceHost, notificationServicePort)
+		responseUser, err := s.HTTPSRequestWithBody(ctx, tokenString, notificationServiceEndpoint, "POST", requestBody)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error fetching notification service")
 			return nil, fmt.Errorf("Error fetching notification service: %v", err)
@@ -245,18 +235,27 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 	ctx, span := s.tracer.Start(h.Context(), "ReservationHandler.CancelReservation")
 	defer span.End()
 
-	vars := mux.Vars(h)
-	reservationID := vars["id"]
-
-	authHeader := h.Header.Get("Authorization")
-	authToken := extractBearerToken(authHeader)
-
-	if authToken == "" {
-		span.SetStatus(codes.Error, "Error extracting Bearer token")
-		s.logger.Println("Error extracting Bearer token")
-		rw.WriteHeader(http.StatusUnauthorized)
+	bearer := h.Header.Get("Authorization")
+	if bearer == "" {
+		log.Println("Authorization header missing")
+		span.AddEvent("Authorization header missing")
+		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+
+	bearerToken := strings.Split(bearer, "Bearer ")
+	if len(bearerToken) != 2 {
+		log.Println("Malformed Authorization header")
+		span.AddEvent("Malformed Authorization header")
+		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	tokenString := bearerToken[1]
+	log.Printf("Token: %s\n", tokenString)
+
+	vars := mux.Vars(h)
+	reservationID := vars["id"]
 
 	reservation, err := s.reservationRepo.GetReservationByID(ctx, reservationID)
 	if err != nil {
@@ -269,10 +268,8 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 
 	// Circuit breaker for accommodation service
 	resultAccommodation, breakerErrAccommodation := s.cb.Execute(func() (interface{}, error) {
-		accommodationDetailsEndpoint := fmt.Sprintf("http://%s:%s/%s", accommodationServiceHost, accommodationServicePort, reservation.AccommodationId)
-		accommodationDetailsRequest, _ := http.NewRequest("GET", accommodationDetailsEndpoint, nil)
-		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationDetailsRequest.Header))
-		accommodationDetailsResponse, err := http.DefaultClient.Do(accommodationDetailsRequest)
+		accommodationDetailsEndpoint := fmt.Sprintf("https://%s:%s/%s", accommodationServiceHost, accommodationServicePort, reservation.AccommodationId)
+		accommodationDetailsResponse, err := s.HTTPSRequestWithouthBody(ctx, tokenString, accommodationDetailsEndpoint, "GET")
 		if err != nil {
 			span.SetStatus(codes.Error, "Error fetching accommodation details")
 			return nil, fmt.Errorf("Error fetching accommodation details: %v", err)
@@ -319,7 +316,7 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 	fmt.Println("OwnerId:", accommodationDetails.OwnerId)
 	fmt.Println("Name:", accommodationDetails.Name)
 
-	err = s.reservationRepo.CancelReservation(ctx, reservationID, authToken)
+	err = s.reservationRepo.CancelReservation(ctx, reservationID, tokenString)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error canceling reservation")
 		if err.Error() == "Can not cancel reservation. You can only cancel it before it starts." {
@@ -343,16 +340,8 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 			"Description": fmt.Sprintf("Guest for period %s canceled reservation for accommodation  %s", reservation.Period, accommodationDetails.Name),
 		}
 
-		body, err := json.Marshal(requestBody)
-		if err != nil {
-			span.SetStatus(codes.Error, err.Error())
-			return nil, fmt.Errorf("Error marshaling requestBody details JSON: %v", err)
-		}
-
-		notificationServiceEndpoint := fmt.Sprintf("http://%s:%s/", notificationServiceHost, notificationServicePort)
-		notificationServiceRequest, _ := http.NewRequest("POST", notificationServiceEndpoint, bytes.NewReader(body))
-		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(notificationServiceRequest.Header))
-		responseUser, err := http.DefaultClient.Do(notificationServiceRequest)
+		notificationServiceEndpoint := fmt.Sprintf("https://%s:%s/", notificationServiceHost, notificationServicePort)
+		responseUser, err := s.HTTPSRequestWithBody(ctx, tokenString, notificationServiceEndpoint, "POST", requestBody)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error fetching notification service")
 			return nil, fmt.Errorf("Error fetching notification service: %v", err)
@@ -389,20 +378,6 @@ func (s *ReservationHandler) CancelReservation(rw http.ResponseWriter, h *http.R
 
 		fmt.Println("Received meaningful data:", resultNotification)
 	}
-
-	/*err = s.reservationRepo.CancelReservation(reservationID)
-	if err != nil {
-		if err.Error() == "Can not cancel reservation. You can only cancel it before it starts." {
-			s.logger.Print("Can not cancel reservation. You can only cancel it before it starts. ")
-			rw.WriteHeader(http.StatusBadRequest)
-			rw.Write([]byte("Can not cancel reservation. You can only cancel it before it starts."))
-		} else {
-			s.logger.Print("Error cancelling reservation: ", err)
-			rw.WriteHeader(http.StatusInternalServerError)
-			rw.Write([]byte("Error cancelling reservation."))
-		}
-		return
-	}*/
 
 	rw.WriteHeader(http.StatusOK)
 	s.logger.Print("Reservation cancelled succesfully")
@@ -447,7 +422,7 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 	// Circuit breaker for user service
 	log.Printf("Circuit Breaker: %+v\n", s.cb)
 	result, breakerErr := s.cb.Execute(func() (interface{}, error) {
-		userID, statusCode, err := s.getUserIDFromUserService(ctx, username)
+		userID, statusCode, err := s.getUserIDFromUserService(ctx, username, tokenString)
 		return map[string]interface{}{"userID": userID, "statusCode": statusCode, "err": err}, err
 	})
 
@@ -512,15 +487,12 @@ func (s *ReservationHandler) GetReservationByUser(rw http.ResponseWriter, h *htt
 	}
 }
 
-func (s *ReservationHandler) getUserIDFromUserService(ctx context.Context, username interface{}) (string, int, error) {
+func (s *ReservationHandler) getUserIDFromUserService(ctx context.Context, username interface{}, token string) (string, int, error) {
 	ctx, span := s.tracer.Start(ctx, "ReservationHandler.getUserIDFromUserService")
 	defer span.End()
 
-	userServiceEndpoint := fmt.Sprintf("http://%s:%s/getOne/%s", userServiceHost, userServicePort, username)
-	userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
-	log.Printf("Host: %s, Port: %s, Username: %s\n", userServiceHost, userServicePort, username)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userServiceRequest.Header))
-	response, err := http.DefaultClient.Do(userServiceRequest)
+	userServiceEndpoint := fmt.Sprintf("https://%s:%s/getOne/%s", userServiceHost, userServicePort, username)
+	response, err := s.HTTPSRequestWithouthBody(ctx, token, userServiceEndpoint, "GET")
 	if err != nil {
 		span.SetStatus(codes.Error, "Interval server error")
 		return "", http.StatusInternalServerError, err
@@ -903,4 +875,99 @@ func ExtractTraceInfoMiddleware(next http.Handler) http.Handler {
 		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (s *ReservationHandler) HTTPSRequestWithBody(ctx context.Context, token string, url string, method string, requestBody interface{}) (*http.Response, error) {
+	clientCertPath := "ca-cert.pem"
+
+	clientCaCert, err := ioutil.ReadFile(clientCertPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(clientCaCert)
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs:    caCertPool,
+		MinVersion: tls.VersionTLS12,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		CurvePreferences: []tls.CurveID{tls.CurveP521,
+			tls.CurveP384, tls.CurveP256},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
+
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(method, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (s *ReservationHandler) HTTPSRequestWithouthBody(ctx context.Context, token string, url string, method string) (*http.Response, error) {
+	clientCertPath := "ca-cert.pem"
+
+	clientCaCert, err := ioutil.ReadFile(clientCertPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(clientCaCert)
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs:    caCertPool,
+		MinVersion: tls.VersionTLS12,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		CurvePreferences: []tls.CurveID{tls.CurveP521,
+			tls.CurveP384, tls.CurveP256},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
+
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }

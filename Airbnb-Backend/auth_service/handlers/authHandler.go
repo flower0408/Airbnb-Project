@@ -8,6 +8,8 @@ import (
 	"auth_service/service"
 	"auth_service/store"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"github.com/casbin/casbin"
@@ -92,7 +94,7 @@ func (handler *AuthHandler) Init(router *mux.Router) {
 	router.HandleFunc("/deleteUser", handler.DeleteUser).Methods("DELETE")
 
 	http.Handle("/", router)
-	log.Fatal(http.ListenAndServe(":8003", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
+	log.Fatal(http.ListenAndServeTLS(":8003", "auth_service-cert.pem", "auth_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
 }
 
 func (handler *AuthHandler) logoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -667,17 +669,17 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 		} else {
 			// Circuit breaker for deleting accommodations
 			deleteAccommodationsResult, breakerErr := handler.cb.Execute(func() (interface{}, error) {
-				deleteAccommodationsEndpoint := fmt.Sprintf("http://%s:%s/delete_accommodations/%s", accommodationServiceHost, accommodationServicePort, userID)
-				deleteAccommodationsRequest, err := http.NewRequest("DELETE", deleteAccommodationsEndpoint, nil)
+				deleteAccommodationsEndpoint := fmt.Sprintf("https://%s:%s/delete_accommodations/%s", accommodationServiceHost, accommodationServicePort, userID)
+				/*deleteAccommodationsRequest, err := http.NewRequest("DELETE", deleteAccommodationsEndpoint, nil)
 				otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(deleteAccommodationsRequest.Header))
 				deleteAccommodationsRequest.Header.Set("Authorization", "Bearer "+tokenString)
 				if err != nil {
 					span.SetStatus(codes.Error, "Error creating deleteAccommodationsRequest")
 					log.Println("Error creating deleteAccommodationsRequest:", err)
 					return nil, err
-				}
+				}*/
 
-				deleteAccommodationsResponse, err := http.DefaultClient.Do(deleteAccommodationsRequest)
+				deleteAccommodationsResponse, err := handler.HTTPSRequest(ctx, tokenString, deleteAccommodationsEndpoint, "DELETE")
 				if err != nil {
 					span.SetStatus(codes.Error, "Error sending deleteAccommodationsRequest")
 					log.Println("Error sending deleteAccommodationsRequest:", err)
@@ -780,9 +782,9 @@ func (handler *AuthHandler) hasHostReservations(ctx context.Context, userID stri
 	ctx, span := handler.tracer.Start(ctx, "AuthHandler.hasHostReservations")
 	defer span.End()
 
-	reservationEndpoint := fmt.Sprintf("http://%s:%s/reservationsByHost/%s", reservationServiceHost, reservationServicePort, userID)
+	reservationEndpoint := fmt.Sprintf("https://%s:%s/reservationsByHost/%s", reservationServiceHost, reservationServicePort, userID)
 
-	reservationRequest, err := http.NewRequest("GET", reservationEndpoint, nil)
+	/*reservationRequest, err := http.NewRequest("GET", reservationEndpoint, nil)
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest.Header))
 	if err != nil {
 		log.Println("Error creating reservation request:", err)
@@ -790,9 +792,9 @@ func (handler *AuthHandler) hasHostReservations(ctx context.Context, userID stri
 		return false, err
 	}
 
-	reservationRequest.Header.Set("Authorization", "Bearer "+authToken)
+	reservationRequest.Header.Set("Authorization", "Bearer "+authToken)*/
 
-	reservationResponse, err := http.DefaultClient.Do(reservationRequest)
+	reservationResponse, err := handler.HTTPSRequest(ctx, authToken, reservationEndpoint, "GET")
 	if err != nil {
 		log.Println("Error sending reservation request:", err)
 		span.SetStatus(codes.Error, "Error sending reservation request")
@@ -824,9 +826,9 @@ func (handler *AuthHandler) hasGuestReservations(ctx context.Context, authToken 
 	ctx, span := handler.tracer.Start(ctx, "AuthHandler.hasGuestReservations")
 	defer span.End()
 
-	reservationEndpoint := fmt.Sprintf("http://%s:%s/reservationsByUser", reservationServiceHost, reservationServicePort)
+	reservationEndpoint := fmt.Sprintf("https://%s:%s/reservationsByUser", reservationServiceHost, reservationServicePort)
 
-	reservationRequest, err := http.NewRequest("GET", reservationEndpoint, nil)
+	/*reservationRequest, err := http.NewRequest("GET", reservationEndpoint, nil)
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest.Header))
 	if err != nil {
 		log.Println("Error creating reservation request:", err)
@@ -834,9 +836,9 @@ func (handler *AuthHandler) hasGuestReservations(ctx context.Context, authToken 
 		return false, err
 	}
 
-	reservationRequest.Header.Set("Authorization", "Bearer "+authToken)
+	reservationRequest.Header.Set("Authorization", "Bearer "+authToken)*/
 
-	reservationResponse, err := http.DefaultClient.Do(reservationRequest)
+	reservationResponse, err := handler.HTTPSRequest(ctx, authToken, reservationEndpoint, "GET")
 	if err != nil {
 		log.Println("Error sending reservation request:", err)
 		span.SetStatus(codes.Error, "Error sending reservation request")
@@ -868,9 +870,9 @@ func (handler *AuthHandler) getUserIDByUsername(ctx context.Context, username st
 	ctx, span := handler.tracer.Start(ctx, "AuthHandler.getUserIDByUsername")
 	defer span.End()
 
-	userserviceEndpoint := fmt.Sprintf("http://%s:%s/getId/%s", userServiceHost, userServicePort, username)
+	userserviceEndpoint := fmt.Sprintf("https://%s:%s/getId/%s", userServiceHost, userServicePort, username)
 
-	userserviceRequest, err := http.NewRequest("GET", userserviceEndpoint, nil)
+	/*userserviceRequest, err := http.NewRequest("GET", userserviceEndpoint, nil)
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userserviceRequest.Header))
 	if err != nil {
 		log.Println("Error creating user request:", err)
@@ -878,9 +880,9 @@ func (handler *AuthHandler) getUserIDByUsername(ctx context.Context, username st
 		return "", err
 	}
 
-	userserviceRequest.Header.Set("Authorization", "Bearer "+authToken)
+	userserviceRequest.Header.Set("Authorization", "Bearer "+authToken)*/
 
-	userserviceResponse, err := http.DefaultClient.Do(userserviceRequest)
+	userserviceResponse, err := handler.HTTPSRequest(ctx, authToken, userserviceEndpoint, "GET")
 	if err != nil {
 		log.Println("Error sending user request:", err)
 		span.SetStatus(codes.Error, "Error sending user request")
@@ -911,9 +913,9 @@ func (handler *AuthHandler) userServiceDeleteUser(ctx context.Context, userID st
 	ctx, span := handler.tracer.Start(ctx, "AuthHandler.userServiceDeleteUser")
 	defer span.End()
 
-	userserviceEndpoint := fmt.Sprintf("http://%s:%s/%s/delete", userServiceHost, userServicePort, userID)
+	userserviceEndpoint := fmt.Sprintf("https://%s:%s/%s/delete", userServiceHost, userServicePort, userID)
 
-	userserviceRequest, err := http.NewRequest("DELETE", userserviceEndpoint, nil)
+	/*userserviceRequest, err := http.NewRequest("DELETE", userserviceEndpoint, nil)
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userserviceRequest.Header))
 	if err != nil {
 		log.Println("Error creating user request:", err)
@@ -921,9 +923,9 @@ func (handler *AuthHandler) userServiceDeleteUser(ctx context.Context, userID st
 		return err
 	}
 
-	userserviceRequest.Header.Set("Authorization", "Bearer "+authToken)
+	userserviceRequest.Header.Set("Authorization", "Bearer "+authToken)*/
 
-	userserviceResponse, err := http.DefaultClient.Do(userserviceRequest)
+	userserviceResponse, err := handler.HTTPSRequest(ctx, authToken, userserviceEndpoint, "DELETE")
 	if err != nil {
 		log.Println("Error sending user request:", err)
 		span.SetStatus(codes.Error, "Error sending user request")
@@ -981,9 +983,7 @@ func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
 				return counts.ConsecutiveFailures > 2
 			},
 			OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
-				//fmt.Printf("DEBUG: Before Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
 				log.Printf("Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
-				//fmt.Printf("DEBUG: After Circuit Breaker '%s' changed from '%s' to '%s'\n", name, from, to)
 			},
 
 			IsSuccessful: func(err error) bool {
@@ -995,4 +995,49 @@ func CircuitBreaker(name string) *gobreaker.CircuitBreaker {
 			},
 		},
 	)
+}
+
+func (handler *AuthHandler) HTTPSRequest(ctx context.Context, token string, url string, method string) (*http.Response, error) {
+	clientCertPath := "ca-cert.pem"
+
+	clientCaCert, err := ioutil.ReadFile(clientCertPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(clientCaCert)
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs:    caCertPool,
+		MinVersion: tls.VersionTLS12,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		CurvePreferences: []tls.CurveID{tls.CurveP521,
+			tls.CurveP384, tls.CurveP256},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
+
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }

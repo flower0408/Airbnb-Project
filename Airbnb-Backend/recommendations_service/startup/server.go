@@ -1,20 +1,12 @@
 package startup
 
 import (
-	"auth_service/domain"
-	"auth_service/handlers"
-	"auth_service/service"
-	"auth_service/startup/config"
-	store2 "auth_service/store"
 	"context"
-	"crypto/tls"
 	"fmt"
-	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
-	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
-	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
@@ -23,19 +15,38 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"recommendations_service/domain"
+	"recommendations_service/handlers"
+	application "recommendations_service/service"
+	"recommendations_service/startup/config"
+	"recommendations_service/store"
 	"syscall"
 	"time"
 )
 
 type Server struct {
-	config    *config.Config
-	tlsConfig *tls.Config
+	config *config.Config
 }
 
 func NewServer(config *config.Config) *Server {
 	return &Server{
 		config: config,
 	}
+}
+
+func (server *Server) initNeo4JDriver(httpClient *http.Client) *neo4j.DriverWithContext {
+	driver, err := store.GetClient(server.config.RecommendationDBHost, server.config.RecommendationDBPort,
+		server.config.RecommendationDBUser, server.config.RecommendationDBPass, httpClient)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return driver
+}
+
+func (server *Server) initRecommendationStore(driver *neo4j.DriverWithContext, tracer trace.Tracer) domain.RecommendationStore {
+	store := store.NewRecommendationNeo4JStore(driver, tracer)
+
+	return store
 }
 
 func (server *Server) Start() {
@@ -48,14 +59,6 @@ func (server *Server) Start() {
 		},
 	}
 
-	mongoClient := server.initMongoClient(httpClient)
-	defer func(mongoClient *mongo.Client, ctx context.Context) {
-		err := mongoClient.Disconnect(ctx)
-		if err != nil {
-			log.Printf("Error disconnecting from MongoDB: %v", err)
-		}
-	}(mongoClient, context.Background())
-
 	cfg := config.NewConfig()
 
 	ctx := context.Background()
@@ -67,56 +70,28 @@ func (server *Server) Start() {
 	tp := newTraceProvider(exp)
 	defer func() { _ = tp.Shutdown(ctx) }()
 	otel.SetTracerProvider(tp)
-	tracer := tp.Tracer("auth_service")
-	otel.SetTextMapPropagator(propagation.TraceContext{})
+	tracer := tp.Tracer("recommendations_service")
 
-	redisClient := server.initRedisClient()
-	authCache := server.initAuthCache(redisClient, tracer)
-	authStore := server.initAuthStore(mongoClient, tracer)
-	authService := server.initAuthService(authStore, authCache, tracer)
-	authHandler := server.initAuthHandler(authService, tracer)
+	neo4jDriver := server.initNeo4JDriver(httpClient)
+	recommendationStore := server.initRecommendationStore(neo4jDriver, tracer)
+	recommendationService := server.initRecommendationService(recommendationStore, tracer)
+	recommendationHandler := server.initRecommendationHandler(recommendationService, tracer)
 
-	server.start(authHandler)
+	server.start(recommendationHandler)
 }
 
-func (server *Server) initMongoClient(httpClient *http.Client) *mongo.Client {
-	client, err := store2.GetClientWithHTTPConfig(server.config.AuthDBHost, server.config.AuthDBPort, httpClient)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return client
+func (server *Server) initRecommendationService(store domain.RecommendationStore, tracer trace.Tracer) *application.RecommendationService {
+	return application.NewRecommendationService(store, tracer)
 }
 
-func (server *Server) initRedisClient() *redis.Client {
-	client, err := store2.GetRedisClient(server.config.AuthCacheHost, server.config.AuthCachePort)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return client
+func (server *Server) initRecommendationHandler(service *application.RecommendationService, tracer trace.Tracer) *handlers.RecommendationHandler {
+	return handlers.NewRecommendationHandler(service, tracer)
 }
 
-func (server *Server) initAuthStore(client *mongo.Client, tracer trace.Tracer) domain.AuthStore {
-	store := store2.NewAuthMongoDBStore(client, tracer)
-	return store
-}
-
-func (server *Server) initAuthCache(client *redis.Client, tracer trace.Tracer) domain.AuthCache {
-	cache := store2.NewAuthRedisCache(client, tracer)
-	return cache
-}
-
-func (server *Server) initAuthService(store domain.AuthStore, cache domain.AuthCache, tracer trace.Tracer) *application.AuthService {
-	return application.NewAuthService(store, cache, tracer)
-}
-
-func (server *Server) initAuthHandler(service *application.AuthService, tracer trace.Tracer) *handlers.AuthHandler {
-	return handlers.NewAuthHandler(service, tracer)
-}
-
-func (server *Server) start(authHandler *handlers.AuthHandler) {
+func (server *Server) start(recommendedHandler *handlers.RecommendationHandler) {
 	router := mux.NewRouter()
 	router.Use(MiddlewareContentTypeSet)
-	authHandler.Init(router)
+	recommendedHandler.Init(router)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", server.config.Port),
@@ -159,7 +134,7 @@ func newTraceProvider(exp sdktrace.SpanExporter) *sdktrace.TracerProvider {
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("auth_service"),
+			semconv.ServiceNameKey.String("recommendations_service"),
 		),
 	)
 
