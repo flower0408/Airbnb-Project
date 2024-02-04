@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +14,8 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"user_service/domain"
@@ -144,18 +148,8 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.IsHighlighted")
 	defer span.End()
 
-	accommodationEndpoint := fmt.Sprintf("http://%s:%s/averageRate/%s", accommodationServiceHost, accommodationServicePort, host)
-	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
-	if err != nil {
-		span.SetStatus(codes.Error, "Error creating accommodation request")
-		fmt.Println("Error creating accommodation request:", err)
-		return false, err
-	}
-
-	accommodationRequest.Header.Set("Authorization", "Bearer "+authToken)
-
-	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
+	accommodationEndpoint := fmt.Sprintf("https://%s:%s/averageRate/%s", accommodationServiceHost, accommodationServicePort, host)
+	accommodationResponse, err := store.HTTPSRequestWithouthBody(ctx, authToken, accommodationEndpoint, "GET")
 	if err != nil {
 		span.SetStatus(codes.Error, "Error sending accommodation request")
 		fmt.Println("Error sending accommodation request:", err)
@@ -184,18 +178,8 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 
 	defer accommodationResponse.Body.Close()
 
-	reservationEndpoint := fmt.Sprintf("http://%s:%s/cancellationRate/%s", reservationServiceHost, reservationServicePort, host)
-	reservationRequest, err := http.NewRequest("GET", reservationEndpoint, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest.Header))
-	if err != nil {
-		span.SetStatus(codes.Error, "Error creating reservation request")
-		fmt.Println("Error creating reservation request:", err)
-		return false, err
-	}
-
-	reservationRequest.Header.Set("Authorization", "Bearer "+authToken)
-
-	reservationResponse, err := http.DefaultClient.Do(reservationRequest)
+	reservationEndpoint := fmt.Sprintf("https://%s:%s/cancellationRate/%s", reservationServiceHost, reservationServicePort, host)
+	reservationResponse, err := store.HTTPSRequestWithouthBody(ctx, authToken, reservationEndpoint, "GET")
 	if err != nil {
 		span.SetStatus(codes.Error, "Error sending reservation request")
 		fmt.Println("Error sending reservation request:", err)
@@ -224,18 +208,8 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 
 	defer reservationResponse.Body.Close()
 
-	reservationEndpoint2 := fmt.Sprintf("http://%s:%s/numOfReservations/%s", reservationServiceHost, reservationServicePort, host)
-	reservationRequest2, err := http.NewRequest("GET", reservationEndpoint2, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest2.Header))
-	if err != nil {
-		span.SetStatus(codes.Error, "Error creating reservation request")
-		fmt.Println("Error creating reservation request:", err)
-		return false, err
-	}
-
-	reservationRequest2.Header.Set("Authorization", "Bearer "+authToken)
-
-	reservationResponse2, err := http.DefaultClient.Do(reservationRequest2)
+	reservationEndpoint2 := fmt.Sprintf("https://%s:%s/numOfReservations/%s", reservationServiceHost, reservationServicePort, host)
+	reservationResponse2, err := store.HTTPSRequestWithouthBody(ctx, authToken, reservationEndpoint2, "GET")
 	if err != nil {
 		span.SetStatus(codes.Error, "Error sending reservation request")
 		fmt.Println("Error sending reservation request:", err)
@@ -264,18 +238,8 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 
 	defer reservationResponse2.Body.Close()
 
-	reservationEndpoint3 := fmt.Sprintf("http://%s:%s/durationOfReservations/%s", reservationServiceHost, reservationServicePort, host)
-	reservationRequest3, err := http.NewRequest("GET", reservationEndpoint3, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest3.Header))
-	if err != nil {
-		span.SetStatus(codes.Error, "Error creating reservation request")
-		fmt.Println("Error creating reservation request:", err)
-		return false, err
-	}
-
-	reservationRequest3.Header.Set("Authorization", "Bearer "+authToken)
-
-	reservationResponse3, err := http.DefaultClient.Do(reservationRequest3)
+	reservationEndpoint3 := fmt.Sprintf("https://%s:%s/durationOfReservations/%s", reservationServiceHost, reservationServicePort, host)
+	reservationResponse3, err := store.HTTPSRequestWithouthBody(ctx, authToken, reservationEndpoint3, "GET")
 	if err != nil {
 		span.SetStatus(codes.Error, "Error sending reservation request")
 		fmt.Println("Error sending reservation request:", err)
@@ -438,4 +402,49 @@ func decode(cursor *mongo.Cursor) (users []*domain.User, err error) {
 	}
 	err = cursor.Err()
 	return
+}
+
+func (store *UserMongoDBStore) HTTPSRequestWithouthBody(ctx context.Context, token string, url string, method string) (*http.Response, error) {
+	clientCertPath := "ca-cert.pem"
+
+	clientCaCert, err := ioutil.ReadFile(clientCertPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(clientCaCert)
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs:    caCertPool,
+		MinVersion: tls.VersionTLS12,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		CurvePreferences: []tls.CurveID{tls.CurveP521,
+			tls.CurveP384, tls.CurveP256},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
+
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }

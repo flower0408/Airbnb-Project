@@ -782,7 +782,7 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 
 	// Circuit breaker for communication with user service
 	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
-		url := fmt.Sprintf("http://%s:%s/changeUsername", userServiceHost, userServicePort)
+		url := fmt.Sprintf("https://%s:%s/changeUsername", userServiceHost, userServicePort)
 		responseUser, err := service.HTTPSRequest(ctx, token, url, "POST", requestBody)
 
 		if err != nil {

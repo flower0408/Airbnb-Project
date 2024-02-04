@@ -148,6 +148,10 @@ services:
         condition: service_healthy
       datanode3:
         condition: service_healthy
+      jaeger:
+        condition: service_started
+      accommodations_db:
+        condition: service_started
     networks:
       - network
     volumes:

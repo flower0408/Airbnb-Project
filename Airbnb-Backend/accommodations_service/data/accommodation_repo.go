@@ -2,6 +2,8 @@ package data
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -147,18 +150,8 @@ func (rr *AccommodationRepo) InsertRateForHost(ctx context.Context, rate *Rate, 
 		return "", err
 	}
 
-	usersEndpoint := fmt.Sprintf("http://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, rate.ForHostId)
-	usersRequest, err := http.NewRequest("GET", usersEndpoint, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(usersRequest.Header))
-	if err != nil {
-		span.SetStatus(codes.Error, "Error creating users request")
-		fmt.Println("Error creating users request:", err)
-		return "Error creating users request:", err
-	}
-
-	usersRequest.Header.Set("Authorization", "Bearer "+authToken)
-
-	usersResponse, err := http.DefaultClient.Do(usersRequest)
+	usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, rate.ForHostId)
+	usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 	if err != nil {
 		span.SetStatus(codes.Error, "Error sending users request")
 		fmt.Println("Error sending users request:", err)
@@ -216,18 +209,8 @@ func (rr *AccommodationRepo) DeleteRateForHost(ctx context.Context, rateID strin
 		return err2
 	}
 
-	usersEndpoint := fmt.Sprintf("http://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, rate.ForHostId)
-	usersRequest, err := http.NewRequest("GET", usersEndpoint, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(usersRequest.Header))
-	if err != nil {
-		span.SetStatus(codes.Error, "Error creating users request")
-		fmt.Println("Error creating users request:", err)
-		return err
-	}
-
-	usersRequest.Header.Set("Authorization", "Bearer "+authToken)
-
-	usersResponse, err := http.DefaultClient.Do(usersRequest)
+	usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, rate.ForHostId)
+	usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 	if err != nil {
 		span.SetStatus(codes.Error, "Error sending users request")
 		fmt.Println("Error sending users request:", err)
@@ -293,18 +276,8 @@ func (rr *AccommodationRepo) UpdateRateForHost(ctx context.Context, rateID strin
 	rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
 	rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
 
-	usersEndpoint := fmt.Sprintf("http://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, foundRate.ForHostId)
-	usersRequest, err := http.NewRequest("GET", usersEndpoint, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(usersRequest.Header))
-	if err != nil {
-		span.SetStatus(codes.Error, "Error creating users request")
-		fmt.Println("Error creating users request:", err)
-		return err
-	}
-
-	usersRequest.Header.Set("Authorization", "Bearer "+authToken)
-
-	usersResponse, err := http.DefaultClient.Do(usersRequest)
+	usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, foundRate.ForHostId)
+	usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 	if err != nil {
 		span.SetStatus(codes.Error, "Error sending users request")
 		fmt.Println("Error sending users request:", err)
@@ -519,22 +492,22 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 		var reservationServiceEndpoint string
 
 		if minPrice > 0 && maxPrice > 0 {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s&maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice), strconv.Itoa(maxPrice))
+			reservationServiceEndpoint = fmt.Sprintf("https://%s:%s/filterByPrice?minPrice=%s&maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice), strconv.Itoa(maxPrice))
 		} else if minPrice == 0 && maxPrice == 0 && minPriceBool && maxPriceBool {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s&maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice), strconv.Itoa(maxPrice))
+			reservationServiceEndpoint = fmt.Sprintf("https://%s:%s/filterByPrice?minPrice=%s&maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice), strconv.Itoa(maxPrice))
 		} else if maxPrice > 0 {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(maxPrice))
+			reservationServiceEndpoint = fmt.Sprintf("https://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(maxPrice))
 		} else if maxPrice == 0 && maxPriceBool {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(maxPrice))
+			reservationServiceEndpoint = fmt.Sprintf("https://%s:%s/filterByPrice?maxPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(maxPrice))
 		} else if minPrice > 0 {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice))
+			reservationServiceEndpoint = fmt.Sprintf("https://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice))
 		} else if minPrice == 0 && minPriceBool {
-			reservationServiceEndpoint = fmt.Sprintf("http://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice))
+			reservationServiceEndpoint = fmt.Sprintf("https://%s:%s/filterByPrice?minPrice=%s", reservationServiceHost, reservationServicePort, strconv.Itoa(minPrice))
 		}
 
 		if reservationServiceEndpoint != "" {
-			reservationServiceRequest, _ := http.NewRequest("GET", reservationServiceEndpoint, nil)
-			responseAppointments, err := http.DefaultClient.Do(reservationServiceRequest)
+			//reservationServiceRequest, _ := http.NewRequest("GET", reservationServiceEndpoint, nil)
+			responseAppointments, err := rr.HTTPSRequestWithouthBody(ctx, authToken, reservationServiceEndpoint, "GET")
 			if err != nil {
 				span.SetStatus(codes.Error, "Error fetching reservation service")
 				return nil, fmt.Errorf("Error fetching reservation service: %v", err)
@@ -612,18 +585,8 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 
 				if len(filteredAccommodations) > 0 {
 					for _, accommodation := range filteredAccommodations {
-						usersEndpoint := fmt.Sprintf("http://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
-						usersRequest, err := http.NewRequest("GET", usersEndpoint, nil)
-						otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(usersRequest.Header))
-						if err != nil {
-							span.SetStatus(codes.Error, "Error creating users request")
-							fmt.Println("Error creating users request:", err)
-							return nil, err
-						}
-
-						usersRequest.Header.Set("Authorization", "Bearer "+authToken)
-
-						usersResponse, err := http.DefaultClient.Do(usersRequest)
+						usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
+						usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 						if err != nil {
 							span.SetStatus(codes.Error, "Error sending users request")
 							fmt.Println("Error sending users request:", err)
@@ -691,18 +654,8 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 
 			if len(filteredAccommodations) > 0 {
 				for _, accommodation := range filteredAccommodations {
-					usersEndpoint := fmt.Sprintf("http://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
-					usersRequest, err := http.NewRequest("GET", usersEndpoint, nil)
-					otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(usersRequest.Header))
-					if err != nil {
-						span.SetStatus(codes.Error, "Error creating users request")
-						fmt.Println("Error creating users request:", err)
-						return nil, err
-					}
-
-					usersRequest.Header.Set("Authorization", "Bearer "+authToken)
-
-					usersResponse, err := http.DefaultClient.Do(usersRequest)
+					usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
+					usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 					if err != nil {
 						span.SetStatus(codes.Error, "Error sending users request")
 						fmt.Println("Error sending users request:", err)
@@ -743,18 +696,8 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 		var filteredAccommodationsWithHighlightedHost []*Accommodation
 
 		for _, accommodation := range accommodations {
-			usersEndpoint := fmt.Sprintf("http://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
-			usersRequest, err := http.NewRequest("GET", usersEndpoint, nil)
-			otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(usersRequest.Header))
-			if err != nil {
-				span.SetStatus(codes.Error, "Error creating users request")
-				fmt.Println("Error creating users request:", err)
-				return nil, err
-			}
-
-			usersRequest.Header.Set("Authorization", "Bearer "+authToken)
-
-			usersResponse, err := http.DefaultClient.Do(usersRequest)
+			usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
+			usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 			if err != nil {
 				span.SetStatus(codes.Error, "Error sending users request")
 				fmt.Println("Error sending users request:", err)
@@ -914,4 +857,49 @@ func decodeRate(cursor *mongo.Cursor) (rates []*Rate, err error) {
 	}
 	err = cursor.Err()
 	return
+}
+
+func (rr *AccommodationRepo) HTTPSRequestWithouthBody(ctx context.Context, token string, url string, method string) (*http.Response, error) {
+	clientCertPath := "ca-cert.pem"
+
+	clientCaCert, err := ioutil.ReadFile(clientCertPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(clientCaCert)
+
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{
+		RootCAs:    caCertPool,
+		MinVersion: tls.VersionTLS12,
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		CurvePreferences: []tls.CurveID{tls.CurveP521,
+			tls.CurveP384, tls.CurveP256},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305, // Go 1.8 only
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,   // Go 1.8 only
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
+
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }

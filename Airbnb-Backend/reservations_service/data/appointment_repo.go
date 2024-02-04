@@ -64,8 +64,8 @@ func NewAppointmentRepo(ctx context.Context, logger *log.Logger, tracer trace.Tr
 }
 
 // Disconnect from database
-func (pr *AppointmentRepo) DisconnectMongo(ctx context.Context) error {
-	err := pr.cli.Disconnect(ctx)
+func (rr *AppointmentRepo) DisconnectMongo(ctx context.Context) error {
+	err := rr.cli.Disconnect(ctx)
 	if err != nil {
 		return err
 	}
