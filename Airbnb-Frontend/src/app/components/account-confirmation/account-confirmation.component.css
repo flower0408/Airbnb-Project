@@ -1,0 +1,43 @@
+.verify-acc-title {
+  font-size: 24px;
+  padding: 15px;
+  color: #333;
+}
+
+.card-title {
+  font-size: 20px;
+  color: #F88379;
+}
+
+.verify-acc-card {
+  width: 50%;
+  margin: auto;
+  margin-top: 60px;
+  text-align: center;
+  background-color: #F3CFC6;
+  border-radius: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.btn {
+  width: 50%;
+  background-color: #F88379;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background-color: #F3CFC6;
+  color: black;
+}
+
+.invalid-token {
+  margin: 20px 0px;
+  font-size: 18px;
+  color: #FF5733;
+  text-align: center;
+}
+

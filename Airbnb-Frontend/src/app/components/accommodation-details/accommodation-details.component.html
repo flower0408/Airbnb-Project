@@ -1,0 +1,318 @@
+<app-header></app-header>
+<div *ngIf="accommodation" class="accommodation-details">
+  <h2 class="accommodation-title">{{ accommodation.name }}</h2>
+  <p class="accommodation-description">{{ accommodation.description }}</p>
+
+  <div *ngIf="accommodation.location">
+    <div class="detail location">
+      <span class="detail-label">Location:</span>
+      <span class="detail-value">
+        {{ accommodation.location.street }},
+        {{ accommodation.location.number }},
+        {{ accommodation.location.city }},
+        {{ accommodation.location.country }}
+      </span>
+    </div>
+  </div>
+
+  <div class="detail benefits">
+    <span class="detail-label">Benefits:</span>
+    <ul>
+      <li *ngFor="let benefit of accommodation.benefits.split(',')">{{ benefit }}</li>
+    </ul>
+  </div>
+
+  <div class="detail guests">
+    <span class="detail-label">Guests:</span>
+    <span class="detail-value">
+      {{ accommodation.minGuest }} - {{ accommodation.maxGuest }} guests
+    </span>
+  </div>
+
+  <div class="carousel slide" style="width: 40%; height: 40%;padding-top: 25px;padding-bottom: 25px;">
+    <div class="carousel-inner">
+      <div class="carousel-item" [class.active]="currentSlideIndex >= 0">
+        <img *ngIf="images.length > 0" [src]="images[currentSlideIndex]" class="d-block w-100" alt="Image">
+      </div>      
+    </div>
+    <button class="carousel-control-prev" (click)="prevSlide()">
+       <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+      <span class="sr-only">Previous</span>
+    </button>
+    <button class="carousel-control-next" (click)="nextSlide()">
+      <span class="carousel-control-next-icon" aria-hidden="true"></span>
+      <span class="sr-only">Next</span>
+    </button>
+  </div>
+
+  <form *ngIf="userRole === 'Guest'" [formGroup]="reservationForm" (ngSubmit)="onSubmit()">
+    <label>Start day</label>
+    <mat-form-field appearance="outline">
+      <input matInput formControlName="startDay"
+             [matDatepickerFilter]="dateFilter"
+             [matDatepicker]="releasedAtPicker1">
+      <mat-datepicker-toggle matSuffix [for]="releasedAtPicker1"></mat-datepicker-toggle>
+      <mat-datepicker #releasedAtPicker1></mat-datepicker>
+    </mat-form-field>
+
+    <label>End day</label>
+    <mat-form-field appearance="outline">
+      <input matInput formControlName="endDay"
+             [matDatepickerFilter]="dateFilter"
+             [matDatepicker]="releasedAtPicker2">
+      <mat-datepicker-toggle matSuffix [for]="releasedAtPicker2"></mat-datepicker-toggle>
+      <mat-datepicker #releasedAtPicker2></mat-datepicker>
+    </mat-form-field>
+
+    <div style="border-bottom: 1px solid gray;" class="container" *ngIf="reservationForm.get('startDay')?.value !== '' && reservationForm.get('endDay')?.value !== ''">
+      <h2 *ngFor="let detail of priceDetails" style="color: rgb(67, 67, 67); ">
+        Price per {{ detail.type }}
+        per night is {{ detail.price }}€
+        <br>
+        Total price: {{ detail.numberOfDays }}x{{ detail.price }}€ = {{ detail.numberOfDays * detail.price }}€
+      </h2>
+    </div>
+
+
+
+    <div class="container" style="padding-top: 25px;">
+      <button type="submit" class="formbold-btn">Create reservation</button>
+    </div>
+
+  </form>
+</div>
+
+<div class="container" *ngIf="userRole === 'Host' && hostId === accommodation?.ownerId">
+  <button type="button" (click)="moreOptions()" class="btn btn-outline-primary">More options</button>
+</div>
+
+<div *ngIf="showMoreOption && userRole === 'Host'" class="accommodation-details">
+
+  <form [formGroup]="addAppointmentForm" (ngSubmit)="onSubmitAddAppointment()">
+    <h2 style="text-align: center;color: blue;">Add appointment</h2>
+    <label>Start day</label>
+    <mat-form-field appearance="outline">
+    <input matInput formControlName="startDay"
+           [matDatepickerFilter]="dateFilter2"
+           [matDatepicker]="releasedAtPicker3">
+    <mat-datepicker-toggle matSuffix [for]="releasedAtPicker3"></mat-datepicker-toggle>
+    <mat-datepicker #releasedAtPicker3></mat-datepicker>
+    </mat-form-field>
+
+    <label>End day</label>
+    <mat-form-field appearance="outline">
+      <input matInput formControlName="endDay"
+             [matDatepickerFilter]="dateFilter2"
+             [matDatepicker]="releasedAtPicker4">
+      <mat-datepicker-toggle matSuffix [for]="releasedAtPicker4"></mat-datepicker-toggle>
+      <mat-datepicker #releasedAtPicker4></mat-datepicker>
+    </mat-form-field>
+
+    <div class="formbold-mb-5" *ngIf="inputGuestPrice">
+      <input
+        type="number"
+        class="formbold-form-input"
+        formControlName="guestPrice"
+        placeholder="Guest price"
+        id="guestPrice"
+        name="guestPrice"
+      />
+
+    </div>
+    <div class="formbold-mb-5" *ngIf="inputAccommodationPrice">
+      <input
+        type="number"
+        class="formbold-form-input"
+        formControlName="accommodationPrice"
+        placeholder="Accommodation price"
+        id="accommodationPrice"
+        name="accommodationPrice"
+      />
+
+    </div>
+
+    <div class="container">
+      <button type="submit" class="btn btn-primary">Create appointment</button>
+    </div>
+
+  </form>
+
+</div>
+
+<div *ngIf="showMoreOption && userRole === 'Host'" class="accommodation-details">
+
+  <form [formGroup]="editAppointmentForm" (ngSubmit)="onSubmitEditAppointment()">
+    <h2 style="text-align: center;color: red;">Edit appointment</h2>
+
+    <select class="form-select" aria-label="Default select example" formControlName="selectedAppointment" (change)="onSelectedAppointmentChange($event)">
+      <option *ngFor="let ap of appointments; let i = index" [ngValue]="i">
+        {{ ap.available[0] | date:'mediumDate':'UTC' }} - {{ ap.available[ap.available.length - 1] | date:'mediumDate':'UTC' }}
+      </option>
+    </select>
+
+
+
+    <label>New start day</label>
+    <mat-form-field appearance="outline">
+    <input matInput formControlName="startDayEdit"
+           [matDatepickerFilter]="dateFilter3"
+           [matDatepicker]="releasedAtPicker5">
+    <mat-datepicker-toggle matSuffix [for]="releasedAtPicker5"></mat-datepicker-toggle>
+    <mat-datepicker #releasedAtPicker5></mat-datepicker>
+    </mat-form-field>
+
+    <label>New end day</label>
+    <mat-form-field appearance="outline">
+      <input matInput formControlName="endDayEdit"
+             [matDatepickerFilter]="dateFilter3"
+             [matDatepicker]="releasedAtPicker6">
+      <mat-datepicker-toggle matSuffix [for]="releasedAtPicker6"></mat-datepicker-toggle>
+      <mat-datepicker #releasedAtPicker6></mat-datepicker>
+    </mat-form-field>
+
+    <div class="formbold-mb-5" *ngIf="inputGuestPrice">
+      <input
+        type="number"
+        class="formbold-form-input"
+        formControlName="guestPriceEdit"
+        placeholder="Guest price"
+        id="guestPriceEdit"
+        name="guestPriceEdit"
+      />
+
+    </div>
+    <div class="formbold-mb-5" *ngIf="inputAccommodationPrice">
+      <input
+        type="number"
+        class="formbold-form-input"
+        formControlName="accommodationPriceEdit"
+        placeholder="Accommodation price"
+        id="accommodationPriceEdit"
+        name="accommodationPriceEdit"
+      />
+
+    </div>
+
+    <div class="container">
+      <button type="submit" class="btn btn-danger">Edit appointment</button>
+    </div>
+
+  </form>
+
+</div>
+
+<div class="card" style="padding-bottom: 10px;" class="container" style="padding-top: 30px; padding-bottom: 100px;">
+  <div class="d-flex">
+    <img width="52px" height="52px" src="assets\host.png" class="rounded-circle" [routerLink]="['/hostProfile', host?.username]" />
+    <div class="ms-2">
+      <h3 [ngClass]="{'highlighted-host': accommodation && accommodation.highlighted}">Hosted by {{host?.firstName}} {{host?.lastName}} <img width="15px" height="15px" src="assets\verified.png" class="rounded-circle" />
+        <span *ngIf="accommodation && accommodation.highlighted" class="highlight-label">Recommended host</span></h3>
+      <p class="text-muted mb-0">Username: {{host?.username}}</p>
+      <p class="text-muted mb-0">Email: {{host?.email}}</p>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="userRole === 'Guest' && rateSum !== 0" style="width: 100%; text-align: center; padding-top: 50px; padding-bottom: 50px;">
+  <h1 style="font-size: 50px; font-family: Arial, Helvetica, sans-serif;">
+    {{ (rateSum / rates.length) | number:'1.1-1' }}
+  </h1>
+  <img width="200px" height="30px" src="assets\frame.jpg">
+  <p style="font-family: Arial, Helvetica, sans-serif;">Average rating</p>
+  <p style="font-family: Arial, Helvetica, sans-serif;">{{rates.length}} Reviews</p>
+</div>
+
+<form *ngIf="userRole === 'Guest'"  [formGroup]="addRateForm" (ngSubmit)="onSubmitAddRate()">
+
+  <div class="formbold-mb-5" class="container" style="padding-bottom: 20px;">
+    <img  width="20px" height="20px" src="assets\star.webp" style="margin-right: 5px;">
+    <select class="form-select" aria-label="Default select example" style="width: 5%;" formControlName="rate">
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+    </select>
+  </div>
+
+  <div class="container">
+    <button type="submit" class="btn btn-outline-primary">Rate it</button>
+  </div>
+
+</form>
+
+<div *ngIf="userRole === 'Guest'" class="container2" style="padding-top: 50px;">
+
+<div *ngFor="let rate of rates; let i = index" class="accommodation-card" [ngClass]="{'new-row': i % 3 === 0 && i !== 0}">
+
+  <div class="card" style="padding-bottom: 10px;">
+        <div class="d-flex">
+          <img width="32px" height="32px" src="assets\user.jpg" class="rounded-circle" />
+          <div class="ms-2">
+            <p class="text-muted mb-0">{{rate?.user?.username}}</p>
+          </div>
+        </div>
+  </div>
+
+    <div *ngIf="rate?.rate === 5" style="text-align: left;">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+    </div>
+
+    <div *ngIf="rate?.rate === 4" style="text-align: left;">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+    </div>
+
+    <div *ngIf="rate?.rate === 3" style="text-align: left;">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+    </div>
+
+    <div *ngIf="rate?.rate === 2" style="text-align: left;">
+      <img  width="13px" height="13px" src="assets\star.webp">
+      <img  width="13px" height="13px" src="assets\star.webp">
+    </div>
+
+    <div *ngIf="rate?.rate === 1" style="text-align: left;">
+      <img  width="13px" height="13px" src="assets\star.webp">
+    </div>
+
+  <div style="padding-top: 10px;">
+    <div style="text-align: left;" *ngIf="!rate?.updatedAt">
+      <span style="color: #6773ab;">Created at:</span>
+      <span> {{ rate?.createdAt | date: 'mediumDate' }} {{ rate?.createdAt | date: 'shortTime' }} </span>
+    </div>
+    <div style="text-align: left;" *ngIf="rate?.updatedAt">
+      <span style="color: #6773ab;">Updated at:</span>
+      <span> {{ rate?.updatedAt | date: 'mediumDate' }} {{ rate?.updatedAt | date: 'shortTime' }} </span>
+    </div>
+  </div>
+  <div style="text-align: left; padding-top: 10px;" *ngIf="hostId === rate?.byGuestId">
+    <img width="15px" height="15px" src="assets\edit.jpg" (click)="showEditRate()"/>
+    <img width="15px" height="15px" src="assets\delete.png" style="margin-left: 15px;" (click)="deleteRate(rate?.id)"/>
+    <div *ngIf="showEditRateBool" style="padding-top: 10px;">
+      <form [formGroup]="editRateForm" (ngSubmit)="onSubmitEditRate(rate?.id)">
+        <select class="form-select" aria-label="Default select example" style="width: 30%;" formControlName="editedRate">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+        <button  type="submit" class="btn btn-outline-secondary" style="margin-top: 15px;">Change rate</button>
+      </form>
+    </div>
+  </div>
+</div>
+</div>
+
+
+
+

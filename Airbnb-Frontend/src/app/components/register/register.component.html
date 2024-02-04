@@ -1,0 +1,137 @@
+<div class="parent clearfix">
+  <div class="bg-illustration">
+    <img src="https://i.ibb.co/Pcg0Pk1/logo.png" alt="logo">
+
+    <div class="burger-btn">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+
+  </div>
+
+  <div class="login">
+    <div class="container">
+      <h1>Register form</h1>
+
+      <div class="login-form">
+        <form [formGroup]="formGroup">
+
+          <label for="firstName"><b>First Name:</b></label>
+          <div>
+            <input type="text" id="firstName" maxlength="21" placeholder="First name" class="form-control" formControlName="firstName"
+                   [ngClass]="{ 'is-invalid': submitted && f['firstName'].errors }">
+            <div *ngIf="submitted && f['firstName'].errors" class="invalid-feedback">
+              <div *ngIf="f['firstName'].errors['required']">First Name is required.</div>
+              <div *ngIf="f['firstName'].errors['minlength']">First Name must be at least 3 characters long.</div>
+              <div *ngIf="f['firstName'].errors['maxlength']">First Name must not exceed 20 characters.</div>
+              <div *ngIf="f['firstName'].errors['pattern']">Numbers and Special Characters are not allowed.</div>
+            </div>
+          </div>
+          <label for="lastName"><b>Last Name:</b></label>
+          <div>
+            <input type="text" id="lastName" maxlength="21" placeholder="Last name" class="form-control" formControlName="lastName"
+                   [ngClass]="{ 'is-invalid': submitted && f['lastName'].errors}">
+            <div *ngIf="submitted && f['lastName'].errors" class="invalid-feedback">
+              <div *ngIf="f['lastName'].errors['required']">Last Name is required.</div>
+              <div *ngIf="f['lastName'].errors['minlength']">Last Name must be at least 3 characters long.</div>
+              <div *ngIf="f['lastName'].errors['maxlength']">Last Name must not exceed 20 characters.</div>
+              <div *ngIf="f['lastName'].errors['pattern']">Numbers and Special Characters are not allowed.</div>
+            </div>
+          </div>
+
+          <label for="email"><b>Email:</b></label>
+          <div>
+            <input type="email" id="email" name="email" maxlength="36" placeholder="Email" formControlName="email" class="form-control"
+                   [ngClass]="{ 'is-invalid': submitted && f['email'].errors }">
+            <div *ngIf="submitted && f['email'].errors" class="invalid-feedback">
+              <div *ngIf="f['email'].errors['required']">Email is required.</div>
+              <div *ngIf="f['email'].errors['minlength']">Email must be at least 3 characters long.</div>
+              <div *ngIf="f['email'].errors['maxlength']">Email must not exceed 35 characters.</div>
+              <div *ngIf="f['email'].errors['email']">Email is not in the correct format.</div>
+            </div>
+          </div>
+
+          <label for="username"><b>Username:</b></label>
+          <div>
+            <input type="text" id="username" name="username" placeholder="Username" maxlength="31" class="form-control" formControlName="username"
+                   [ngClass]="{ 'is-invalid': submitted && f['username'].errors}">
+            <div *ngIf="submitted && f['username'].errors" class="invalid-feedback">
+              <div *ngIf="f['username'].errors['required']">Username is required.</div>
+              <div *ngIf="f['username'].errors['minlength']">Username must be at least 4 characters long.</div>
+              <div *ngIf="f['username'].errors['maxlength']">Username must not exceed 30 characters.</div>
+              <div *ngIf="f['username'].errors['pattern']">Special Characters are not allowed.</div>
+            </div>
+          </div>
+
+          <label for="password"><b>Password:</b></label>
+          <div>
+            <input type="password" id="password" name="password" placeholder="Password" maxlength="31" formControlName="password" class="form-control"
+                   [ngClass]="{ 'is-invalid': submitted && f['password'].errors}">
+            <div *ngIf="submitted && f['password'].errors" class="invalid-feedback">
+              <div *ngIf="f['password'].errors['required']">Password is required.</div>
+              <div *ngIf="f['password'].errors['minlength']">Password must be at least 11 characters long.</div>
+              <div *ngIf="f['password'].errors['maxlength']">Password must not exceed 30 characters.</div>
+              <div *ngIf="f['password'].errors['passwordStrength']">Your password must have lower case, upper case, numeric and special characters.</div>
+              <div *ngIf="f['password'].errors['noSpecialCharacter']">Special characters not allowed!</div>
+            </div>
+          </div>
+
+          <label for="age"><b>Age</b></label>
+          <div>
+            <input type="number" class="form-control" placeholder="Age" formControlName="age" id="age"
+                   [ngClass]="{ 'is-invalid': submitted && f['age'].errors}">
+            <div *ngIf="submitted && f['age'].errors" class="invalid-feedback">
+              <div *ngIf="f['age'].errors['required']">Age is required.</div>
+              <div *ngIf="f['age'].errors['min']">Minimum age is 1.</div>
+              <div *ngIf="f['age'].errors['max']">Maximum age is 100.</div>
+            </div>
+          </div>
+
+          <label for="gender"><b>Gender</b></label>
+          <div>
+            <mat-select class="custom-mat-select" formControlName="gender" placeholder="Gender" id="gender"
+                        [ngClass]="{ 'is-invalid': submitted && f['gender'].errors}">
+              <mat-option *ngFor="let gender of genders" [value]="gender">
+                {{gender}}
+              </mat-option>
+            </mat-select>
+            <div *ngIf="submitted && f['gender'].errors" class="invalid-feedback">
+              <div *ngIf="f['gender'].errors['required']">Gender is required.</div>
+            </div>
+          </div>
+
+          <label for="userType"><b>User type</b></label>
+          <div >
+            <mat-select class="form-control" formControlName="userType" placeholder="User type" id="userType"
+                        [ngClass]="{ 'is-invalid': submitted && f['userType'].errors}">
+            <mat-option *ngFor="let userType of userTypes" [value]="userType">
+              {{userType}}
+            </mat-option>
+            </mat-select>
+            <div *ngIf="submitted && f['userType'].errors" class="invalid-feedback">
+              <div *ngIf="f['userType'].errors['required']">User type is required.</div>
+            </div>
+          </div>
+
+          <label for="residence"><b>Residence</b></label>
+          <div>
+            <input type="text" maxlength="36" class="form-control" placeholder="Residence" formControlName="residence" id="residence"
+                   [ngClass]="{ 'is-invalid': submitted && f['residence'].errors}">
+            <div *ngIf="submitted && f['residence'].errors" class="invalid-feedback">
+              <div *ngIf="f['residence'].errors['required']">Residence is required.</div>
+              <div *ngIf="f['residence'].errors['minlength']">Residence must be at least 3 characters long.</div>
+              <div *ngIf="f['residence'].errors['maxlength']">Residence must not exceed 35 characters.</div>
+              <div *ngIf="f['residence'].errors['pattern']">Special Characters are not allowed.</div>
+            </div>
+          </div>
+
+          <a [routerLink]="['']">Already have account? Login!</a>
+
+          <button type="submit" class="btn btn-primary" (click)="onSubmit()" >Register</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+

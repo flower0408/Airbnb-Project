@@ -1,0 +1,98 @@
+.profile-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 60%;
+  margin: 50px auto;
+  padding: 20px;
+  background: linear-gradient(45deg, #F3CFC6, #FCEBEC);
+  color: #fff;
+  border-radius: 15px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.profile-info-box {
+  border: 2px solid #F88379;
+  padding-left: 140px;
+  padding-right: 140px;
+  padding-top: 20px;
+  padding-bottom: 20px;
+  margin-bottom: 40px;
+  width: 100%;
+}
+
+.profile-header {
+  margin-bottom: 20px;
+}
+
+.profile {
+  font-size: 36px;
+  color: #F88379;
+}
+
+.profile-info .info {
+  font-size: 18px;
+  margin: 10px 0;
+  color: #F88379;
+}
+
+.profile-options {
+  margin-top: 30px;
+}
+
+.btn-danger {
+  padding: 15px 30px;
+  font-size: 18px;
+  color: #fff;
+  background-color: #F88379;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.btn-danger:hover {
+  background-color: #F3CFC6;
+  color: black;
+}
+.color{
+  color: #F88379;
+}
+
+.profile-info1 label[for="gender"] {
+  color: #F88379;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.profile-info1 label[for="gender"] + div label {
+  color: #F88379;
+  font-weight: bold;
+  font-size: 16px;
+  padding-right: 10px;
+}
+
+.profile-container1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.profile-info1 {
+  flex: 1;
+  margin-right: 50px;
+  margin-left: 50px;
+}
+
+.profile-options1 {
+  flex-basis: 200px;
+}
+
+.profile-info1 .info {
+  font-size: 18px;
+  margin: 10px 0;
+  color: #F88379;
+}

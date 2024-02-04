@@ -1,0 +1,24 @@
+<div>
+    <mat-card class="recovery-pass-card">
+      <br>
+        <div class="form-group mx-auto w-50">
+            <form [formGroup]="formGroup">
+                <div class="mb-3">
+                    <mat-card-title class="card-title">~ Enter your email address ~</mat-card-title>
+                    <input type="text" class="form-control" formControlName="email"
+                        [ngClass]="{ 'is-invalid': submitted && form['email'].errors }">
+                    <div *ngIf="submitted && form['email'].errors" class="invalid-feedback">
+                        <div *ngIf="form['email'].errors['required']">Email is required.</div>
+                        <div *ngIf="form['email'].errors['email']">Email is not valid.</div>
+                    </div>
+                    <div *ngIf="formGroup.errors?.['userNotExist']" class="invalid-email">
+                        User with this email not exist. Check if your email is valid.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" (click)="onSubmit()">Confirm</button>
+
+            </form>
+        </div>
+    </mat-card>
+</div>

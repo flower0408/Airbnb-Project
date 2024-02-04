@@ -1,0 +1,77 @@
+<app-header></app-header>
+<form [formGroup]="searchForm">
+  <div class="search-container">
+    <label for="location" class="form-label">Location:</label>
+    <input type="text" id="location" formControlName="location" class="form-input">
+
+    <label for="minGuests" class="form-label">Guests:</label>
+    <input type="number" id="minGuests" formControlName="minGuests" class="form-input">
+
+    <label for="startDay" class="form-label">Start Day:</label>
+    <mat-form-field appearance="outline" class="form-input">
+      <input matInput [matDatepicker]="startDayPicker" formControlName="startDay" [matDatepickerFilter]="startDateFilter">
+      <mat-datepicker-toggle matSuffix [for]="startDayPicker"></mat-datepicker-toggle>
+      <mat-datepicker #startDayPicker></mat-datepicker>
+    </mat-form-field>
+
+    <label for="endDay" class="form-label">End Day:</label>
+    <mat-form-field appearance="outline" class="form-input">
+      <input matInput [matDatepicker]="endDayPicker" formControlName="endDay" [matDatepickerFilter]="endDateFilter">
+      <mat-datepicker-toggle matSuffix [for]="endDayPicker"></mat-datepicker-toggle>
+      <mat-datepicker #endDayPicker></mat-datepicker>
+    </mat-form-field>
+
+    <button type="button" class="btn btn-danger" (click)="searchAccommodations()">Search</button>
+  </div>
+</form>
+
+<form (ngSubmit)="filterAccommodations()">
+  <div class="filter-container">
+    <label for="desiredBenefits" class="form-label">Desired Benefits:</label>
+    <input type="text" class="form-input" placeholder="Press Enter to add" id="desiredBenefits" [(ngModel)]="newBenefit" (keyup.enter)="addBenefit()" name="desiredBenefits">
+
+    <div *ngFor="let benefit of filterParams.desiredBenefits">
+      {{ benefit }} <button type="button" class="btn btn-danger" (click)="removeBenefit(benefit)">Remove</button>
+    </div>
+
+    <label for="minPrice" class="form-label">Min Price:</label>
+    <input type="text" class="form-input" id="minPrice" [(ngModel)]="filterParams.minPrice" name="minPrice">
+
+    <label for="maxPrice" class="form-label">Max Price:</label>
+    <input type="text" class="form-input" id="maxPrice" [(ngModel)]="filterParams.maxPrice" name="maxPrice">
+
+    <label for="highlightedHost" class="form-label">Highlighted Host:</label>
+    <input type="checkbox" id="highlightedHost" [(ngModel)]="filterParams.highlightedHost" name="highlightedHost">
+
+    <button type="button" class="btn btn-danger" (click)="filterAccommodations()">Filter</button>
+  </div>
+</form>
+
+<div *ngFor="let accommodation of accommodations; let i = index" class="accommodation-card"  [ngClass]="{'new-row': i % 3 === 0 && i !== 0}">
+  <h2 class="accommodation-title">{{ accommodation?.name }}</h2>
+  <p class="accommodation-description"> {{ accommodation?.description }}</p>
+  <div class="accommodation-details">
+    <div class="detail">
+    <div class="detail">
+      <span class="detail-label">Benefits:</span>
+      <span class="detail-value"> {{ accommodation?.benefits }}</span>
+    </div>
+    <div class="detail">
+      <span class="detail-label">Guests:</span>
+      <span class="detail-value"> {{ accommodation?.minGuest }} - {{ accommodation?.maxGuest }}</span>
+    </div>
+    <div class="detail">
+      <span class="detail-label">Location:</span>
+      <span class="detail-value">
+        {{ accommodation?.location?.country }},
+        {{ accommodation?.location?.city }},
+        {{ accommodation?.location?.street }}
+        {{ accommodation?.location?.number }}
+      </span>
+    </div>
+  </div>
+</div>
+  <div>
+    <button [routerLink]="['/AccommodationDetails', accommodation.id]" type="submit"class="btn btn-danger">Check availability</button>
+  </div>
+</div>

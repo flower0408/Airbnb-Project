@@ -1,0 +1,151 @@
+<app-header></app-header>
+<div class="profile-container">
+  <div class="profile-header">
+    <h1 class="profile">Profile of {{user.username}}</h1>
+  </div>
+  <div class="profile-info">
+    <div class="profile-info-box">
+      <p class="info"><b>First Name:</b> {{user.firstName}}</p>
+      <p class="info"><b>Last Name:</b> {{user.lastName}}</p>
+      <p class="info"><b>Gender:</b> {{user.gender}}</p>
+      <p class="info"><b>Age:</b> {{user.age}}</p>
+      <p class="info"><b>Residence:</b> {{user.residence}}</p>
+      <p class="info"><b>Email:</b> {{user.email}}</p>
+    </div>
+  </div>
+  <div class="profile-container1">
+    <div class="profile-info1">
+
+      <form [formGroup]="profileForm">
+        <label for="firstName" class="info"><b>First Name: </b> </label>
+        <input type="text" id="firstName" formControlName="firstName" [placeholder]="user.firstName" />
+        <div class="color" *ngIf="profileForm.get('firstName')?.hasError('required')">
+          First Name is required.
+        </div>
+        <div class="color" *ngIf="profileForm.get('firstName')?.hasError('minlength')">
+          First Name must be at least 3 characters long.
+        </div>
+        <div class="color" *ngIf="profileForm.get('firstName')?.hasError('maxlength')">
+          First Name must not exceed 20 characters.
+        </div>
+        <div class="color" *ngIf="profileForm.get('firstName')?.hasError('pattern')">
+          Special characters are not allowed in First Name.
+        </div>
+        <br>
+
+        <label for="lastName" class="info"><b>Last Name: </b> </label>
+        <input type="text" id="lastName" formControlName="lastName" [placeholder]="user.lastName" />
+        <div class="color" *ngIf="profileForm.get('lastName')?.hasError('required')">
+          Last Name is required.
+        </div>
+        <div class="color" *ngIf="profileForm.get('lastName')?.hasError('minlength')">
+          Last Name must be at least 3 characters long.
+        </div>
+        <div class="color" *ngIf="profileForm.get('lastName')?.hasError('maxlength')">
+          Last Name must not exceed 20 characters.
+        </div>
+        <div class="color" *ngIf="profileForm.get('lastName')?.hasError('pattern')">
+          Special characters are not allowed in Last Name.
+        </div>
+        <br>
+
+        <label for="gender" class="info"><b>Gender:</b></label>
+        <div>
+          <label>
+            <input type="radio" formControlName="gender" [value]="'Male'" />
+            Male
+          </label>
+          <label>
+            <input type="radio" formControlName="gender" [value]="'Female'" />
+            Female
+          </label>
+        </div>
+        <div class="color" *ngIf="profileForm.get('gender')?.hasError('required')">
+          Gender is required.
+        </div>
+
+        <label for="age" class="info"><b>Age:</b></label>
+        <br>
+        <input type="number" id="age" formControlName="age" [placeholder]="user.age.toString()" />
+        <div class="color" *ngIf="profileForm.get('age')?.hasError('required')">
+          Age is required.
+        </div>
+        <div class="color" *ngIf="profileForm.get('age')?.hasError('min')">
+          Age must be at least 1.
+        </div>
+        <div class="color" *ngIf="profileForm.get('age')?.hasError('max')">
+          Age must not exceed 100.
+        </div>
+        <br>
+
+        <label for="residence" class="info"><b>Residence:</b></label>
+        <input type="text" id="residence" formControlName="residence" [placeholder]="user.residence" />
+        <div class="color" *ngIf="profileForm.get('residence')?.hasError('required')">
+          Residence is required.
+        </div>
+        <div class="color" *ngIf="profileForm.get('residence')?.hasError('minlength')">
+          Residence must be at least 3 characters long.
+        </div>
+        <div class="color" *ngIf="profileForm.get('residence')?.hasError('maxlength')">
+          Residence must not exceed 35 characters.
+        </div>
+        <div class="color" *ngIf="profileForm.get('residence')?.hasError('pattern')">
+          Special characters are not allowed in Residence.
+        </div>
+        <br>
+
+        <label for="email" class="info"><b>Email:</b></label>
+        <br>
+        <input type="text" id="email" formControlName="email" [placeholder]="user.email" />
+        <div class="color" *ngIf="profileForm.get('email')?.hasError('required')">
+          Email is required.
+        </div>
+        <div class="color" *ngIf="profileForm.get('email')?.hasError('email')">
+          Please enter a valid email address.
+        </div>
+        <div class="color" *ngIf="profileForm.get('email')?.hasError('minlength')">
+          Email must be at least 3 characters long.
+        </div>
+        <div class="color" *ngIf="profileForm.get('email')?.hasError('maxlength')">
+          Email must not exceed 35 characters.
+        </div>
+        <br>
+        <br>
+        <button class="btn btn-danger" (click)="updateProfile()">Update Profile</button>
+      </form>
+    </div>
+    <div class="profile-info1">
+      <form [formGroup]="usernameForm">
+        <p for="newUsername" class="info"><b>New Username:</b></p>
+        <input type="text" id="newUsername"  formControlName="newUsername" [placeholder]="user.username" />
+        <div class="color" *ngIf="usernameForm.get('newUsername')?.hasError('required')">
+          Username is required.
+        </div>
+        <div class="color" *ngIf="usernameForm.get('newUsername')?.hasError('minlength')">
+          Username must be at least 4 characters long.
+        </div>
+        <div class="color" *ngIf="usernameForm.get('newUsername')?.hasError('maxlength')">
+          Username must not exceed 30 characters.
+        </div>
+        <div class="color" *ngIf="usernameForm.get('newUsername')?.hasError('pattern')">
+          Special Characters are not allowed.
+        </div>
+        <br>
+        <br>
+        <button class="btn btn-danger" (click)="updateUsername()">Change Username</button>
+      </form>
+      <br>
+      <br>
+      <br>
+      <p class="info"><b>New password</b> </p>
+      <div class="profile-options">
+        <button class="btn btn-danger" (click)="updatePassword()">Change Password</button>
+      </div>
+      <br>
+      <button class="btn btn-danger" (click)="deleteAccount()">Delete account</button>
+    </div>
+  </div>
+
+</div>
+
+
