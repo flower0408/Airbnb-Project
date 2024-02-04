@@ -140,10 +140,6 @@ services:
       KEY: /accommodations_service-key.pem
       CA_CERT: /ca-cert.pem
     depends_on:
-      accommodations_db:
-        condition: service_healthy
-      jaeger:
-        condition: service_healthy
       namenode:
         condition: service_healthy
       datanode1:
