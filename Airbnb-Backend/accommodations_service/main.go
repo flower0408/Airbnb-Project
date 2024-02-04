@@ -1,8 +1,10 @@
 package main
 
 import (
+	"accommodations_service/cache"
 	"accommodations_service/data"
 	"accommodations_service/handlers"
+	"accommodations_service/storage"
 	"context"
 	"errors"
 	"github.com/casbin/casbin"
@@ -50,7 +52,7 @@ func main() {
 	logger := log.New(os.Stdout, "[acc-api] ", log.LstdFlags)
 	storeLogger := log.New(os.Stdout, "[acc-store] ", log.LstdFlags)
 
-	// NoSQL: Initialize Product Repository store
+	// NoSQL: Initialize Repository store
 	store, err := data.New(timeoutContext, storeLogger, tracer)
 	if err != nil {
 		logger.Fatal(err)
@@ -58,7 +60,26 @@ func main() {
 	defer store.DisconnectMongo(timeoutContext)
 	store.Ping()
 
-	accommodationHandler := handlers.NewAccommodationHandler(logger, store, tracer)
+	//// NoSQL: Initialize File Storage store
+	fileStorage, err := storage.New(storeLogger, tracer)
+	if err != nil {
+		logger.Fatalf("Error initializing FileStorage: %v", err)
+	}
+
+	// Close connection to HDFS on shutdown
+	defer fileStorage.Close()
+
+	//// Create directory tree on HDFS
+	_ = fileStorage.CreateDirectoriesStart()
+
+	// NoSQL: Initialize Cache store
+	imageCache, err := cache.New(storeLogger, tracer)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	imageCache.Ping()
+
+	accommodationHandler := handlers.NewAccommodationHandler(logger, store, tracer, fileStorage, imageCache)
 
 	//Initialize the router and add a middleware for all the requests
 	router := mux.NewRouter()
@@ -85,6 +106,10 @@ func main() {
 	getAccommodationId.HandleFunc("/{id}", accommodationHandler.GetByID)
 	getAccommodationsByOwner := router.Methods(http.MethodGet).Subrouter()
 	getAccommodationsByOwner.HandleFunc("/owner/{ownerID}", accommodationHandler.GetAccommodationsByOwner)
+	getImagesUrls := router.Methods(http.MethodGet).Subrouter()
+	getImagesUrls.HandleFunc("/getImagesUrls/{folderName}", accommodationHandler.GetImageURLS)
+	getImages := router.Methods(http.MethodGet).Subrouter()
+	getImages.HandleFunc("/getImages/{folderName}/{imageName}", accommodationHandler.GetImageContent)
 	postAccommodation := router.Methods(http.MethodPost).Subrouter()
 	postAccommodation.HandleFunc("/", accommodationHandler.CreateAccommodation)
 	postAccommodation.Use(accommodationHandler.MiddlewareAccommodationDeserialization)
@@ -94,6 +119,8 @@ func main() {
 	postRateForHost := router.Methods(http.MethodPost).Subrouter()
 	postRateForHost.HandleFunc("/createRateForHost", accommodationHandler.CreateRateForHost)
 	postRateForHost.Use(accommodationHandler.MiddlewareRateDeserialization)
+	uploadImages := router.Methods(http.MethodPost).Subrouter()
+	uploadImages.HandleFunc("/upload/{folderName}", accommodationHandler.UploadImages)
 	updateRateForHost := router.Methods(http.MethodPatch).Subrouter()
 	updateRateForHost.HandleFunc("/updateRate/{rateID}", accommodationHandler.UpdateRateForHost)
 	updateRateForHost.Use(accommodationHandler.MiddlewareRateDeserialization)
@@ -101,6 +128,10 @@ func main() {
 	deleteAccommodationsByOwner.HandleFunc("/delete_accommodations/{ownerID}", accommodationHandler.DeleteAccommodationsByOwnerID)
 	deleteRateForHost := router.Methods(http.MethodDelete).Subrouter()
 	deleteRateForHost.HandleFunc("/deleteRate/{rateID}", accommodationHandler.DeleteRateForHost)
+	filterAccommodations := router.Methods(http.MethodPost).Subrouter()
+	filterAccommodations.HandleFunc("/filterAccommodations", accommodationHandler.FilterAccommodationsHandler)
+	averageRateForHost := router.Methods(http.MethodGet).Subrouter()
+	averageRateForHost.HandleFunc("/averageRate/{id}", accommodationHandler.GetAverageRateForHost)
 
 	//Initialize the server
 	server := http.Server{

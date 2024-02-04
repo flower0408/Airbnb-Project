@@ -10,7 +10,6 @@ type Accommodation struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	Name        string             `bson:"name,omitempty" json:"name"`
 	Description string             `bson:"description,omitempty" json:"description"`
-	Images      string             `bson:"images,omitempty" json:"images"`
 	Location    Location           `bson:"location,omitempty" json:"location"`
 	Benefits    string             `bson:"benefits,omitempty" json:"benefits"`
 	MinGuest    int                `bson:"minGuest,omitempty" json:"minGuest"`
@@ -33,6 +32,13 @@ type Rate struct {
 	CreatedAt          string             `bson:"createdAt,omitempty" json:"createdAt"`
 	UpdatedAt          string             `bson:"updatedAt,omitempty" json:"updatedAt"`
 	Rate               int                `bson:"rate,omitempty" json:"rate"`
+}
+
+type FilterParams struct {
+	DesiredBenefits []string `json:"desiredBenefits"`
+	MinPrice        string   `json:"minPrice"`
+	MaxPrice        string   `json:"maxPrice"`
+	HighlightedHost bool     `json:"highlightedHost"`
 }
 
 func (o *Accommodation) ToJSON(w io.Writer) error {

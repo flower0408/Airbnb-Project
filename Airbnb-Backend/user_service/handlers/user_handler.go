@@ -63,6 +63,7 @@ func (handler *UserHandler) Init(router *mux.Router) {
 	router.HandleFunc("/changeUsername", handler.ChangeUsername).Methods("POST")
 	router.HandleFunc("/{userID}", handler.UpdateUser).Methods("PATCH")
 	router.HandleFunc("/{id}/delete", handler.DeleteAccount).Methods("DELETE")
+	router.HandleFunc("/isHighlighted/{id}", handler.IsHighlighted).Methods("GET")
 
 	http.Handle("/", router)
 	log.Fatal(http.ListenAndServeTLS(":8002", "user_service-cert.pem", "user_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
@@ -381,6 +382,32 @@ func (handler *UserHandler) GetId(writer http.ResponseWriter, request *http.Requ
 		writer.WriteHeader(http.StatusNotFound)
 	}
 	jsonResponse(userId, writer)
+}
+
+func (handler *UserHandler) IsHighlighted(writer http.ResponseWriter, req *http.Request) {
+	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.IsHighlighted")
+	defer span.End()
+
+	vars := mux.Vars(req)
+	userID := vars["id"]
+
+	authHeader := req.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		span.SetStatus(codes.Error, "Host ID or Auth Token missing in headers")
+		http.Error(writer, "Host ID or Auth Token missing in headers", http.StatusUnauthorized)
+		return
+	}
+
+	isHighlighted, err := handler.service.IsHighlighted(ctx, userID, authToken)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error checking if host is highlighted")
+		http.Error(writer, "Error checking if host is highlighted", http.StatusInternalServerError)
+		return
+	}
+
+	jsonResponse(isHighlighted, writer)
 }
 
 func (handler *UserHandler) DeleteAccount(writer http.ResponseWriter, req *http.Request) {

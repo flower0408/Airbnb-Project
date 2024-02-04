@@ -8,14 +8,25 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+	"net/http"
+	"os"
 	"user_service/domain"
 )
 
 const (
 	DATABASE   = "user"
 	COLLECTION = "users"
+)
+
+var (
+	reservationServiceHost   = os.Getenv("RESERVATIONS_SERVICE_HOST")
+	reservationServicePort   = os.Getenv("RESERVATIONS_SERVICE_PORT")
+	accommodationServiceHost = os.Getenv("ACCOMMODATIONS_SERVICE_HOST")
+	accommodationServicePort = os.Getenv("ACCOMMODATIONS_SERVICE_PORT")
 )
 
 type UserMongoDBStore struct {
@@ -34,6 +45,7 @@ func NewUserMongoDBStore(client *mongo.Client, tracer trace.Tracer) domain.UserS
 func (store *UserMongoDBStore) Register(ctx context.Context, user *domain.User) (*domain.User, error) {
 	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.Register")
 	defer span.End()
+	user.Highlighted = false
 
 	fmt.Println(json.Marshal(user))
 	user.ID = primitive.NewObjectID()
@@ -126,6 +138,252 @@ func (store *UserMongoDBStore) UpdateUser(ctx context.Context, updateUser *domai
 	}
 
 	return updateUser, nil
+}
+
+func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, authToken string) (bool, error) {
+	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.IsHighlighted")
+	defer span.End()
+
+	accommodationEndpoint := fmt.Sprintf("http://%s:%s/averageRate/%s", accommodationServiceHost, accommodationServicePort, host)
+	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(accommodationRequest.Header))
+	if err != nil {
+		span.SetStatus(codes.Error, "Error creating accommodation request")
+		fmt.Println("Error creating accommodation request:", err)
+		return false, err
+	}
+
+	accommodationRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error sending accommodation request")
+		fmt.Println("Error sending accommodation request:", err)
+		return false, err
+	}
+
+	if accommodationResponse.StatusCode != http.StatusOK {
+		span.SetStatus(codes.Error, "Accommodation service returned an error")
+		fmt.Println("Accommodation service returned an error:", accommodationResponse.Status)
+		return false, errors.New("Accommodation service returned an error")
+	}
+
+	type AccommodationResponseRate struct {
+		AverageRate float64 `json:"averageRate"`
+	}
+
+	var response AccommodationResponseRate
+
+	//err = responseToType(accommodationResponse.Body, accommodations)
+	err = json.NewDecoder(accommodationResponse.Body).Decode(&response)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error decoding accommodation response")
+		fmt.Println("Error decoding accommodation response:", err)
+		return false, err
+	}
+
+	defer accommodationResponse.Body.Close()
+
+	reservationEndpoint := fmt.Sprintf("http://%s:%s/cancellationRate/%s", reservationServiceHost, reservationServicePort, host)
+	reservationRequest, err := http.NewRequest("GET", reservationEndpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest.Header))
+	if err != nil {
+		span.SetStatus(codes.Error, "Error creating reservation request")
+		fmt.Println("Error creating reservation request:", err)
+		return false, err
+	}
+
+	reservationRequest.Header.Set("Authorization", "Bearer "+authToken)
+
+	reservationResponse, err := http.DefaultClient.Do(reservationRequest)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error sending reservation request")
+		fmt.Println("Error sending reservation request:", err)
+		return false, err
+	}
+
+	if reservationResponse.StatusCode != http.StatusOK {
+		span.SetStatus(codes.Error, "Reservation service returned an error")
+		fmt.Println("Reservation service returned an error:", reservationResponse.Status)
+		return false, errors.New("Reservation service returned an error")
+	}
+
+	type ReservationResponseRate struct {
+		CancellationRate bool `json:"isBelowThreshold"`
+	}
+
+	var response2 ReservationResponseRate
+
+	//err = responseToType(accommodationResponse.Body, accommodations)
+	err = json.NewDecoder(reservationResponse.Body).Decode(&response2)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error decoding reservation response")
+		fmt.Println("Error decoding reservation response:", err)
+		return false, err
+	}
+
+	defer reservationResponse.Body.Close()
+
+	reservationEndpoint2 := fmt.Sprintf("http://%s:%s/numOfReservations/%s", reservationServiceHost, reservationServicePort, host)
+	reservationRequest2, err := http.NewRequest("GET", reservationEndpoint2, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest2.Header))
+	if err != nil {
+		span.SetStatus(codes.Error, "Error creating reservation request")
+		fmt.Println("Error creating reservation request:", err)
+		return false, err
+	}
+
+	reservationRequest2.Header.Set("Authorization", "Bearer "+authToken)
+
+	reservationResponse2, err := http.DefaultClient.Do(reservationRequest2)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error sending reservation request")
+		fmt.Println("Error sending reservation request:", err)
+		return false, err
+	}
+
+	if reservationResponse2.StatusCode != http.StatusOK {
+		span.SetStatus(codes.Error, "Reservation service returned an error")
+		fmt.Println("Reservation service returned an error:", reservationResponse2.Status)
+		return false, errors.New("Reservation service returned an error")
+	}
+
+	type NumOfReservationResponse struct {
+		NumOfReservations bool `json:"hasEnoughReservations"`
+	}
+
+	var response3 NumOfReservationResponse
+
+	//err = responseToType(accommodationResponse.Body, accommodations)
+	err = json.NewDecoder(reservationResponse2.Body).Decode(&response3)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error decoding reservation response")
+		fmt.Println("Error decoding reservation response:", err)
+		return false, err
+	}
+
+	defer reservationResponse2.Body.Close()
+
+	reservationEndpoint3 := fmt.Sprintf("http://%s:%s/durationOfReservations/%s", reservationServiceHost, reservationServicePort, host)
+	reservationRequest3, err := http.NewRequest("GET", reservationEndpoint3, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest3.Header))
+	if err != nil {
+		span.SetStatus(codes.Error, "Error creating reservation request")
+		fmt.Println("Error creating reservation request:", err)
+		return false, err
+	}
+
+	reservationRequest3.Header.Set("Authorization", "Bearer "+authToken)
+
+	reservationResponse3, err := http.DefaultClient.Do(reservationRequest3)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error sending reservation request")
+		fmt.Println("Error sending reservation request:", err)
+		return false, err
+	}
+
+	if reservationResponse3.StatusCode != http.StatusOK {
+		span.SetStatus(codes.Error, "Reservation service returned an error")
+		fmt.Println("Reservation service returned an error:", reservationResponse3.Status)
+		return false, errors.New("Reservation service returned an error")
+	}
+
+	type DurationOfReservationResponse struct {
+		DurationOfReservations bool `json:"hasMoreThan50Days"`
+	}
+
+	var response4 DurationOfReservationResponse
+
+	//err = responseToType(accommodationResponse.Body, accommodations)
+	err = json.NewDecoder(reservationResponse3.Body).Decode(&response4)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error decoding reservation response")
+		fmt.Println("Error decoding reservation response:", err)
+		return false, err
+	}
+
+	defer reservationResponse3.Body.Close()
+
+	if response.AverageRate > 4.7 &&
+		response2.CancellationRate &&
+		response3.NumOfReservations &&
+		response4.DurationOfReservations {
+		hostID, err := primitive.ObjectIDFromHex(host)
+		if err != nil {
+			span.SetStatus(codes.Error, "Error parsing string to ObjectID:")
+			fmt.Println("Error parsing string to ObjectID:", err)
+			return false, err
+		}
+		filter := bson.M{"_id": hostID}
+
+		user, err := store.filterOne(ctx, filter)
+		if err != nil {
+			span.SetStatus(codes.Error, "Error getting user")
+			return false, err
+		}
+
+		if user.Highlighted != true {
+			updateData := bson.M{
+				"highlighted": true,
+			}
+
+			filter = bson.M{"_id": hostID}
+			update := bson.M{"$set": updateData}
+
+			result, err := store.users.UpdateOne(ctx, filter, update)
+			if err != nil {
+				span.SetStatus(codes.Error, "Error update user")
+				fmt.Println("Error update user")
+				return false, err
+			}
+
+			if result.ModifiedCount == 0 {
+				return false, errors.New("No user updated")
+			}
+		}
+	} else if response.AverageRate < 4.7 ||
+		!response2.CancellationRate ||
+		!response3.NumOfReservations ||
+		!response4.DurationOfReservations {
+		hostID, err := primitive.ObjectIDFromHex(host)
+		if err != nil {
+			span.SetStatus(codes.Error, "Error parsing string to ObjectID:")
+			fmt.Println("Error parsing string to ObjectID:", err)
+			return false, err
+		}
+		filter := bson.M{"_id": hostID}
+
+		user, err := store.filterOne(ctx, filter)
+		if err != nil {
+			span.SetStatus(codes.Error, "Error getting user")
+			return false, err
+		}
+
+		if user.Highlighted != false {
+			updateData := bson.M{
+				"highlighted": false,
+			}
+
+			filter = bson.M{"_id": hostID}
+			update := bson.M{"$set": updateData}
+
+			result, err := store.users.UpdateOne(ctx, filter, update)
+			if err != nil {
+				span.SetStatus(codes.Error, "Error update user")
+				fmt.Println("Error update user")
+				return false, err
+			}
+
+			if result.ModifiedCount == 0 {
+				return false, errors.New("No user updated")
+			}
+		}
+	}
+
+	return response.AverageRate > 4.7 &&
+		response2.CancellationRate &&
+		response3.NumOfReservations &&
+		response4.DurationOfReservations, nil
 }
 
 func (store *UserMongoDBStore) DeleteAccount(ctx context.Context, userID primitive.ObjectID) error {

@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"accommodations_service/authorization"
+	"accommodations_service/cache"
 	"accommodations_service/data"
 	"accommodations_service/errors"
+	"accommodations_service/storage"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -22,9 +24,12 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -46,24 +51,28 @@ var (
 type KeyProduct struct{}
 
 type AccommodationHandler struct {
-	logger *log.Logger
-	repo   *data.AccommodationRepo
-	cb     *gobreaker.CircuitBreaker
-	cb2    *gobreaker.CircuitBreaker
-	tracer trace.Tracer
+	logger  *log.Logger
+	repo    *data.AccommodationRepo
+	cb      *gobreaker.CircuitBreaker
+	cb2     *gobreaker.CircuitBreaker
+	tracer  trace.Tracer
+	storage *storage.FileStorage
+	cache   *cache.ImageCache
 }
 
 type ValidationError struct {
 	Message string `json:"message"`
 }
 
-func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo, t trace.Tracer) *AccommodationHandler {
+func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo, t trace.Tracer, s *storage.FileStorage, c *cache.ImageCache) *AccommodationHandler {
 	return &AccommodationHandler{
-		logger: l,
-		repo:   r,
-		cb:     CircuitBreaker("accommodationService"),
-		cb2:    CircuitBreaker("reservationService2"),
-		tracer: t,
+		logger:  l,
+		repo:    r,
+		cb:      CircuitBreaker("accommodationService"),
+		cb2:     CircuitBreaker("reservationService2"),
+		tracer:  t,
+		storage: s,
+		cache:   c,
 	}
 }
 
@@ -407,7 +416,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 		log.Println("After http.Error")
 
-		err := s.repo.DeleteRateForHost(ctx, rate.ID.String())
+		err := s.repo.DeleteRateForHost(ctx, rate.ID.String(), tokenString)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error deleting rate for accommodation after circuit breaker error")
 			log.Printf("Error deleting rate for accommodation after circuit breaker error: %v", err)
@@ -589,7 +598,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 		return
 	}
 
-	_, err = s.repo.InsertRateForHost(ctx, rate)
+	_, err = s.repo.InsertRateForHost(ctx, rate, tokenString)
 	if err != nil {
 		span.SetStatus(codes.Error, "Database exception")
 		s.logger.Print("Database exception: ", err)
@@ -634,7 +643,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 
 		log.Println("After http.Error")
 
-		err := s.repo.DeleteRateForHost(ctx, rate.ID.String())
+		err := s.repo.DeleteRateForHost(ctx, rate.ID.String(), tokenString)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error deleting rate for host after circuit breaker error")
 			log.Printf("Error deleting rate for host after circuit breaker error: %v", err)
@@ -738,7 +747,7 @@ func (s *AccommodationHandler) DeleteRateForHost(rw http.ResponseWriter, h *http
 		return
 	}
 
-	err := s.repo.DeleteRateForHost(ctx, rateID)
+	err := s.repo.DeleteRateForHost(ctx, rateID, authToken)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error deleting rate for host")
 		http.Error(rw, "Error deleting rate for host", http.StatusInternalServerError)
@@ -754,6 +763,15 @@ func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http
 
 	vars := mux.Vars(h)
 	rateID := vars["rateID"]
+
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	rate := h.Context().Value(KeyProduct{}).(*data.Rate)
 
@@ -773,7 +791,7 @@ func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http
 
 	rate.UpdatedAt = cetTime.Format(time.RFC3339)
 
-	err = s.repo.UpdateRateForHost(ctx, rateID, rate)
+	err = s.repo.UpdateRateForHost(ctx, rateID, rate, authToken)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error updating rate for host")
 		s.logger.Println("Error updating rate for host:", err)
@@ -1097,6 +1115,179 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 	}
 }
 
+func (s *AccommodationHandler) GetAverageRateForHost(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.GetAverageRateByHost")
+	defer span.End()
+
+	vars := mux.Vars(h)
+	hostID := vars["id"]
+
+	averageRate, err := s.repo.AverageRate(ctx, hostID)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		span.SetStatus(codes.Error, "Error calculating average rate")
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]float64{"averageRate": averageRate}
+
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(rw).Encode(response); err != nil {
+		span.SetStatus(codes.Error, "Error encoding JSON response")
+		s.logger.Println("Error encoding JSON response:", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	span.SetStatus(codes.Ok, "")
+}
+
+func (s *AccommodationHandler) GetImageURLS(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.GetImageURLS")
+	defer span.End()
+
+	vars := mux.Vars(h)
+	folderName := vars["folderName"]
+
+	// Check if the image urls is in the cache
+	imageURLs, err := s.cache.GetUrls(ctx, folderName)
+	if err == nil {
+		// Return the list of image URLs as JSON
+		span.SetStatus(codes.Ok, "")
+		json.NewEncoder(rw).Encode(imageURLs)
+		return
+	}
+
+	imageURLs, err = s.storage.GetImageURLS(ctx, folderName)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error getting image URLs")
+		s.logger.Println("Error getting image URLs:", err)
+		http.Error(rw, "Error getting image URLs", http.StatusInternalServerError)
+		return
+	}
+
+	// Store the image url in the cache for future requests
+	err = s.cache.PostUrls(ctx, folderName, imageURLs)
+	if err != nil {
+		span.SetStatus(codes.Error, "Failed to store image URLs in cache")
+		s.logger.Println("Failed to store image URLs in cache", err)
+		log.Println("Failed to store image URLs in cache:", err)
+	}
+
+	// Return the list of image URLs as JSON
+	span.SetStatus(codes.Ok, "")
+	json.NewEncoder(rw).Encode(imageURLs)
+}
+
+func (s *AccommodationHandler) GetImageContent(rw http.ResponseWriter, req *http.Request) {
+	ctx, span := s.tracer.Start(req.Context(), "AccommodationHandler.GetImageContent")
+	defer span.End()
+
+	vars := mux.Vars(req)
+	folderName := vars["folderName"]
+	imageName := vars["imageName"]
+
+	imagePath := path.Join(folderName, imageName)
+	imagePath = strings.TrimPrefix(imagePath, "/") // Ensure there is no leading slash
+
+	imageType := mime.TypeByExtension(filepath.Ext(imagePath))
+	if imageType == "" {
+		span.SetStatus(codes.Error, "Error retrieving image type")
+		s.logger.Println("Error retrieving image type")
+		http.Error(rw, "Error retrieving image type", http.StatusInternalServerError)
+		http.Error(rw, imagePath, http.StatusInternalServerError)
+		return
+	}
+
+	// Check if the image is in the cache
+	imageContent, err := s.cache.Get(ctx, folderName, imageName)
+	if err == nil {
+		// Image found in cache, serve it
+		rw.Header().Set("Content-Type", imageType)
+		span.SetStatus(codes.Ok, "")
+		rw.WriteHeader(http.StatusOK)
+		rw.Write(imageContent)
+		return
+	}
+
+	imageContent, err = s.storage.GetImageContent(ctx, imagePath)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error retrieving image content")
+		s.logger.Println("Error retrieving image content")
+		http.Error(rw, "Error retrieving image content", http.StatusInternalServerError)
+		http.Error(rw, imagePath, http.StatusInternalServerError)
+		return
+	}
+
+	// Store the image in the cache for future requests
+	err = s.cache.Post(ctx, folderName, imageName, imageContent)
+	if err != nil {
+		span.SetStatus(codes.Error, "Failed to store image in cache")
+		s.logger.Println("Failed to store image in cache")
+		log.Println("Failed to store image in cache:", err)
+	}
+
+	rw.Header().Set("Content-Type", imageType)
+	span.SetStatus(codes.Ok, "")
+	rw.WriteHeader(http.StatusOK)
+	rw.Write(imageContent)
+}
+
+func (s *AccommodationHandler) UploadImages(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.UploadImages")
+	defer span.End()
+
+	vars := mux.Vars(h)
+	folderName := vars["folderName"]
+
+	// Parse the multipart form with a MB limit
+	err := h.ParseMultipartForm(40 << 20)
+	if err != nil {
+		span.SetStatus(codes.Error, "Error parsing form")
+		s.logger.Println("Error parsing form:", err)
+		http.Error(rw, "Error parsing form", http.StatusBadRequest)
+		return
+	}
+
+	// Retrieve the files from the form data
+	files := h.MultipartForm.File["images"]
+
+	for _, file := range files {
+		// Open each file and get its content
+		src, err := file.Open()
+		if err != nil {
+			span.SetStatus(codes.Error, "Error opening file")
+			s.logger.Println("Error opening file:", err)
+			http.Error(rw, "Error opening file", http.StatusInternalServerError)
+			return
+		}
+		defer src.Close()
+
+		// Read the content of the file
+		imageContent, err := ioutil.ReadAll(src)
+		if err != nil {
+			span.SetStatus(codes.Error, "Error reading file")
+			s.logger.Println("Error reading file:", err)
+			http.Error(rw, "Error reading file", http.StatusInternalServerError)
+			return
+		}
+
+		// Save the image using the SaveImage function
+		err = s.storage.SaveImage(ctx, folderName, file.Filename, imageContent)
+		if err != nil {
+			span.SetStatus(codes.Error, "Error saving file")
+			s.logger.Println("Error saving file:", err)
+			http.Error(rw, "Error saving file", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Return a success response
+	span.SetStatus(codes.Ok, "")
+	rw.WriteHeader(http.StatusOK)
+}
+
 type StatusError struct {
 	Code int
 	Err  string
@@ -1109,7 +1300,6 @@ func (e StatusError) Error() string {
 func validateAccommodation(accommodation *data.Accommodation) *ValidationError {
 	nameRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,35}$`)
 	descriptionRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,200}$`)
-	imagesRegex := regexp.MustCompile(`^[a-zA-Z0-9\s,'-]{3,200}$`)
 	countryRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,35}$`)
 	cityRegex := regexp.MustCompile(`^[A-Z][a-zA-Z\s-]{2,35}$`)
 	streetRegex := regexp.MustCompile(`^[A-Z][a-zA-Z0-9\s,'-]{2,35}$`)
@@ -1127,13 +1317,6 @@ func validateAccommodation(accommodation *data.Accommodation) *ValidationError {
 	}
 	if !descriptionRegex.MatchString(accommodation.Description) {
 		return &ValidationError{Message: "Invalid 'Description' format. It must be 3-200 characters long and contain only letters, numbers, spaces, commas, apostrophes, and hyphens"}
-	}
-
-	if accommodation.Images == "" {
-		return &ValidationError{Message: "Images cannot be empty"}
-	}
-	if !imagesRegex.MatchString(accommodation.Images) {
-		return &ValidationError{Message: "Invalid 'Images' format. It must be 3-200 characters long and contain only letters, numbers, spaces, commas, apostrophes, and hyphens"}
 	}
 
 	if accommodation.Benefits == "" {
@@ -1192,6 +1375,104 @@ func validateRate(rate *data.Rate) *ValidationError {
 	}
 
 	return nil
+}
+
+func (s *AccommodationHandler) FilterAccommodationsHandler(rw http.ResponseWriter, h *http.Request) {
+	ctx, span := s.tracer.Start(h.Context(), "AccommodationHandler.FilterAccommodationsHandler")
+	defer span.End()
+
+	var filterParams data.FilterParams
+
+	authHeader := h.Header.Get("Authorization")
+	authToken := extractBearerToken(authHeader)
+
+	if authToken == "" {
+		span.AddEvent("Error extracting Bearer token")
+		s.logger.Println("Error extracting Bearer token")
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if err := json.NewDecoder(h.Body).Decode(&filterParams); err != nil {
+		s.logger.Println("Error decoding filter parameters: ", err)
+		span.SetStatus(codes.Error, "Error decoding filter parameters")
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var minPrice int
+	var maxPrice int
+	var minPriceBool bool
+	var maxPriceBool bool
+	var err error
+
+	if filterParams.MinPrice != "" {
+		minPrice, err = strconv.Atoi(filterParams.MinPrice)
+		if err != nil {
+			errorMessage := "minPrice must be a valid integer"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+		if minPrice < 0 {
+			errorMessage := "minPrice must be non-negative"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			//rw.WriteHeader(http.StatusBadRequest)
+			//rw.Write([]byte(errorMessage))
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+		minPriceBool = true
+	}
+
+	if filterParams.MaxPrice != "" {
+		maxPrice, err = strconv.Atoi(filterParams.MaxPrice)
+		if err != nil {
+			errorMessage := "maxPrice must be a valid integer"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+		if maxPrice < 0 {
+			errorMessage := "maxPrice must be non-negative"
+			span.SetStatus(codes.Error, errorMessage)
+			http.Error(rw, errorMessage, http.StatusBadRequest)
+			//rw.WriteHeader(http.StatusBadRequest)
+			//rw.Write([]byte(errorMessage))
+			fmt.Println("Error:", errorMessage)
+			return
+		}
+		maxPriceBool = true
+	}
+
+	if filterParams.MinPrice != "" && filterParams.MaxPrice != "" {
+		if minPrice >= 0 && maxPrice >= 0 {
+			if minPrice > maxPrice {
+				errorMessage := "minPrice must be less than or equal to maxPrice"
+				span.SetStatus(codes.Error, errorMessage)
+				http.Error(rw, errorMessage, http.StatusBadRequest)
+				fmt.Println("Error:", errorMessage)
+				return
+			}
+		}
+	}
+
+	accommodations, err := s.repo.FilterAccommodations(ctx, authToken, filterParams, minPrice, maxPrice, minPriceBool, maxPriceBool)
+	if err != nil {
+		s.logger.Print("Database exception: ", err)
+		span.SetStatus(codes.Error, "Error filtering accommodations")
+		rw.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(accommodations)
+
+	span.SetStatus(codes.Ok, "")
+	rw.WriteHeader(http.StatusOK)
 }
 
 func (s *AccommodationHandler) MiddlewareAccommodationDeserialization(next http.Handler) http.Handler {

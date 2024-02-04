@@ -51,6 +51,8 @@ services:
       USER_SERVICE_PORT: ${USER_SERVICE_PORT}
       RESERVATIONS_SERVICE_HOST: ${RESERVATIONS_SERVICE_HOST}
       RESERVATIONS_SERVICE_PORT: ${RESERVATIONS_SERVICE_PORT}
+      ACCOMMODATIONS_SERVICE_PORT: ${ACCOMMODATIONS_SERVICE_PORT}
+      ACCOMMODATIONS_SERVICE_HOST: ${ACCOMMODATIONS_SERVICE_HOST}
       SECRET_KEY: ${SECRET_KEY}
       JAEGER_ADDRESS: ${JAEGER_ADDRESS}
       CERT: /user_service-cert.pem
@@ -131,18 +133,33 @@ services:
       NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT}
       SECRET_KEY: ${SECRET_KEY}
       JAEGER_ADDRESS: ${JAEGER_ADDRESS}
+      HDFS_URI: namenode:${HDFS_PORT}
+      IMAGE_CACHE_HOST: ${IMAGE_CACHE_HOST}
+      IMAGE_CACHE_PORT: ${IMAGE_CACHE_PORT}
       CERT: /accommodations_service-cert.pem
       KEY: /accommodations_service-key.pem
       CA_CERT: /ca-cert.pem
     depends_on:
-      - accommodations_db
-      - jaeger
+      accommodations_db:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+      namenode:
+        condition: service_healthy
+      datanode1:
+        condition: service_healthy
+      datanode2:
+        condition: service_healthy
+      datanode3:
+        condition: service_healthy
     networks:
       - network
     volumes:
+      - ./files:/usr/bin/files
       - ./api_gateway/cert/accommodations_service/accommodations_service-cert.pem:/accommodations_service-cert.pem
       - ./api_gateway/cert/accommodations_service/accommodations_service-key.pem:/accommodations_service-key.pem
       - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem
+
 
   reservations_service:
     image: reservations_service
@@ -264,6 +281,7 @@ services:
     networks:
       - network
 
+
   reservations_db:
     image: cassandra
     container_name: reservations_db
@@ -352,13 +370,82 @@ services:
     networks:
       - network
 
+  image_cache:
+    image: redis
+    restart: always
+    environment:
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL,CONFIG
+    ports:
+      - ${IMAGE_CACHE_INPUT_OUTPUT_PORT}
+    command: redis-server --save 20 1 --loglevel warning
+    networks:
+      - network
+    volumes:
+      - image_cache:/data
+
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    ports:
+      - 9870:9870
+      - ${HDFS_PORT}:${HDFS_PORT}
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hdfs.env
+    networks:
+      - network
+
+  datanode1:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode1
+    volumes:
+      - hadoop_datanode1:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    env_file:
+      - ./hdfs.env
+    networks:
+      - network
+
+  datanode2:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode2
+    volumes:
+      - hadoop_datanode2:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    env_file:
+      - ./hdfs.env
+    networks:
+      - network
+
+  datanode3:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode3
+    volumes:
+      - hadoop_datanode3:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    env_file:
+      - ./hdfs.env
+    networks:
+      - network
+
 volumes:
   # Volume na koji se povezuje reservations_db baza podataka
   reservations_db_store:
   neo4j_data:
   auth_cache:
     driver: local
-
+  image_cache:
+    driver: local
+  hadoop_namenode:
+  hadoop_datanode1:
+  hadoop_datanode2:
+  hadoop_datanode3:
 
 networks:
   network:

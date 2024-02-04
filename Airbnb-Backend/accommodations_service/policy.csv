@@ -15,3 +15,16 @@ p, Guest, /getRatesByHost/*, GET
 p, Guest, /updateRate/*, PATCH
 p, Guest, /deleteRateForHost/*, DELETE
 p, Host, /delete_accommodations/*, DELETE
+p, Unauthenticated, /filterAccommodations, POST
+p, Host, /filterAccommodations, POST
+p, Guest, /filterAccommodations, POST
+p, Host, /averageRate/*, GET
+p, Guest, /averageRate/*, GET
+p, Unauthenticated, /averageRate/*, GET
+p, Host, /upload/*, POST
+p, Host, /getImages/*, GET
+p, Guest, /getImages/*, GET
+p, Unauthenticated, /getImages/*, GET
+p, Host, /getImagesUrls/*, GET
+p, Guest, /getImagesUrls/*, GET
+p, Unauthenticated, /getImagesUrls/*, GET
