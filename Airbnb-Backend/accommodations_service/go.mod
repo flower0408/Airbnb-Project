@@ -1,6 +1,6 @@
 module accommodations_service
 
-go 1.20
+go 1.21.5
 
 require (
 	github.com/andjelabjekovic/logovi v0.0.0-20240118200501-23801741ddb7

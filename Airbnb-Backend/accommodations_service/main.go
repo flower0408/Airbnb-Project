@@ -44,10 +44,12 @@ func main() {
 
 	// NoSQL: Initialize Product Repository store
 	//ovde
-	logger, loggingMiddleware, _, _, _ := logovi.LogInit("logfile.log", "accommodation_service")
+	logger, loggingMiddleware, _, _, _ := logovi.LogInit("/logs/logfile.log", "accommodation_service")
 
 	store, err := data.New(timeoutContext, storeLogger)
 	if err != nil {
+		//writeFatal(r, "Poruka!")
+
 		logger.Fatal(err)
 	}
 	defer store.DisconnectMongo(timeoutContext)
@@ -205,7 +207,7 @@ func InitializeCasbinMiddleware(modelPath, policyPath string) (func(http.Handler
 
 			res, err := e.EnforceSafe(userRole, r.URL.Path, r.Method)
 			if err != nil {
-				//writeFatal(r, "Poruka!")
+
 				log.Println("Enforce error:", err)
 				http.Error(w, "Unauthorized user", http.StatusUnauthorized)
 				return
