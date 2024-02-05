@@ -254,7 +254,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 	}
 
 	// Circuit breaker for email existence check
-	/*result, breakerErr := service.cb.Execute(func() (interface{}, error) {
+	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
 		userServiceEndpointMail := fmt.Sprintf("https://%s:%s/mailExist/%s", userServiceHost, userServicePort, user.Email)
 		response, err := service.HTTPSRequestGetToken(ctx, userServiceEndpointMail, "GET")
 		if err != nil {
@@ -282,9 +282,8 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 	}
 
 	if result != nil {
-		span.SetStatus(codes.Error, err.Error())
 		fmt.Println("Received meaningful data:", result)
-	}*/
+	}
 	pass := []byte(user.Password)
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
 	if err != nil {
@@ -306,7 +305,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 	}
 
 	// Circuit breaker for user service request
-	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
+	result, breakerErr = service.cb.Execute(func() (interface{}, error) {
 		userServiceEndpoint := fmt.Sprintf("https://%s:%s/", userServiceHost, userServicePort)
 		responseUser, err := service.HTTPSRequestWithoutToken(ctx, userServiceEndpoint, "POST", requestBody)
 		if err != nil {

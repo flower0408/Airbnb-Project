@@ -13,7 +13,7 @@ import { ViewChild } from '@angular/core';
 import { Appointment } from 'src/app/models/appointment.model';
 import { AppointmentService } from 'src/app/services/appointment.service';
 
-declare var $: any; // Declare jQuery
+declare let $: any; // Declare jQuery
 
 @Component({
   selector: 'app-create-accommodation',
@@ -93,7 +93,7 @@ export class CreateAccommodationComponent implements OnInit{
 
           let elements = document.getElementsByClassName("drp-selected");
           let dateRange: any;
-          for (var i = 0; i < elements.length; i++) {
+          for (let i = 0; i < elements.length; i++) {
             dateRange = elements[i].textContent;
             console.log(dateRange);
           }

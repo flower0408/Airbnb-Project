@@ -8,11 +8,5 @@ import { Component } from '@angular/core';
 export class AppComponent {
   title = 'Airbnb-Frontend';
 
-  constructor() {
 
-  }
-
-  ngOnInit() {
-
-  }
 }

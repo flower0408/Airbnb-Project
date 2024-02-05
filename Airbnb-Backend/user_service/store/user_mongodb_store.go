@@ -27,6 +27,9 @@ const (
 	ErrorParsing           = "Error parsing string to ObjectID:"
 	ErrorDecodingResponse  = "Error decoding reservation response:"
 	ErrorDecodingResponse2 = "Error decoding reservation response"
+	ErrorGettingUser       = "Error getting user"
+	ErrorUpdateUser        = "Error update user"
+	NoUserUpdated          = "No user updated"
 )
 
 var (
@@ -89,7 +92,7 @@ func (store *UserMongoDBStore) GetOneUser(ctx context.Context, username string) 
 
 	user, err := store.filterOne(ctx, filter)
 	if err != nil {
-		span.SetStatus(codes.Error, "Error getting user")
+		span.SetStatus(codes.Error, ErrorGettingUser)
 		return nil, err
 	}
 
@@ -136,12 +139,12 @@ func (store *UserMongoDBStore) UpdateUser(ctx context.Context, updateUser *domai
 
 	result, err := store.users.UpdateOne(ctx, filter, update)
 	if err != nil {
-		span.SetStatus(codes.Error, "Error update user")
+		span.SetStatus(codes.Error, ErrorUpdateUser)
 		return nil, err
 	}
 
 	if result.ModifiedCount == 0 {
-		return nil, errors.New("No user updated")
+		return nil, errors.New(NoUserUpdated)
 	}
 
 	return updateUser, nil
@@ -285,7 +288,7 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 
 		user, err := store.filterOne(ctx, filter)
 		if err != nil {
-			span.SetStatus(codes.Error, "Error getting user")
+			span.SetStatus(codes.Error, ErrorGettingUser)
 			return false, err
 		}
 
@@ -299,13 +302,13 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 
 			result, err := store.users.UpdateOne(ctx, filter, update)
 			if err != nil {
-				span.SetStatus(codes.Error, "Error update user")
-				fmt.Println("Error update user")
+				span.SetStatus(codes.Error, ErrorUpdateUser)
+				fmt.Println(ErrorUpdateUser)
 				return false, err
 			}
 
 			if result.ModifiedCount == 0 {
-				return false, errors.New("No user updated")
+				return false, errors.New(NoUserUpdated)
 			}
 		}
 	} else if response.AverageRate < 4.7 ||
@@ -322,7 +325,7 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 
 		user, err := store.filterOne(ctx, filter)
 		if err != nil {
-			span.SetStatus(codes.Error, "Error getting user")
+			span.SetStatus(codes.Error, ErrorGettingUser)
 			return false, err
 		}
 
@@ -336,13 +339,13 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 
 			result, err := store.users.UpdateOne(ctx, filter, update)
 			if err != nil {
-				span.SetStatus(codes.Error, "Error update user")
-				fmt.Println("Error update user")
+				span.SetStatus(codes.Error, ErrorUpdateUser)
+				fmt.Println(ErrorUpdateUser)
 				return false, err
 			}
 
 			if result.ModifiedCount == 0 {
-				return false, errors.New("No user updated")
+				return false, errors.New(NoUserUpdated)
 			}
 		}
 	}

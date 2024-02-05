@@ -12,9 +12,7 @@ export class VerificationService {
   private userMail = new BehaviorSubject('');
   currentUserMail = this.userMail.asObservable();
 
- constructor() {
 
- }
  updateVerificationToken(message: string) {
     this.verificationToken.next(message)
  }
