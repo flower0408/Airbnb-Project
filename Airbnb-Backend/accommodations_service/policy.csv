@@ -20,7 +20,6 @@ p, Host, /filterAccommodations, POST
 p, Guest, /filterAccommodations, POST
 p, Host, /averageRate/*, GET
 p, Guest, /averageRate/*, GET
-p, Unauthenticated, /averageRate/*, GET
 p, Host, /upload/*, POST
 p, Host, /getImages/*, GET
 p, Guest, /getImages/*, GET
