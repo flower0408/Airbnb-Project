@@ -22,8 +22,11 @@ import (
 )
 
 const (
-	DATABASE   = "user"
-	COLLECTION = "users"
+	DATABASE               = "user"
+	COLLECTION             = "users"
+	ErrorParsing           = "Error parsing string to ObjectID:"
+	ErrorDecodingResponse  = "Error decoding reservation response:"
+	ErrorDecodingResponse2 = "Error decoding reservation response"
 )
 
 var (
@@ -201,8 +204,8 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	//err = responseToType(accommodationResponse.Body, accommodations)
 	err = json.NewDecoder(reservationResponse.Body).Decode(&response2)
 	if err != nil {
-		span.SetStatus(codes.Error, "Error decoding reservation response")
-		fmt.Println("Error decoding reservation response:", err)
+		span.SetStatus(codes.Error, ErrorDecodingResponse2)
+		fmt.Println(ErrorDecodingResponse, err)
 		return false, err
 	}
 
@@ -231,8 +234,8 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	//err = responseToType(accommodationResponse.Body, accommodations)
 	err = json.NewDecoder(reservationResponse2.Body).Decode(&response3)
 	if err != nil {
-		span.SetStatus(codes.Error, "Error decoding reservation response")
-		fmt.Println("Error decoding reservation response:", err)
+		span.SetStatus(codes.Error, ErrorDecodingResponse2)
+		fmt.Println(ErrorDecodingResponse, err)
 		return false, err
 	}
 
@@ -261,8 +264,8 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	//err = responseToType(accommodationResponse.Body, accommodations)
 	err = json.NewDecoder(reservationResponse3.Body).Decode(&response4)
 	if err != nil {
-		span.SetStatus(codes.Error, "Error decoding reservation response")
-		fmt.Println("Error decoding reservation response:", err)
+		span.SetStatus(codes.Error, ErrorDecodingResponse2)
+		fmt.Println(ErrorDecodingResponse, err)
 		return false, err
 	}
 
@@ -274,8 +277,8 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 		response4.DurationOfReservations {
 		hostID, err := primitive.ObjectIDFromHex(host)
 		if err != nil {
-			span.SetStatus(codes.Error, "Error parsing string to ObjectID:")
-			fmt.Println("Error parsing string to ObjectID:", err)
+			span.SetStatus(codes.Error, ErrorParsing)
+			fmt.Println(ErrorParsing, err)
 			return false, err
 		}
 		filter := bson.M{"_id": hostID}
@@ -311,8 +314,8 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 		!response4.DurationOfReservations {
 		hostID, err := primitive.ObjectIDFromHex(host)
 		if err != nil {
-			span.SetStatus(codes.Error, "Error parsing string to ObjectID:")
-			fmt.Println("Error parsing string to ObjectID:", err)
+			span.SetStatus(codes.Error, ErrorParsing)
+			fmt.Println(ErrorParsing, err)
 			return false, err
 		}
 		filter := bson.M{"_id": hostID}
