@@ -30,7 +30,6 @@ import { MyProfileComponent } from './components/my-profile/my-profile.component
 import {ChangePasswordComponent} from "./components/change-password/change-password.component";
 import { NgxCaptchaModule } from 'ngx-captcha';
 import { CreateAccommodationComponent } from './components/create-accommodation/create-accommodation.component';
-import { XSSInterceptor } from './services/xss.interceptor';
 import {AccommodationDetailsComponent} from "./components/accommodation-details/accommodation-details.component";
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatInputModule } from '@angular/material/input';
