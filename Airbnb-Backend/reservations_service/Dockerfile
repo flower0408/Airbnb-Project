@@ -1,4 +1,4 @@
-FROM golang:latest as builder
+FROM golang:latest AS builder
 WORKDIR /app
 COPY ./reservations_service/go.mod ./reservations_service/go.sum ./
 RUN go mod download

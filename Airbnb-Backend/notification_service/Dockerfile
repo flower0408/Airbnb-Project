@@ -1,4 +1,4 @@
-FROM golang:latest as builder
+FROM golang:latest AS builder
 WORKDIR /app
 COPY ./notification_service/go.mod ./notification_service/go.sum ./
 RUN go mod download

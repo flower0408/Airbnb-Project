@@ -1,4 +1,4 @@
-FROM golang:latest as builder
+FROM golang:latest AS builder
 WORKDIR /app
 COPY ./auth_service/go.mod ./auth_service/go.sum ./
 RUN go mod download

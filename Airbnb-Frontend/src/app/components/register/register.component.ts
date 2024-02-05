@@ -44,7 +44,6 @@ export class RegisterComponent implements OnInit {
               private _snackBar: MatSnackBar,) { }
 
   // @ts-ignore
-  formGroup: FormGroup;
   submitted = false;
 
   ngOnInit(): void {
