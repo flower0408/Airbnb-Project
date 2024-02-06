@@ -24,6 +24,8 @@ services:
       - notification_db
     networks:
       - network
+    volumes:
+      - logs_volume:/logs
     dns:
       - 8.8.8.8
 
@@ -47,6 +49,8 @@ services:
       - user_db
     networks:
       - network
+    volumes:
+      - logs_volume:/logs
 
 
   auth_service:
@@ -79,6 +83,8 @@ services:
       - auth_cache
     networks:
       - network
+    volumes:
+      - logs_volume:/logs
 
 
   accommodations_service:
@@ -105,7 +111,8 @@ services:
       - accommodations_db
     networks:
       - network
-
+    volumes:
+      - logs_volume:/logs
 
   reservations_service:
     image: reservations_service
@@ -138,6 +145,8 @@ services:
         condition: service_healthy
     networks:
       - network
+    volumes:
+      - logs_volume:/logs
 
 
   api_gateway:
@@ -225,7 +234,7 @@ services:
 
 volumes:
   # Volume na koji se povezuje reservations_db baza podataka
-
+  logs_volume:
   reservations_db_store:
 
   auth_cache:

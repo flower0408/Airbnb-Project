@@ -72,7 +72,7 @@ func (server *Server) start(notificationHandler *handlers.NotificationHandler) {
 	router.Use(MiddlewareContentTypeSet)
 	notificationHandler.Init(router)
 
-	_, loggingMiddleware, _, _, _ := logovi.LogInit("logfile.log", "notification_service")
+	_, loggingMiddleware, _, _, _, _ := logovi.LogInit("/logs/logfile.log", "notification_service")
 	router.Use(loggingMiddleware)
 
 	srv := &http.Server{

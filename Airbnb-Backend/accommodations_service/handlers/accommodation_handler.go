@@ -40,29 +40,39 @@ var (
 type KeyProduct struct{}
 
 type AccommodationHandler struct {
-	logger *log.Logger
-	repo   *data.AccommodationRepo
-	cb     *gobreaker.CircuitBreaker
-	cb2    *gobreaker.CircuitBreaker
+	logger            *log.Logger
+	repo              *data.AccommodationRepo
+	cb                *gobreaker.CircuitBreaker
+	cb2               *gobreaker.CircuitBreaker
+	writeError        func(msg string)
+	writeInfo         func(msg string)
+	writeRequestError func(r *http.Request, msg string)
+	writeRequestInfo  func(r *http.Request, msg string)
 }
 
 type ValidationError struct {
 	Message string `json:"message"`
 }
 
-func NewAccommodationHandler(l *log.Logger, r *data.AccommodationRepo) *AccommodationHandler {
+func NewAccommodationHandler(l *log.Logger, e func(msg string), i func(msg string), re func(r *http.Request, msg string), ri func(r *http.Request, msg string), r *data.AccommodationRepo) *AccommodationHandler {
 	return &AccommodationHandler{
-		logger: l,
-		repo:   r,
-		cb:     CircuitBreaker("accommodationService"),
-		cb2:    CircuitBreaker("reservationService2"),
+		logger:            l,
+		repo:              r,
+		cb:                CircuitBreaker("accommodationService"),
+		cb2:               CircuitBreaker("reservationService2"),
+		writeError:        e,
+		writeInfo:         i,
+		writeRequestError: re,
+		writeRequestInfo:  ri,
 	}
 }
 
 func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, req *http.Request) {
 	bearer := req.Header.Get("Authorization")
 	if bearer == "" {
+
 		log.Println("Authorization header missing")
+		s.writeRequestError(req, "Authorization header missing")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -70,16 +80,18 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	bearerToken := strings.Split(bearer, "Bearer ")
 	if len(bearerToken) != 2 {
 		log.Println("Malformed Authorization header")
+		s.writeRequestError(req, "Malformed Authorization header")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-
+	s.writeRequestInfo(req, "Authorization header successfully checked")
 	tokenString := bearerToken[1]
 	log.Printf("Token: %s\n", tokenString)
 
 	token, err := jwt.Parse([]byte(tokenString), verifier)
 	if err != nil {
 		log.Println("Token parsing error:", err)
+		//s.writeRequestError(fmt.Sprintf(req,"Token parsing error: %v", err))
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -102,13 +114,15 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 
 	if breakerErr != nil {
 		log.Println("Circuit breaker open:", breakerErr)
+		//s.writeError(fmt.Sprintf("Circuit breaker open: %v", breakerErr))
 		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 		return
 	}
-
+	s.writeRequestInfo(req, "getUserIDFromUserService successfully executed")
 	resultMap, ok := result.(map[string]interface{})
 	if !ok {
 		log.Println("Internal server error: Unexpected result type")
+		s.writeRequestError(req, "Internal server error: Unexpected result type")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -116,6 +130,7 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	userID, ok := resultMap["userID"].(string)
 	if !ok {
 		log.Println("Internal server error: User ID not found in the response")
+		s.writeRequestError(req, "Internal server error: User ID not found in the response")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -123,12 +138,14 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	statusCode, ok := resultMap["statusCode"].(int)
 	if !ok {
 		log.Println("Internal server error: Status code not found in the response")
+		s.writeRequestError(req, "Internal server error: Status code not found in the response")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	if err, ok := resultMap["err"].(error); ok && err != nil {
 		log.Println("Error from user service:", err)
+		//s.writeError(fmt.Sprintf("Error from user service: %v", err))
 		http.Error(writer, err.Error(), statusCode)
 		return
 	}
@@ -145,6 +162,7 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	id, err = s.repo.InsertAccommodation(accommodation)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
+		//s.writeError(fmt.Sprintf("Database exception: %v", err))
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -153,6 +171,7 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	responseBytes, err := json.Marshal(responseJSON)
 	if err != nil {
 		s.logger.Print("Error encoding response:", err)
+		//s.writeError(fmt.Sprintf("Error encoding response: %v", err))
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -163,12 +182,14 @@ func (s *AccommodationHandler) CreateAccommodation(writer http.ResponseWriter, r
 	if err != nil {
 		s.logger.Print("Error writing response:", err)
 	}
+	s.writeRequestInfo(req, "CreateAccommodation successfully executed")
 }
 
 func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWriter, req *http.Request) {
 	bearer := req.Header.Get("Authorization")
 	if bearer == "" {
 		log.Println("Authorization header missing")
+		s.writeRequestError(req, "Authorization header missing")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -176,6 +197,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	bearerToken := strings.Split(bearer, "Bearer ")
 	if len(bearerToken) != 2 {
 		log.Println("Malformed Authorization header")
+		s.writeRequestError(req, "Malformed Authorization header")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -186,6 +208,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	token, err := jwt.Parse([]byte(tokenString), verifier)
 	if err != nil {
 		log.Println("Token parsing error:", err)
+		//s.writeError(fmt.Sprintf("Token parsing error: %v", err))
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -202,6 +225,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 	if breakerErr != nil {
 		log.Println("Circuit breaker open:", breakerErr)
+		//s.writeError(fmt.Sprintf("Circuit breaker open: %v", breakerErr))
 		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -209,6 +233,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	resultMap, ok := result.(map[string]interface{})
 	if !ok {
 		log.Println("Internal server error: Unexpected result type")
+		s.writeRequestError(req, "Internal server error: Unexpected result type")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -216,6 +241,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	userID, ok := resultMap["userID"].(string)
 	if !ok {
 		log.Println("Internal server error: User ID not found in the response")
+		s.writeRequestError(req, "Internal server error: User ID not found in the response")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -223,6 +249,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	statusCode, ok := resultMap["statusCode"].(int)
 	if !ok {
 		log.Println("Internal server error: Status code not found in the response")
+		s.writeRequestError(req, "Internal server error: Status code not found in the response")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -267,6 +294,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	hasPastReservations, ok := resultR.(bool)
 	if !ok {
 		log.Println("Error parsing result from reservation service: Unexpected result type")
+		s.writeRequestError(req, "Error parsing result from reservation service: Unexpected result type")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -279,6 +307,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	hasRated, err := s.repo.HasUserRatedAccommodation(userID, rate.ForAccommodationId)
 	if err != nil {
 		log.Println("Error checking if user has already rated the host:", err)
+		s.writeRequestError(req, "Error checking if user has already rated the host")
 		http.Error(writer, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -311,12 +340,14 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	_, err = s.repo.InsertRateForAccommodation(rate)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
+		s.writeRequestError(req, "Database exception ")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	accommodationID, err := primitive.ObjectIDFromHex(rate.ForAccommodationId)
 	if err != nil {
 		log.Println("Invalid accommodation ID:", err)
+		s.writeRequestError(req, "Invalid accommodation ID")
 		http.Error(writer, "Invalid accommodation ID", http.StatusBadRequest)
 		return
 	}
@@ -324,6 +355,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	accommodation, err := s.repo.GetByID(accommodationID)
 	if err != nil {
 		log.Println("Error getting accommodation details:", err)
+		s.writeRequestError(req, "Error getting accommodation details")
 		http.Error(writer, "Error getting accommodation details", http.StatusInternalServerError)
 		return
 	}
@@ -365,7 +397,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 	if breakerErrNotification != nil {
 		log.Printf("Circuit breaker error: %v", breakerErrNotification)
 		log.Println("Before http.Error")
-
+		s.writeRequestError(req, "Error ")
 		writer.WriteHeader(http.StatusServiceUnavailable)
 
 		http.Error(writer, "Error getting notification service", http.StatusServiceUnavailable)
@@ -386,7 +418,7 @@ func (s *AccommodationHandler) CreateRateForAccommodation(writer http.ResponseWr
 
 		fmt.Println("Received meaningful data:", resultNotification)
 	}
-
+	//s.writeInfo("CreateRateForAccommodation successfully executed")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -394,6 +426,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	bearer := req.Header.Get("Authorization")
 	if bearer == "" {
 		log.Println("Authorization header missing")
+		s.writeRequestError(req, "Authorization header missing")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -401,6 +434,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	bearerToken := strings.Split(bearer, "Bearer ")
 	if len(bearerToken) != 2 {
 		log.Println("Malformed Authorization header")
+		s.writeRequestError(req, "Malformed Authorization header")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -411,6 +445,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	token, err := jwt.Parse([]byte(tokenString), verifier)
 	if err != nil {
 		log.Println("Token parsing error:", err)
+		s.writeRequestError(req, "Token parsing error")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -427,6 +462,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 
 	if breakerErr != nil {
 		log.Println("Circuit breaker open:", breakerErr)
+		s.writeRequestError(req, "Circuit breaker open")
 		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -434,6 +470,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	resultMap, ok := result.(map[string]interface{})
 	if !ok {
 		log.Println("Internal server error: Unexpected result type")
+		s.writeRequestError(req, "Internal server error: Unexpected result type")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -441,6 +478,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	userID, ok := resultMap["userID"].(string)
 	if !ok {
 		log.Println("Internal server error: User ID not found in the response")
+		s.writeRequestError(req, "Internal server error: User ID not found in the response")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -448,12 +486,15 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	statusCode, ok := resultMap["statusCode"].(int)
 	if !ok {
 		log.Println("Internal server error: Status code not found in the response")
+		s.writeRequestError(req, "Internal server error: Status code not found in the response")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	if err, ok := resultMap["err"].(error); ok && err != nil {
 		log.Println("Error from user service:", err)
+
+		s.writeRequestError(req, "Error from user service")
 		http.Error(writer, err.Error(), statusCode)
 		return
 	}
@@ -493,6 +534,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	hasPastReservations, ok := resultR.(bool)
 	if !ok {
 		log.Println("Error parsing result from reservation service: Unexpected result type")
+		s.writeRequestError(req, "Error parsing result from reservation service: Unexpected result type")
 		http.Error(writer, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -505,6 +547,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	hasRated, err := s.repo.HasUserRatedHost(userID, rate.ForHostId)
 	if err != nil {
 		log.Println("Error checking if user has already rated the host:", err)
+		s.writeRequestError(req, "Error checking if user has already rated the host")
 		http.Error(writer, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -537,6 +580,7 @@ func (s *AccommodationHandler) CreateRateForHost(writer http.ResponseWriter, req
 	_, err = s.repo.InsertRateForHost(rate)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
+		s.writeRequestError(req, "Database exception")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -658,6 +702,7 @@ func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWri
 
 	if authToken == "" {
 		s.logger.Println("Error extracting Bearer token")
+		s.writeRequestError(h, "Error extracting Bearer token")
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -693,6 +738,7 @@ func (s *AccommodationHandler) DeleteAccommodationsByOwnerID(rw http.ResponseWri
 	err := s.repo.DeleteAccommodationsByOwner(ownerID)
 	if err != nil {
 		s.logger.Print("Database exception")
+		s.writeRequestError(h, "Database exception")
 		http.Error(rw, "Error deleting accommodations", http.StatusInternalServerError)
 		return
 	}
@@ -710,12 +756,14 @@ func (s *AccommodationHandler) DeleteRateForHost(rw http.ResponseWriter, h *http
 
 	if authToken == "" {
 		s.logger.Println("Error extracting Bearer token")
+		s.writeRequestError(h, "Error extracting Bearer token")
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	err := s.repo.DeleteRateForHost(rateID)
 	if err != nil {
+		s.writeRequestError(h, "Error deleting rate for host")
 		http.Error(rw, "Error deleting rate for host", http.StatusInternalServerError)
 	}
 
@@ -746,6 +794,7 @@ func (s *AccommodationHandler) UpdateRateForHost(rw http.ResponseWriter, h *http
 	err = s.repo.UpdateRateForHost(rateID, rate)
 	if err != nil {
 		s.logger.Println("Error updating rate for host:", err)
+		s.writeRequestError(h, "Error updating rate for host")
 		http.Error(rw, "Error updating rate for host", http.StatusInternalServerError)
 		return
 	}
@@ -784,6 +833,7 @@ func (s *AccommodationHandler) GetAll(rw http.ResponseWriter, h *http.Request) {
 	accommodations, err := s.repo.GetAll()
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
+		s.writeRequestError(h, "Database exception")
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -798,6 +848,7 @@ func (s *AccommodationHandler) GetAllRate(rw http.ResponseWriter, h *http.Reques
 	rates, err := s.repo.GetAllRate()
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
+		s.writeRequestError(h, "Database exception")
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -811,6 +862,7 @@ func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) 
 	vars := mux.Vars(h)
 	id, err := primitive.ObjectIDFromHex(vars["id"])
 	if err != nil {
+		s.writeRequestError(h, "Invalid request ID")
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -818,6 +870,7 @@ func (s *AccommodationHandler) GetByID(rw http.ResponseWriter, h *http.Request) 
 	accommodation, err := s.repo.GetByID(id)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
+		s.writeRequestError(h, "Database exception")
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -834,6 +887,7 @@ func (s *AccommodationHandler) GetRatesByAccommodation(rw http.ResponseWriter, h
 	rates, err := s.repo.GetRatesByAccommodation(id)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
+		s.writeRequestError(h, "Database exception")
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -850,6 +904,7 @@ func (s *AccommodationHandler) GetRatesByHost(rw http.ResponseWriter, h *http.Re
 	rates, err := s.repo.GetRatesByHost(id)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
+		s.writeRequestError(h, "Database exception")
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -866,6 +921,7 @@ func (s *AccommodationHandler) GetAccommodationsByOwner(rw http.ResponseWriter, 
 	accommodations, err := s.repo.GetAccommodationsByOwner(ownerID)
 	if err != nil {
 		s.logger.Print("Database exception: ", err)
+		s.writeRequestError(req, "Database exception")
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -887,6 +943,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 
 	minGuestsInt, err := strconv.Atoi(minGuests)
 	if err != nil {
+		s.writeRequestError(h, "Invalid minGuests parameter")
 		http.Error(rw, "Invalid minGuests parameter", http.StatusBadRequest)
 		return
 	}
@@ -908,6 +965,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 		accommodations, err := s.repo.Search(filter)
 		if err != nil {
 			s.logger.Print("Database exception: ", err)
+			s.writeRequestError(h, "Database exception")
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -937,6 +995,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 
 		if err != nil {
 			log.Println("Error making reservation service request:", err)
+			s.writeRequestError(h, "Error making reservation service request")
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
 			return nil, fmt.Errorf("ReservationServiceError")
 		}
@@ -944,6 +1003,7 @@ func (s *AccommodationHandler) SearchAccommodations(rw http.ResponseWriter, h *h
 
 		if reservationServiceResponse.StatusCode != http.StatusOK {
 			log.Printf("Reservation service responded with status: %d\n", reservationServiceResponse.StatusCode)
+
 			http.Error(rw, "Internal server error", http.StatusInternalServerError)
 			return nil, StatusError{Code: http.StatusInternalServerError, Err: "ReservationServiceError"}
 		}

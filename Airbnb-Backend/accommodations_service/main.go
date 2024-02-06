@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+var logger, loggingMiddleware, writeInfo, writeError, writeRequestInfo, writeRequestError = logovi.LogInit("/logs/logfile.log", "accommodation_service")
+
 func main() {
 
 	port := os.Getenv("ACCOMMODATIONS_SERVICE_PORT")
@@ -44,18 +46,17 @@ func main() {
 
 	// NoSQL: Initialize Product Repository store
 	//ovde
-	logger, loggingMiddleware, _, _, _ := logovi.LogInit("/logs/logfile.log", "accommodation_service")
 
 	store, err := data.New(timeoutContext, storeLogger)
+
 	if err != nil {
-		//writeFatal(r, "Poruka!")
 
 		logger.Fatal(err)
 	}
 	defer store.DisconnectMongo(timeoutContext)
 	store.Ping()
 
-	accommodationHandler := handlers.NewAccommodationHandler(logger, store)
+	accommodationHandler := handlers.NewAccommodationHandler(logger, writeError, writeInfo, writeRequestInfo, writeRequestError, store)
 
 	//Initialize the router and add a middleware for all the requests
 	router := mux.NewRouter()
@@ -152,6 +153,7 @@ var verifier, _ = jwt.NewVerifierHS(jwt.HS256, jwtKey)
 func parseToken(tokenString string) (*jwt.Token, error) {
 	token, err := jwt.Parse([]byte(tokenString), verifier)
 	if err != nil {
+		writeError("Failed to parse token: " + err.Error())
 		log.Println(err)
 		return nil, err
 	}
@@ -184,6 +186,7 @@ func extractClaims(token *jwt.Token) map[string]string {
 
 	err := jwt.ParseClaims(token.Bytes(), verifier, &claims)
 	if err != nil {
+		writeError("Failed to extract claims: " + err.Error())
 		log.Println(err)
 	}
 
@@ -201,13 +204,14 @@ func InitializeCasbinMiddleware(modelPath, policyPath string) (func(http.Handler
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			userRole, err := extractUserType(r)
 			if err != nil {
+				writeError("Failed to extract user role: " + err.Error())
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
 
 			res, err := e.EnforceSafe(userRole, r.URL.Path, r.Method)
 			if err != nil {
-
+				writeError("Failed to enforce access control: " + err.Error())
 				log.Println("Enforce error:", err)
 				http.Error(w, "Unauthorized user", http.StatusUnauthorized)
 				return

@@ -3,7 +3,7 @@ module accommodations_service
 go 1.21.5
 
 require (
-	github.com/andjelabjekovic/logovi v0.0.0-20240118200501-23801741ddb7
+	github.com/andjelabjekovic/logovi v0.0.0-20240206144557-4ddcdb065841
 	github.com/casbin/casbin v1.9.1
 	github.com/cristalhq/jwt/v4 v4.0.2
 	github.com/gorilla/mux v1.8.1

@@ -1,9 +1,9 @@
 module notification_service
 
-go 1.20
+go 1.21.5
 
 require (
-	github.com/andjelabjekovic/logovi v0.0.0-20240125211708-04b8cd85c9b1
+	github.com/andjelabjekovic/logovi v0.0.0-20240206144557-4ddcdb065841
 	github.com/casbin/casbin v1.9.1
 	github.com/cristalhq/jwt/v4 v4.0.2
 	github.com/gorilla/mux v1.8.1

@@ -16,9 +16,11 @@ import (
 )
 
 type AccommodationRepo struct {
-	cli    *mongo.Client
-	logger *log.Logger
-	client *http.Client
+	cli        *mongo.Client
+	logger     *log.Logger
+	client     *http.Client
+	writeError func(msg string)
+	writeInfo  func(msg string)
 }
 
 func New(ctx context.Context, logger *log.Logger) (*AccommodationRepo, error) {
@@ -67,6 +69,8 @@ func (rr *AccommodationRepo) Ping() {
 	// Check connection -> if no error, connection is established
 	err := rr.cli.Ping(ctx, readpref.Primary())
 	if err != nil {
+		rr.writeError(err.Error())
+
 		rr.logger.Println(err)
 	}
 
@@ -85,6 +89,7 @@ func (rr *AccommodationRepo) InsertAccommodation(accommodation *Accommodation) (
 
 	result, err := accommodationCollection.InsertOne(ctx, accommodation)
 	if err != nil {
+		rr.writeError("Failed to insert accommodation into database")
 		rr.logger.Println(err)
 		return "", err
 	}
@@ -94,7 +99,7 @@ func (rr *AccommodationRepo) InsertAccommodation(accommodation *Accommodation) (
 		rr.logger.Println("Failed to convert InsertedID to ObjectID")
 		return "", errors.New("Failed to convert InsertedID")
 	}
-
+	rr.writeInfo("created")
 	return insertedID.Hex(), nil
 }
 

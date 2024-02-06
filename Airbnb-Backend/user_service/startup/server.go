@@ -19,13 +19,23 @@ import (
 	"user_service/store"
 )
 
+var _, loggingMiddleware, _, _, _, _ = logovi.LogInit("/logs/logfile.log", "user_service")
+
 type Server struct {
 	config *config.Config
+	//writeError        func(msg string)
+	//writeInfo         func(msg string)
+	//writeRequestError func(r *http.Request, msg string)
+	//writeRequestInfo  func(r *http.Request, msg string)
 }
 
-func NewServer(config *config.Config) *Server {
+func NewServer(config *config.Config /*, e func(msg string), i func(msg string), re func(r *http.Request, msg string), ri func(r *http.Request, msg string)*/) *Server {
 	return &Server{
 		config: config,
+		/*writeError:        e,
+		writeInfo:         i,
+		writeRequestError: re,
+		writeRequestInfo:  ri,*/
 	}
 }
 
@@ -72,7 +82,6 @@ func (server *Server) start(tweetHandler *handlers.UserHandler) {
 	router.Use(MiddlewareContentTypeSet)
 	tweetHandler.Init(router)
 
-	_, loggingMiddleware, _, _, _ := logovi.LogInit("logfile.log", "user_service")
 	router.Use(loggingMiddleware)
 
 	srv := &http.Server{
@@ -83,6 +92,7 @@ func (server *Server) start(tweetHandler *handlers.UserHandler) {
 	wait := time.Second * 15
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
+			//server.writeError("Failed to start server")
 			log.Println(err)
 		}
 	}()

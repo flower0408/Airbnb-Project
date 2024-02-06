@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"github.com/andjelabjekovic/logovi"
 	"github.com/casbin/casbin"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
@@ -22,6 +23,7 @@ import (
 	"user_service/service"
 )
 
+var _, loggingMiddleware, writeInfo, writeError, writeRequestInfo, writeRequestError = logovi.LogInit("/logs/logfile.log", "accommodation_service")
 var (
 	jwtKey                 = []byte(os.Getenv("SECRET_KEY"))
 	verifier, _            = jwt.NewVerifierHS(jwt.HS256, jwtKey)
@@ -124,6 +126,7 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 	err := json.NewDecoder(req.Body).Decode(&user)
 	if err != nil {
 		log.Println(err)
+
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}

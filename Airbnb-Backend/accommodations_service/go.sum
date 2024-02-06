@@ -2,6 +2,12 @@ github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible h1
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
 github.com/andjelabjekovic/logovi v0.0.0-20240118200501-23801741ddb7 h1:SZV7TGYirozw7YQkABJV8TPjMw3QOw3xIUFeKAo8hHo=
 github.com/andjelabjekovic/logovi v0.0.0-20240118200501-23801741ddb7/go.mod h1:GB12oHieoPra6KuwH/jTTLU6QwnXFer7JaTdQiDcLEc=
+github.com/andjelabjekovic/logovi v0.0.0-20240205093946-45f95bcfdf69 h1:u4inS6LjAUCyklw8B6ZYeEyOZX1c4vmX2eNblBOhKhQ=
+github.com/andjelabjekovic/logovi v0.0.0-20240205093946-45f95bcfdf69/go.mod h1:301uZnTpvaJP6FHOEhPBrP7RFXiq3NzRCzHHKRfUWc4=
+github.com/andjelabjekovic/logovi v0.0.0-20240205211455-99e533472414 h1:F2mq3rDWA2OeE3VytF09ZO1Opfgx+Jdfc9Uj5AUiS6Q=
+github.com/andjelabjekovic/logovi v0.0.0-20240205211455-99e533472414/go.mod h1:301uZnTpvaJP6FHOEhPBrP7RFXiq3NzRCzHHKRfUWc4=
+github.com/andjelabjekovic/logovi v0.0.0-20240206144557-4ddcdb065841 h1:a1rvgTkh2irDBHkDmW9cmkzvcDwEbOye00izU/jD5SE=
+github.com/andjelabjekovic/logovi v0.0.0-20240206144557-4ddcdb065841/go.mod h1:301uZnTpvaJP6FHOEhPBrP7RFXiq3NzRCzHHKRfUWc4=
 github.com/casbin/casbin v1.9.1 h1:ucjbS5zTrmSLtH4XogqOG920Poe6QatdXtz1FEbApeM=
 github.com/casbin/casbin v1.9.1/go.mod h1:z8uPsfBJGUsnkagrt3G8QvjgTKFMBJ32UP8HpZllfog=
 github.com/cristalhq/jwt/v4 v4.0.2 h1:g/AD3h0VicDamtlM70GWGElp8kssQEv+5wYd7L9WOhU=

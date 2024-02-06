@@ -20,6 +20,8 @@ import (
 	"time"
 )
 
+var _, loggingMiddleware, _, _, _, _ = logovi.LogInit("/logs/logfile.log", "auth_service")
+
 type Server struct {
 	config *config.Config
 }
@@ -96,7 +98,6 @@ func (server *Server) start(authHandler *handlers.AuthHandler) {
 	router.Use(MiddlewareContentTypeSet)
 	authHandler.Init(router)
 
-	_, loggingMiddleware, _, _, _ := logovi.LogInit("logfile.log", "auth_service")
 	router.Use(loggingMiddleware)
 
 	srv := &http.Server{

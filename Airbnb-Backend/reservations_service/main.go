@@ -54,7 +54,7 @@ func main() {
 	router := mux.NewRouter()
 	router.Use(MiddlewareContentTypeSet)
 
-	_, loggingMiddleware, _, _, _ := logovi.LogInit("logfile.log", "reservation_service")
+	_, loggingMiddleware, _, _, _, _ := logovi.LogInit("/logs/logfile.log", "reservation_service")
 	router.Use(loggingMiddleware)
 
 	casbinMiddleware, err := InitializeCasbinMiddleware("./rbac_model.conf", "./policy.csv")
