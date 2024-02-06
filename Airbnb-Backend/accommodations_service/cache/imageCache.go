@@ -5,21 +5,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-redis/redis"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-	"log"
 	"os"
 	"time"
 )
 
 type ImageCache struct {
 	cli    *redis.Client
-	logger *log.Logger
+	logger *logrus.Logger
 	tracer trace.Tracer
 }
 
 // Construct Redis client
-func New(logger *log.Logger, tracer trace.Tracer) (*ImageCache, error) {
+func New(logger *logrus.Logger, tracer trace.Tracer) (*ImageCache, error) {
 	redisHost := os.Getenv("IMAGE_CACHE_HOST")
 	redisPort := os.Getenv("IMAGE_CACHE_PORT")
 	redisAddress := fmt.Sprintf("%s:%s", redisHost, redisPort)

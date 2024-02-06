@@ -7,9 +7,12 @@ import (
 	"accommodations_service/storage"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/casbin/casbin"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/propagation"
@@ -27,6 +30,44 @@ import (
 var (
 	JaegerAddress = os.Getenv("JAEGER_ADDRESS")
 )
+
+var Logger = logrus.New()
+
+const (
+	LogFilePath = "/app/logs/accommodation.log"
+)
+
+type CustomFormatter struct{}
+
+func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	entry.Data["id"] = generateUniqueID()
+
+	msg := fmt.Sprintf("[%s] [%s] [%s] %s\n",
+		entry.Time.Format("2006-01-02T15:04:05Z07:00"),
+		entry.Level,
+		entry.Data["id"],
+		entry.Message,
+	)
+
+	return []byte(msg), nil
+}
+
+func generateUniqueID() string {
+	return fmt.Sprintf("ID-%d", time.Now().UnixNano())
+}
+
+func initLogger() {
+	writer, err := rotatelogs.New(
+		LogFilePath+"_%Y%m%d%H%M",
+		rotatelogs.WithRotationTime(3*time.Minute), // Rotate logs every 15 minutes
+	)
+	if err != nil {
+		Logger.Fatalf("Failed to create rotatelogs hook: %v", err)
+	}
+	Logger.SetOutput(writer)
+
+	Logger.SetFormatter(&CustomFormatter{})
+}
 
 func main() {
 
@@ -49,21 +90,22 @@ func main() {
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
 	//Initialize the logger we are going to use, with prefix and datetime for every log
-	logger := log.New(os.Stdout, "[acc-api] ", log.LstdFlags)
-	storeLogger := log.New(os.Stdout, "[acc-store] ", log.LstdFlags)
+	//logger := log.New(os.Stdout, "[acc-api] ", log.LstdFlags)
+	initLogger()
+	//storeLogger := log.New(os.Stdout, "[acc-store] ", log.LstdFlags)
 
 	// NoSQL: Initialize Repository store
-	store, err := data.New(timeoutContext, storeLogger, tracer)
+	store, err := data.New(timeoutContext, Logger, tracer)
 	if err != nil {
-		logger.Fatal(err)
+		Logger.Fatal(err)
 	}
 	defer store.DisconnectMongo(timeoutContext)
 	store.Ping()
 
 	//// NoSQL: Initialize File Storage store
-	fileStorage, err := storage.New(storeLogger, tracer)
+	fileStorage, err := storage.New(Logger, tracer)
 	if err != nil {
-		logger.Fatalf("Error initializing FileStorage: %v", err)
+		Logger.Fatalf("Error initializing FileStorage: %v", err)
 	}
 
 	// Close connection to HDFS on shutdown
@@ -73,13 +115,13 @@ func main() {
 	_ = fileStorage.CreateDirectoriesStart()
 
 	// NoSQL: Initialize Cache store
-	imageCache, err := cache.New(storeLogger, tracer)
+	imageCache, err := cache.New(Logger, tracer)
 	if err != nil {
-		logger.Fatal(err)
+		Logger.Fatal(err)
 	}
 	imageCache.Ping()
 
-	accommodationHandler := handlers.NewAccommodationHandler(logger, store, tracer, fileStorage, imageCache)
+	accommodationHandler := handlers.NewAccommodationHandler(Logger, store, tracer, fileStorage, imageCache)
 
 	//Initialize the router and add a middleware for all the requests
 	router := mux.NewRouter()
@@ -142,12 +184,12 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	logger.Println("Server listening on port", port)
+	Logger.Println("Server listening on port", port)
 
 	go func() {
 		err := server.ListenAndServeTLS("accommodations_service-cert.pem", "accommodations_service-key.pem")
 		if err != nil {
-			logger.Fatal(err)
+			Logger.Fatal(err)
 		}
 	}()
 
@@ -156,12 +198,12 @@ func main() {
 	signal.Notify(sigCh, os.Kill)
 
 	sig := <-sigCh
-	logger.Println("Received terminate, graceful shutdown", sig)
+	Logger.Println("Received terminate, graceful shutdown", sig)
 
 	if server.Shutdown(timeoutContext) != nil {
-		logger.Fatal("Cannot gracefully shutdown...")
+		Logger.Fatal("Cannot gracefully shutdown...")
 	}
-	logger.Println("Server stopped")
+	Logger.Println("Server stopped")
 
 }
 

@@ -1,0 +1,52 @@
+[2024-02-06T23:13:55Z] [info] [ID-1707261235178232539] AuthHandler.VerifyRecaptcha : VerifyRecaptcha endpoint reached
+[2024-02-06T23:13:55Z] [info] [ID-1707261235193847610] AuthService.Register : register service reached
+[2024-02-06T23:13:55Z] [info] [ID-1707261235195308273] AuthService.VerifyRecaptcha : Making request to reCAPTCHA API
+[2024-02-06T23:13:56Z] [info] [ID-1707261236094918520] AuthService.VerifyRecaptcha : Successfully received response from reCAPTCHA API
+[2024-02-06T23:13:56Z] [info] [ID-1707261236118503334] AuthHandler.Login : endpoint login reached
+[2024-02-06T23:13:56Z] [info] [ID-1707261236119917226] AuthService.Login : login service reached
+[2024-02-06T23:13:56Z] [info] [ID-1707261236121219911] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-06T23:13:56Z] [info] [ID-1707261236216991687] AuthStore.GetOneUser : getOneUser success
+[2024-02-06T23:13:56Z] [error] [ID-1707261236272986772] AuthService.Login.CompareHashAndPassword() : password not same
+[2024-02-06T23:13:56Z] [error] [ID-1707261236274356331] AuthHandler.Login : wrong password
+[2024-02-06T23:14:05Z] [info] [ID-1707261245052377281] AuthHandler.VerifyRecaptcha : VerifyRecaptcha endpoint reached
+[2024-02-06T23:14:05Z] [info] [ID-1707261245054756277] AuthService.Register : register service reached
+[2024-02-06T23:14:05Z] [info] [ID-1707261245056534847] AuthService.VerifyRecaptcha : Making request to reCAPTCHA API
+[2024-02-06T23:14:05Z] [info] [ID-1707261245218355838] AuthService.VerifyRecaptcha : Successfully received response from reCAPTCHA API
+[2024-02-06T23:14:05Z] [info] [ID-1707261245239814451] AuthHandler.Login : endpoint login reached
+[2024-02-06T23:14:05Z] [info] [ID-1707261245241945927] AuthService.Login : login service reached
+[2024-02-06T23:14:05Z] [info] [ID-1707261245243756927] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-06T23:14:05Z] [error] [ID-1707261245258400225] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-06T23:14:05Z] [error] [ID-1707261245260030124] AuthHandler.Login : Invalid username or password (username not exist)
+[2024-02-06T23:14:12Z] [info] [ID-1707261252567654547] AuthHandler.VerifyRecaptcha : VerifyRecaptcha endpoint reached
+[2024-02-06T23:14:12Z] [info] [ID-1707261252569163559] AuthService.Register : register service reached
+[2024-02-06T23:14:12Z] [info] [ID-1707261252570211513] AuthService.VerifyRecaptcha : Making request to reCAPTCHA API
+[2024-02-06T23:14:12Z] [info] [ID-1707261252746793654] AuthService.VerifyRecaptcha : Successfully received response from reCAPTCHA API
+[2024-02-06T23:14:12Z] [info] [ID-1707261252761578216] AuthHandler.Login : endpoint login reached
+[2024-02-06T23:14:12Z] [info] [ID-1707261252762841318] AuthService.Login : login service reached
+[2024-02-06T23:14:12Z] [info] [ID-1707261252763647206] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-06T23:14:12Z] [info] [ID-1707261252766621216] AuthStore.GetOneUser : getOneUser success
+[2024-02-06T23:14:12Z] [info] [ID-1707261252832227263] AuthHandler.Login : endpoint login successful
+[2024-02-06T23:14:37Z] [info] [ID-1707261277248827846] AuthHandler.ChangePassword : change password endpoint reached
+[2024-02-06T23:14:37Z] [info] [ID-1707261277250447998] AuthService.ChangePassword : ChangePassword service reached
+[2024-02-06T23:14:37Z] [info] [ID-1707261277251764584] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-06T23:14:37Z] [info] [ID-1707261277267389276] AuthStore.GetOneUser : getOneUser success
+[2024-02-06T23:14:37Z] [error] [ID-1707261277330618793] AuthService.ChangePassword: New password does not match confirmation
+[2024-02-06T23:14:37Z] [error] [ID-1707261277332252765] AuthHandler.ChangePassword : New password does not match confirmation
+[2024-02-06T23:14:40Z] [info] [ID-1707261280444268190] AuthHandler.ChangePassword : change password endpoint reached
+[2024-02-06T23:14:40Z] [info] [ID-1707261280445740360] AuthService.ChangePassword : ChangePassword service reached
+[2024-02-06T23:14:40Z] [info] [ID-1707261280447009355] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-06T23:14:40Z] [info] [ID-1707261280449569036] AuthStore.GetOneUser : getOneUser success
+[2024-02-06T23:14:40Z] [error] [ID-1707261280508530902] AuthService.ChangePassword: New password does not match confirmation
+[2024-02-06T23:14:40Z] [error] [ID-1707261280509535942] AuthHandler.ChangePassword : New password does not match confirmation
+[2024-02-06T23:14:43Z] [info] [ID-1707261283861233670] AuthHandler.ChangePassword : change password endpoint reached
+[2024-02-06T23:14:43Z] [info] [ID-1707261283862554343] AuthService.ChangePassword : ChangePassword service reached
+[2024-02-06T23:14:43Z] [info] [ID-1707261283864522900] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-06T23:14:43Z] [info] [ID-1707261283872178031] AuthStore.GetOneUser : getOneUser success
+[2024-02-06T23:14:43Z] [error] [ID-1707261283932835387] AuthService.ChangePassword.CompareHashAndPassword() : crypto/bcrypt: hashedPassword is not the hash of the given password (old password not match)
+[2024-02-06T23:14:43Z] [error] [ID-1707261283934765146] AuthHandler.ChangePassword : Old password is incorrect
+[2024-02-06T23:14:59Z] [info] [ID-1707261299516897739] AuthHandler.ChangePassword : change password endpoint reached
+[2024-02-06T23:14:59Z] [info] [ID-1707261299520497056] AuthService.ChangePassword : ChangePassword service reached
+[2024-02-06T23:14:59Z] [info] [ID-1707261299522089643] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-06T23:14:59Z] [info] [ID-1707261299569281528] AuthStore.GetOneUser : getOneUser success
+[2024-02-06T23:14:59Z] [error] [ID-1707261299633202890] AuthService.ChangePassword : Password is in the blacklist
+[2024-02-06T23:14:59Z] [error] [ID-1707261299634849506] AuthHandler.ChangePassword : Password is in the blacklist

@@ -7,10 +7,11 @@ import (
 	"auth_service/startup/config"
 	store2 "auth_service/store"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -28,8 +29,45 @@ import (
 )
 
 type Server struct {
-	config    *config.Config
-	tlsConfig *tls.Config
+	config *config.Config
+}
+
+var Logger = logrus.New()
+
+const (
+	LogFilePath = "/app/logs/auth.log"
+)
+
+type CustomFormatter struct{}
+
+func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	entry.Data["id"] = generateUniqueID()
+
+	msg := fmt.Sprintf("[%s] [%s] [%s] %s\n",
+		entry.Time.Format("2006-01-02T15:04:05Z07:00"),
+		entry.Level,
+		entry.Data["id"],
+		entry.Message,
+	)
+
+	return []byte(msg), nil
+}
+
+func generateUniqueID() string {
+	return fmt.Sprintf("ID-%d", time.Now().UnixNano())
+}
+
+func initLogger() {
+	writer, err := rotatelogs.New(
+		LogFilePath+"_%Y%m%d%H%M",
+		rotatelogs.WithRotationTime(3*time.Minute), // Rotate logs every 15 minutes
+	)
+	if err != nil {
+		Logger.Fatalf("Failed to create rotatelogs hook: %v", err)
+	}
+	Logger.SetOutput(writer)
+
+	Logger.SetFormatter(&CustomFormatter{})
 }
 
 func NewServer(config *config.Config) *Server {
@@ -39,6 +77,8 @@ func NewServer(config *config.Config) *Server {
 }
 
 func (server *Server) Start() {
+
+	initLogger()
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
@@ -72,9 +112,9 @@ func (server *Server) Start() {
 
 	redisClient := server.initRedisClient()
 	authCache := server.initAuthCache(redisClient, tracer)
-	authStore := server.initAuthStore(mongoClient, tracer)
-	authService := server.initAuthService(authStore, authCache, tracer)
-	authHandler := server.initAuthHandler(authService, tracer)
+	authStore := server.initAuthStore(mongoClient, tracer, Logger)
+	authService := server.initAuthService(authStore, authCache, tracer, Logger)
+	authHandler := server.initAuthHandler(authService, tracer, Logger)
 
 	server.start(authHandler)
 }
@@ -95,8 +135,8 @@ func (server *Server) initRedisClient() *redis.Client {
 	return client
 }
 
-func (server *Server) initAuthStore(client *mongo.Client, tracer trace.Tracer) domain.AuthStore {
-	store := store2.NewAuthMongoDBStore(client, tracer)
+func (server *Server) initAuthStore(client *mongo.Client, tracer trace.Tracer, logger *logrus.Logger) domain.AuthStore {
+	store := store2.NewAuthMongoDBStore(client, tracer, logger)
 	return store
 }
 
@@ -105,12 +145,12 @@ func (server *Server) initAuthCache(client *redis.Client, tracer trace.Tracer) d
 	return cache
 }
 
-func (server *Server) initAuthService(store domain.AuthStore, cache domain.AuthCache, tracer trace.Tracer) *application.AuthService {
-	return application.NewAuthService(store, cache, tracer)
+func (server *Server) initAuthService(store domain.AuthStore, cache domain.AuthCache, tracer trace.Tracer, logger *logrus.Logger) *application.AuthService {
+	return application.NewAuthService(store, cache, tracer, logger)
 }
 
-func (server *Server) initAuthHandler(service *application.AuthService, tracer trace.Tracer) *handlers.AuthHandler {
-	return handlers.NewAuthHandler(service, tracer)
+func (server *Server) initAuthHandler(service *application.AuthService, tracer trace.Tracer, logger *logrus.Logger) *handlers.AuthHandler {
+	return handlers.NewAuthHandler(service, tracer, logger)
 }
 
 func (server *Server) start(authHandler *handlers.AuthHandler) {

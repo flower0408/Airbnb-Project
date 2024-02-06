@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	"github.com/sony/gobreaker"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
@@ -37,16 +38,16 @@ var (
 )
 
 type ReservationHandler struct {
-	logger          *log.Logger
+	logger          *logrus.Logger
 	reservationRepo *data.ReservationRepo
 	tracer          trace.Tracer
 	cb              *gobreaker.CircuitBreaker
 	cb2             *gobreaker.CircuitBreaker
 }
 
-func NewReservationHandler(l *log.Logger, r *data.ReservationRepo, t trace.Tracer) *ReservationHandler {
+func NewReservationHandler(logger *logrus.Logger, r *data.ReservationRepo, t trace.Tracer) *ReservationHandler {
 	return &ReservationHandler{
-		logger:          l,
+		logger:          logger,
 		reservationRepo: r,
 		tracer:          t,
 		cb:              CircuitBreaker("reservationService"),

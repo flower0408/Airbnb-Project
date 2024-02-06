@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
@@ -23,7 +24,7 @@ import (
 )
 
 type AppointmentHandler struct {
-	logger          *log.Logger
+	logger          *logrus.Logger
 	appointmentRepo *data.AppointmentRepo
 	tracer          trace.Tracer
 }
@@ -33,8 +34,8 @@ var (
 	accommodationServicePort = os.Getenv("ACCOMMODATIONS_SERVICE_PORT")
 )
 
-func NewAppointmentHandler(l *log.Logger, r *data.AppointmentRepo, t trace.Tracer) *AppointmentHandler {
-	return &AppointmentHandler{l, r, t}
+func NewAppointmentHandler(logger *logrus.Logger, r *data.AppointmentRepo, t trace.Tracer) *AppointmentHandler {
+	return &AppointmentHandler{logger, r, t}
 }
 
 // mongo
@@ -42,25 +43,29 @@ func (r *AppointmentHandler) CreateAppointment(rw http.ResponseWriter, h *http.R
 	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.CreateAppointment")
 	defer span.End()
 
+	r.logger.Infoln("AppointmentHandler.CreateAppointment : CreateAppointment endpoint reached")
+
 	appointment := h.Context().Value(KeyProduct{}).(*data.Appointment)
 	err := r.appointmentRepo.InsertAppointment(ctx, appointment)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error creating appointment")
 		if err.Error() == "Error adding appointment. Date already exists. " {
-			r.logger.Print("Error adding appointment. Date already exists. ")
+			r.logger.Errorf("AppointmentHandler.CreateAppointment : Error adding appointment. Date already exists. ")
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte("Error adding appointment. Date already exists. "))
 		} else if err.Error() == "Error adding appointment. Cannot add appointment in the past." {
-			r.logger.Print("Error adding appointment. Cannot add appointment in the past.")
+			r.logger.Errorf("AppointmentHandler.CreateAppointment : Error adding appointment. Cannot add appointment in the past.")
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte("Error adding appointment. Cannot add appointment in the past."))
 		} else {
-			r.logger.Print("Database exception: ", err)
+			r.logger.Errorf("AppointmentHandler.CreateAppointment : Database exception: %s", err)
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte("Error creating reservation."))
 		}
 		return
 	}
+
+	r.logger.Infoln("AppointmentHandler.CreateAppointment : CreateAppointment finished")
 	rw.WriteHeader(http.StatusOK)
 }
 
@@ -68,10 +73,12 @@ func (r *AppointmentHandler) GetAllAppointment(rw http.ResponseWriter, h *http.R
 	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.GetAllAppointment")
 	defer span.End()
 
+	r.logger.Infoln("AppointmentHandler.GetAllAppointment : GetAllAppointment endpoint reached")
+
 	appointments, err := r.appointmentRepo.GetAllAppointment(ctx)
 	if err != nil {
+		r.logger.Errorf("AppointmentHandler.GetAllAppointment : Database exception")
 		span.SetStatus(codes.Error, "Database exception")
-		r.logger.Print("Database exception")
 	}
 
 	if appointments == nil {
@@ -80,9 +87,9 @@ func (r *AppointmentHandler) GetAllAppointment(rw http.ResponseWriter, h *http.R
 
 	err = appointments.ToJSON(rw)
 	if err != nil {
+		r.logger.Errorf("AppointmentHandler.GetAllAppointment : Unable to convert to json")
 		span.SetStatus(codes.Error, "Unable to convert to json")
 		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
-		r.logger.Fatal("Unable to convert to json")
 		return
 	}
 }
@@ -91,11 +98,14 @@ func (r *AppointmentHandler) GetAppointmentsByAccommodation(rw http.ResponseWrit
 	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.GetAppointmentsByAccommodation")
 	defer span.End()
 
+	r.logger.Infoln("AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached")
+
 	vars := mux.Vars(h)
 	id := vars["id"]
 
 	appointments, err := r.appointmentRepo.GetAppointmentsByAccommodation(ctx, id)
 	if err != nil {
+		r.logger.Errorf("AppointmentHandler.GetAppointmentsByAccommodation : Database exception")
 		span.SetStatus(codes.Error, "Database exception")
 		r.logger.Print("Database exception")
 		http.Error(rw, "Database exception", http.StatusInternalServerError)
@@ -108,6 +118,7 @@ func (r *AppointmentHandler) GetAppointmentsByAccommodation(rw http.ResponseWrit
 
 	err = appointments.ToJSON(rw)
 	if err != nil {
+		r.logger.Errorf("AppointmentHandler.GetAppointmentsByAccommodation : Unable to convert to json")
 		span.SetStatus(codes.Error, "Unable to convert to json")
 		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
 		r.logger.Fatal("Unable to convert to json")
@@ -119,11 +130,14 @@ func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *ht
 	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.GetAppointmentsByDate")
 	defer span.End()
 
+	r.logger.Infoln("AppointmentHandler.GetAppointmentsByDate : GetAppointmentsByDate endpoint reached")
+
 	startDateStr := h.URL.Query().Get("startDate")
 	endDateStr := h.URL.Query().Get("endDate")
 
 	startDate, err := time.Parse(time.RFC3339, startDateStr)
 	if err != nil {
+		r.logger.Errorf("AppointmentHandler.GetAppointmentsByDate : Invalid startDate parameter")
 		span.SetStatus(codes.Error, "Invalid startDate parameter")
 		http.Error(rw, "Invalid startDate parameter", http.StatusBadRequest)
 		return
@@ -131,6 +145,7 @@ func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *ht
 
 	endDate, err := time.Parse(time.RFC3339, endDateStr)
 	if err != nil {
+		r.logger.Errorf("AppointmentHandler.GetAppointmentsByDate : Invalid endDate parameter")
 		span.SetStatus(codes.Error, "Invalid endDate parameter")
 		http.Error(rw, "Invalid endDate parameter", http.StatusBadRequest)
 		return
@@ -138,8 +153,8 @@ func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *ht
 
 	appointments, err := r.appointmentRepo.GetAppointmentsByDate(ctx, startDate, endDate)
 	if err != nil {
+		r.logger.Errorf("AppointmentHandler.GetAppointmentsByDate : Unable to retrieve appointments")
 		span.SetStatus(codes.Error, "Unable to retrieve appointments")
-		r.logger.Print("Database exception")
 		http.Error(rw, "Unable to retrieve appointments", http.StatusInternalServerError)
 		return
 	}
@@ -162,9 +177,9 @@ func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *ht
 
 	err = appointments.ToJSON(rw)
 	if err != nil {
+		r.logger.Errorf("AppointmentHandler.GetAppointmentsByDate : Unable to convert to json")
 		span.SetStatus(codes.Error, "Unable to convert to JSON")
 		http.Error(rw, "Unable to convert to JSON", http.StatusInternalServerError)
-		r.logger.Fatal("Unable to convert to JSON")
 		return
 	}
 }
@@ -173,6 +188,8 @@ func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.R
 	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.UpdateAppointment")
 	defer span.End()
 
+	r.logger.Infoln("AppointmentHandler.UpdateAppointment : UpdateAppointment endpoint reached")
+
 	vars := mux.Vars(h)
 	id := vars["id"]
 
@@ -180,6 +197,7 @@ func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.R
 
 	tokenString, err := extractTokenFromHeader(h)
 	if err != nil {
+		r.logger.Errorf("AppointmentHandler.UpdateAppointment : Unable to convert to json")
 		span.SetStatus(codes.Error, "No token found")
 		rw.WriteHeader(http.StatusBadRequest)
 		rw.Write([]byte("No token found"))
@@ -190,23 +208,26 @@ func (r *AppointmentHandler) UpdateAppointment(rw http.ResponseWriter, h *http.R
 	if err != nil {
 		span.SetStatus(codes.Error, "Error update appointment")
 		if err.Error() == "Reservation exists for the appointment." {
+			r.logger.Errorf("AppointmentHandler.UpdateAppointment : Reservation exists for the appointment. Update not allowed")
 			rw.WriteHeader(http.StatusMethodNotAllowed)
 			rw.Write([]byte("Reservation exists for the appointment. Update not allowed."))
 		} else if err.Error() == "Error editing appointment. Date already exists. " {
-			r.logger.Print("Error editing appointment. Date already exists. ")
+			r.logger.Errorf("AppointmentHandler.UpdateAppointment : Error editing appointment. Date already exists")
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte("Error editing appointment. Date already exists. "))
 		} else if err.Error() == "Error editing appointment. Cannot add appointment in the past." {
-			r.logger.Print("Error editing appointment. Cannot add appointment in the past.")
+			r.logger.Errorf("AppointmentHandler.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.")
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte("Error editing appointment. Cannot add appointment in the past."))
 		} else {
+			r.logger.Errorf("AppointmentHandler.UpdateAppointment : Error updating appointment")
 			rw.WriteHeader(http.StatusBadRequest)
 			rw.Write([]byte("Error updating appointment."))
 		}
 		return
 	}
 
+	r.logger.Infoln("AppointmentHandler.UpdateAppointment : UpdateAppointment finished")
 	span.SetStatus(codes.Ok, "")
 	rw.WriteHeader(http.StatusOK)
 }
@@ -231,6 +252,8 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.DeleteAppointmentsByAccommodationIDs")
 	defer span.End()
 
+	r.logger.Infoln("AppointmentHandler.DeleteAppointmentsByAccommodationIDs : DeleteAppointmentsByAccommodationIDs endpoint reached")
+
 	vars := mux.Vars(h)
 	userId := vars["id"]
 
@@ -238,8 +261,8 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 	authToken := extractBearerToken(authHeader)
 
 	if authToken == "" {
+		r.logger.Errorf("AppointmentHandler.DeleteAppointmentsByAccommodationIDs : Error extracting Bearer token")
 		span.SetStatus(codes.Error, "Error extracting Bearer token")
-		r.logger.Println("Error extracting Bearer token")
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -247,15 +270,15 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 	accommodationEndpoint := fmt.Sprintf("https://%s:%s/owner/%s", accommodationServiceHost, accommodationServicePort, userId)
 	accommodationResponse, err := r.HTTPSRequestWithouthBody(ctx, authToken, accommodationEndpoint, "GET")
 	if err != nil {
+		r.logger.Errorf("AppointmentHandler.DeleteAppointmentsByAccommodationIDs : Error sending accommodation request")
 		span.SetStatus(codes.Error, "Error sending accommodation request")
-		r.logger.Println("Error sending accommodation request:", err)
 		rw.Write([]byte("Error sending accommodation request"))
 		return
 	}
 
 	if accommodationResponse.StatusCode != http.StatusOK {
+		r.logger.Errorf("AppointmentHandler.DeleteAppointmentsByAccommodationIDs : Accommodation service returned an error")
 		span.SetStatus(codes.Error, "Accommodation service returned an error")
-		r.logger.Println("Accommodation service returned an error:", accommodationResponse.Status)
 		rw.Write([]byte("Accommodation service returned an error"))
 		return
 	}
@@ -265,8 +288,8 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 	fmt.Println("lola", accommodations)
 	err = json.NewDecoder(accommodationResponse.Body).Decode(&accommodations)
 	if err != nil {
+		r.logger.Errorf("AppointmentHandler.DeleteAppointmentsByAccommodationIDs : Error decoding accommodation response")
 		span.SetStatus(codes.Error, "Error decoding accommodation response")
-		r.logger.Println("Error decoding accommodation response:", err)
 		rw.Write([]byte("Error decoding accommodation response"))
 		return
 	}
@@ -276,8 +299,8 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 
 		err := r.appointmentRepo.DeleteAppointmentsByAccommodationID(ctx, accommodationID.Hex())
 		if err != nil {
+			r.logger.Errorf("AppointmentHandler.DeleteAppointmentsByAccommodationIDs : Error deleting appointments")
 			span.SetStatus(codes.Error, "Error deleting appointments")
-			r.logger.Print("Database exception:", err)
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write([]byte("Error deleting appointments"))
 			return
@@ -285,6 +308,7 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 		return
 	}
 
+	r.logger.Infoln("AppointmentHandler.DeleteAppointmentsByAccommodationIDs : DeleteAppointmentsByAccommodationIDs finished")
 	rw.WriteHeader(http.StatusOK)
 	rw.Write([]byte("Appointments deleted successfully"))
 }
@@ -292,6 +316,8 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 func (r *AppointmentHandler) FilterAppointmentsByPrice(rw http.ResponseWriter, h *http.Request) {
 	ctx, span := r.tracer.Start(h.Context(), "AppointmentHandler.FilterAppointmentsByPrice")
 	defer span.End()
+
+	r.logger.Infoln("AppointmentHandler.FilterAppointmentsByPrice : FilterAppointmentsByPrice endpoint reached")
 
 	minPriceStr := h.URL.Query().Get("minPrice")
 	maxPriceStr := h.URL.Query().Get("maxPrice")
@@ -302,6 +328,7 @@ func (r *AppointmentHandler) FilterAppointmentsByPrice(rw http.ResponseWriter, h
 	if minPriceStr != "" {
 		minPrice, err = strconv.ParseFloat(minPriceStr, 64)
 		if err != nil {
+			r.logger.Errorf("AppointmentHandler.FilterAppointmentsByPrice : Invalid minPrice parameter")
 			span.SetStatus(codes.Error, "Invalid minPrice parameter")
 			http.Error(rw, "Invalid minPrice parameter", http.StatusBadRequest)
 			rw.Write([]byte("Invalid minPrice parameter"))
@@ -312,6 +339,7 @@ func (r *AppointmentHandler) FilterAppointmentsByPrice(rw http.ResponseWriter, h
 	if maxPriceStr != "" {
 		maxPrice, err = strconv.ParseFloat(maxPriceStr, 64)
 		if err != nil {
+			r.logger.Errorf("AppointmentHandler.FilterAppointmentsByPrice : Invalid maxPrice parameter")
 			span.SetStatus(codes.Error, "Invalid maxPrice parameter")
 			http.Error(rw, "Invalid maxPrice parameter", http.StatusBadRequest)
 			rw.Write([]byte("Invalid maxPrice parameter"))
@@ -322,22 +350,23 @@ func (r *AppointmentHandler) FilterAppointmentsByPrice(rw http.ResponseWriter, h
 	if minPriceStr == "" {
 		appointments, err := r.appointmentRepo.FilterAppointmentsByPrice(ctx, -1, int(maxPrice))
 		if err != nil {
+			r.logger.Errorf("AppointmentHandler.FilterAppointmentsByPrice : Unable to retrieve filtered appointments")
 			span.SetStatus(codes.Error, "Unable to retrieve filtered appointments")
-			r.logger.Print("Database exception")
 			http.Error(rw, "Unable to retrieve filtered appointments", http.StatusInternalServerError)
 			return
 		}
 
 		if len(appointments) == 0 {
+			r.logger.Errorf("AppointmentHandler.FilterAppointmentsByPrice : Status no content")
 			rw.WriteHeader(http.StatusNoContent)
 			return
 		}
 
 		err = appointments.ToJSON(rw)
 		if err != nil {
+			r.logger.Errorf("AppointmentHandler.FilterAppointmentsByPrice : Unable to convert to JSON")
 			span.SetStatus(codes.Error, "Unable to convert to JSON")
 			http.Error(rw, "Unable to convert to JSON", http.StatusInternalServerError)
-			r.logger.Fatal("Unable to convert to JSON")
 			return
 		}
 
@@ -347,22 +376,23 @@ func (r *AppointmentHandler) FilterAppointmentsByPrice(rw http.ResponseWriter, h
 	if maxPriceStr == "" {
 		appointments, err := r.appointmentRepo.FilterAppointmentsByPrice(ctx, int(minPrice), -1)
 		if err != nil {
+			r.logger.Errorf("AppointmentHandler.FilterAppointmentsByPrice : Unable to retrieve filtered appointments")
 			span.SetStatus(codes.Error, "Unable to retrieve filtered appointments")
-			r.logger.Print("Database exception")
 			http.Error(rw, "Unable to retrieve filtered appointments", http.StatusInternalServerError)
 			return
 		}
 
 		if len(appointments) == 0 {
+			r.logger.Errorf("AppointmentHandler.FilterAppointmentsByPrice : Status no content")
 			rw.WriteHeader(http.StatusNoContent)
 			return
 		}
 
 		err = appointments.ToJSON(rw)
 		if err != nil {
+			r.logger.Errorf("AppointmentHandler.FilterAppointmentsByPrice : Unable to convert to JSON")
 			span.SetStatus(codes.Error, "Unable to convert to JSON")
 			http.Error(rw, "Unable to convert to JSON", http.StatusInternalServerError)
-			r.logger.Fatal("Unable to convert to JSON")
 			return
 		}
 
@@ -372,13 +402,14 @@ func (r *AppointmentHandler) FilterAppointmentsByPrice(rw http.ResponseWriter, h
 	if minPriceStr != "" && maxPriceStr != "" {
 		appointments, err := r.appointmentRepo.FilterAppointmentsByPrice(ctx, int(minPrice), int(maxPrice))
 		if err != nil {
+			r.logger.Errorf("AppointmentHandler.FilterAppointmentsByPrice : Unable to retrieve filtered appointments")
 			span.SetStatus(codes.Error, "Unable to retrieve filtered appointments")
-			r.logger.Print("Database exception")
 			http.Error(rw, "Unable to retrieve filtered appointments", http.StatusInternalServerError)
 			return
 		}
 
 		if len(appointments) == 0 {
+			r.logger.Errorf("AppointmentHandler.FilterAppointmentsByPrice : Status no content")
 			rw.WriteHeader(http.StatusNoContent)
 			return
 		}

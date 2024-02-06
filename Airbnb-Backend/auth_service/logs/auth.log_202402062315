@@ -1,0 +1,17 @@
+[2024-02-06T23:15:04Z] [info] [ID-1707261304565379827] AuthHandler.ChangePassword : change password endpoint reached
+[2024-02-06T23:15:04Z] [info] [ID-1707261304588609250] AuthService.ChangePassword : ChangePassword service reached
+[2024-02-06T23:15:04Z] [info] [ID-1707261304589879168] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-06T23:15:04Z] [info] [ID-1707261304594741315] AuthStore.GetOneUser : getOneUser success
+[2024-02-06T23:15:04Z] [info] [ID-1707261304707384712] AuthStore.UpdateUser : reached UpdateUser in store
+[2024-02-06T23:15:04Z] [info] [ID-1707261304772204454] AuthStore.UpdateUser : UpdateUser success
+[2024-02-06T23:15:04Z] [info] [ID-1707261304773271012] AuthService.ChangePassword : ChangePassword service finished
+[2024-02-06T23:15:04Z] [info] [ID-1707261304774206057] AuthHandler.ChangePassword : ChangePassword success
+[2024-02-06T23:15:25Z] [info] [ID-1707261325849754080] AuthHandler.VerifyRecaptcha : VerifyRecaptcha endpoint reached
+[2024-02-06T23:15:25Z] [info] [ID-1707261325852635491] AuthService.Register : register service reached
+[2024-02-06T23:15:25Z] [info] [ID-1707261325854139082] AuthService.VerifyRecaptcha : Making request to reCAPTCHA API
+[2024-02-06T23:15:26Z] [info] [ID-1707261326058747462] AuthService.VerifyRecaptcha : Successfully received response from reCAPTCHA API
+[2024-02-06T23:15:26Z] [info] [ID-1707261326091905176] AuthHandler.Login : endpoint login reached
+[2024-02-06T23:15:26Z] [info] [ID-1707261326093389534] AuthService.Login : login service reached
+[2024-02-06T23:15:26Z] [info] [ID-1707261326095372969] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-06T23:15:26Z] [info] [ID-1707261326208359428] AuthStore.GetOneUser : getOneUser success
+[2024-02-06T23:15:26Z] [info] [ID-1707261326266624648] AuthHandler.Login : endpoint login successful

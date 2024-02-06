@@ -1,0 +1,10 @@
+[2024-02-06T23:15:28Z] [info] [ID-1707261328467543039] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-06T23:15:33Z] [info] [ID-1707261333250161222] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-06T23:15:33Z] [info] [ID-1707261333932114042] Reservation created successfully: &{6ba332f5-0e78-41cb-ab96-b906c60d54df [2024-02-08 23:00:00 +0000 UTC] 65bdefb7d03a85351a91d5fd 65c28b4e814b9e4d477596b9 111 false}
+[2024-02-06T23:15:33Z] [info] [ID-1707261333933538139] AccommodationId: 65c28b4e814b9e4d477596b9
+[2024-02-06T23:15:42Z] [info] [ID-1707261342489641318] Code after circuit breaker execution
+[2024-02-06T23:15:45Z] [info] [ID-1707261345206669401] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-06T23:17:15Z] [info] [ID-1707261435396766618] Code after circuit breaker execution
+[2024-02-06T23:17:15Z] [info] [ID-1707261435401952814] Reservation cancelled succesfully
+[2024-02-06T23:17:29Z] [info] [ID-1707261449705610934] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-06T23:17:48Z] [info] [ID-1707261468624654309] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/gorilla/mux"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -29,6 +31,44 @@ type Server struct {
 	config *config.Config
 }
 
+const (
+	LogFilePath = "/app/logs/user.log"
+)
+
+type CustomFormatter struct{}
+
+func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	entry.Data["id"] = generateUniqueID()
+
+	msg := fmt.Sprintf("[%s] [%s] [%s] %s\n",
+		entry.Time.Format("2006-01-02T15:04:05Z07:00"),
+		entry.Level,
+		entry.Data["id"],
+		entry.Message,
+	)
+
+	return []byte(msg), nil
+}
+
+func generateUniqueID() string {
+	return fmt.Sprintf("ID-%d", time.Now().UnixNano())
+}
+
+func initLogger() {
+	writer, err := rotatelogs.New(
+		LogFilePath+"_%Y%m%d%H%M",
+		rotatelogs.WithRotationTime(3*time.Minute), // Rotate logs every 15 minutes
+	)
+	if err != nil {
+		Logger.Fatalf("Failed to create rotatelogs hook: %v", err)
+	}
+	Logger.SetOutput(writer)
+
+	Logger.SetFormatter(&CustomFormatter{})
+}
+
+var Logger = logrus.New()
+
 func NewServer(config *config.Config) *Server {
 	return &Server{
 		config: config,
@@ -43,13 +83,15 @@ func (server *Server) initMongoClient(httpClient *http.Client) *mongo.Client {
 	return client
 }
 
-func (server *Server) initUserStore(client *mongo.Client, tracer trace.Tracer) domain.UserStore {
-	store := store.NewUserMongoDBStore(client, tracer)
+func (server *Server) initUserStore(client *mongo.Client, tracer trace.Tracer, logger *logrus.Logger) domain.UserStore {
+	store := store.NewUserMongoDBStore(client, tracer, logger)
 
 	return store
 }
 
 func (server *Server) Start() {
+
+	initLogger()
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
@@ -81,19 +123,19 @@ func (server *Server) Start() {
 	tracer := tp.Tracer("user_service")
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
-	userStore := server.initUserStore(mongoClient, tracer)
-	userService := server.initUserService(userStore, tracer)
-	userHandler := server.initUserHandler(userService, tracer)
+	userStore := server.initUserStore(mongoClient, tracer, Logger)
+	userService := server.initUserService(userStore, tracer, Logger)
+	userHandler := server.initUserHandler(userService, tracer, Logger)
 
 	server.start(userHandler)
 }
 
-func (server *Server) initUserService(store domain.UserStore, tracer trace.Tracer) *application.UserService {
-	return application.NewUserService(store, tracer)
+func (server *Server) initUserService(store domain.UserStore, tracer trace.Tracer, logger *logrus.Logger) *application.UserService {
+	return application.NewUserService(store, tracer, logger)
 }
 
-func (server *Server) initUserHandler(service *application.UserService, tracer trace.Tracer) *handlers.UserHandler {
-	return handlers.NewUserHandler(service, tracer)
+func (server *Server) initUserHandler(service *application.UserService, tracer trace.Tracer, logger *logrus.Logger) *handlers.UserHandler {
+	return handlers.NewUserHandler(service, tracer, logger)
 }
 
 func (server *Server) start(tweetHandler *handlers.UserHandler) {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/gorilla/mux"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -29,6 +31,44 @@ type Server struct {
 	config *config.Config
 }
 
+var Logger = logrus.New()
+
+const (
+	LogFilePath = "/app/logs/notification.log"
+)
+
+type CustomFormatter struct{}
+
+func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	entry.Data["id"] = generateUniqueID()
+
+	msg := fmt.Sprintf("[%s] [%s] [%s] %s\n",
+		entry.Time.Format("2006-01-02T15:04:05Z07:00"),
+		entry.Level,
+		entry.Data["id"],
+		entry.Message,
+	)
+
+	return []byte(msg), nil
+}
+
+func generateUniqueID() string {
+	return fmt.Sprintf("ID-%d", time.Now().UnixNano())
+}
+
+func initLogger() {
+	writer, err := rotatelogs.New(
+		LogFilePath+"_%Y%m%d%H%M",
+		rotatelogs.WithRotationTime(3*time.Minute), // Rotate logs every 15 minutes
+	)
+	if err != nil {
+		Logger.Fatalf("Failed to create rotatelogs hook: %v", err)
+	}
+	Logger.SetOutput(writer)
+
+	Logger.SetFormatter(&CustomFormatter{})
+}
+
 func NewServer(config *config.Config) *Server {
 	return &Server{
 		config: config,
@@ -43,13 +83,15 @@ func (server *Server) initMongoClient(httpClient *http.Client) *mongo.Client {
 	return client
 }
 
-func (server *Server) initNotificationStore(client *mongo.Client, tracer trace.Tracer) domain.NotificationStore {
-	store := store.NewNotificationMongoDBStore(client, tracer)
+func (server *Server) initNotificationStore(client *mongo.Client, tracer trace.Tracer, logger *logrus.Logger) domain.NotificationStore {
+	store := store.NewNotificationMongoDBStore(client, tracer, logger)
 
 	return store
 }
 
 func (server *Server) Start() {
+
+	initLogger()
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
@@ -81,19 +123,19 @@ func (server *Server) Start() {
 	tracer := tp.Tracer("user_service")
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
-	notificationStore := server.initNotificationStore(mongoClient, tracer)
-	notificationService := server.initNotificationService(notificationStore, tracer)
-	notificationHandler := server.initNotificationHandler(notificationService, tracer)
+	notificationStore := server.initNotificationStore(mongoClient, tracer, Logger)
+	notificationService := server.initNotificationService(notificationStore, tracer, Logger)
+	notificationHandler := server.initNotificationHandler(notificationService, tracer, Logger)
 
 	server.start(notificationHandler)
 }
 
-func (server *Server) initNotificationService(store domain.NotificationStore, tracer trace.Tracer) *application.NotificationService {
-	return application.NewNotificationService(store, tracer)
+func (server *Server) initNotificationService(store domain.NotificationStore, tracer trace.Tracer, logger *logrus.Logger) *application.NotificationService {
+	return application.NewNotificationService(store, tracer, logger)
 }
 
-func (server *Server) initNotificationHandler(service *application.NotificationService, tracer trace.Tracer) *handlers.NotificationHandler {
-	return handlers.NewNotificationHandler(service, tracer)
+func (server *Server) initNotificationHandler(service *application.NotificationService, tracer trace.Tracer, logger *logrus.Logger) *handlers.NotificationHandler {
+	return handlers.NewNotificationHandler(service, tracer, logger)
 }
 
 func (server *Server) start(notificationHandler *handlers.NotificationHandler) {

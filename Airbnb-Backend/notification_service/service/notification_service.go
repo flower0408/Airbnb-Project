@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"github.com/sony/gobreaker"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
@@ -35,19 +36,23 @@ type NotificationService struct {
 	store  domain.NotificationStore
 	cb     *gobreaker.CircuitBreaker
 	tracer trace.Tracer
+	logger *logrus.Logger
 }
 
-func NewNotificationService(store domain.NotificationStore, tracer trace.Tracer) *NotificationService {
+func NewNotificationService(store domain.NotificationStore, tracer trace.Tracer, logger *logrus.Logger) *NotificationService {
 	return &NotificationService{
 		store:  store,
 		cb:     CircuitBreaker("notificationService"),
 		tracer: tracer,
+		logger: logger,
 	}
 }
 
 func (service *NotificationService) GetNotificationByHostId(ctx context.Context, hostId string) ([]*domain.Notification, error) {
 	ctx, span := service.tracer.Start(ctx, "NotificationService.GetNotificationByHostId")
 	defer span.End()
+
+	service.logger.Infoln("NotificationService.GetNotificationByHostId : GetNotificationByHostId service reached")
 
 	return service.store.GetNotificationsByHostId(ctx, hostId)
 }
@@ -56,12 +61,16 @@ func (service *NotificationService) GetAllNotifications(ctx context.Context) ([]
 	ctx, span := service.tracer.Start(ctx, "NotificationService.GetAllNotifications")
 	defer span.End()
 
+	service.logger.Infoln("NotificationService.GetNotificationByHostId : GetNotificationByHostId service reached")
+
 	return service.store.GetAllNotifications(ctx)
 }
 
 func (service *NotificationService) CreateNotification(ctx context.Context, notification *domain.Notification, token string) error {
 	ctx, span := service.tracer.Start(ctx, "NotificationService.CreateNotification")
 	defer span.End()
+
+	service.logger.Infoln("NotificationService.CreateNotification : CreateNotification service reached")
 
 	notificationInfo := domain.Notification{
 		ID:          notification.ID,
@@ -73,6 +82,7 @@ func (service *NotificationService) CreateNotification(ctx context.Context, noti
 
 	_, err := service.store.CreateNotification(ctx, &notificationInfo)
 	if err != nil {
+		service.logger.Errorln("NotificationService.CreateNotification : Error creating notification")
 		span.SetStatus(codes.Error, "Error creating notification")
 		return err
 	}
@@ -83,12 +93,14 @@ func (service *NotificationService) CreateNotification(ctx context.Context, noti
 	})
 
 	if breakerErr != nil {
+		service.logger.Errorln("NotificationService.CreateNotification : Breaker service error")
 		span.SetStatus(codes.Error, "Breaker service error")
 		return breakerErr
 	}
 
 	userDetails, ok := result.(*UserDetails)
 	if !ok {
+		service.logger.Errorln("NotificationService.CreateNotification : Internal server error: Unexpected result type")
 		return fmt.Errorf("Internal server error: Unexpected result type")
 	}
 
@@ -97,6 +109,7 @@ func (service *NotificationService) CreateNotification(ctx context.Context, noti
 	email := strings.TrimSpace(userDetails.Email)
 
 	if email == "" {
+		service.logger.Errorln("NotificationService.CreateNotification : Empty email address")
 		return errors.New("Empty email address")
 	}
 
@@ -104,10 +117,12 @@ func (service *NotificationService) CreateNotification(ctx context.Context, noti
 
 	err = service.sendValidationMail(ctx, notification.Description, email)
 	if err != nil {
+		service.logger.Errorln("NotificationService.CreateNotification : Error sending mail")
 		span.SetStatus(codes.Error, "Error sending mail")
 		return err
 	}
 
+	service.logger.Infoln("NotificationService.CreateNotification : CreateNotification service finished")
 	return nil
 }
 
@@ -115,9 +130,12 @@ func (service *NotificationService) getUserDetails(ctx context.Context, userID s
 	ctx, span := service.tracer.Start(ctx, "NotificationService.getUserDetails")
 	defer span.End()
 
+	service.logger.Infoln("NotificationService.getUserDetails : getUserDetails service reached")
+
 	userDetailsEndpoint := fmt.Sprintf("https://%s:%s/%s", userServiceHost, userServicePort, userID)
 	userDetailsResponse, err := service.HTTPSRequest(ctx, token, userDetailsEndpoint, "GET")
 	if err != nil {
+		service.logger.Errorln("NotificationService.getUserDetails : User Service Error")
 		span.SetStatus(codes.Error, "UserServiceError")
 		return nil, fmt.Errorf("UserServiceError: %v", err)
 	}
@@ -125,6 +143,7 @@ func (service *NotificationService) getUserDetails(ctx context.Context, userID s
 
 	body, err := ioutil.ReadAll(userDetailsResponse.Body)
 	if err != nil {
+		service.logger.Errorln("NotificationService.getUserDetails : Error reading user details response body")
 		span.SetStatus(codes.Error, "Error reading user details response body")
 		return nil, err
 	}
@@ -134,6 +153,7 @@ func (service *NotificationService) getUserDetails(ctx context.Context, userID s
 	var userDetails UserDetails
 	err = json.Unmarshal(body, &userDetails)
 	if err != nil {
+		service.logger.Errorln("NotificationService.getUserDetails : Error unmarshalling JSON")
 		span.SetStatus(codes.Error, "Error unmarshalling JSON")
 		fmt.Println("Error unmarshalling JSON:", err)
 		return nil, err
@@ -158,6 +178,8 @@ func (service *NotificationService) sendValidationMail(ctx context.Context, Desc
 	ctx, span := service.tracer.Start(ctx, "NotificationService.sendValidationMail")
 	defer span.End()
 
+	service.logger.Infoln("NotificationService.sendValidationMail : sendValidationMail service reached")
+
 	m := gomail.NewMessage()
 	m.SetHeader("From", smtpEmail)
 	m.SetHeader("To", email)
@@ -169,11 +191,13 @@ func (service *NotificationService) sendValidationMail(ctx context.Context, Desc
 	client := gomail.NewDialer(smtpServer, smtpServerPort, smtpEmail, smtpPassword)
 
 	if err := client.DialAndSend(m); err != nil {
+		service.logger.Errorln("NotificationService.sendValidationMail : Failed to send verification mail")
 		span.SetStatus(codes.Error, "Failed to send verification mail")
 		log.Fatalf("Failed to send verification mail because of: %s", err)
 		return err
 	}
 
+	service.logger.Infoln("NotificationService.sendValidationMail : sendValidationMail service finished")
 	return nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -28,12 +29,12 @@ import (
 
 type AppointmentRepo struct {
 	cli    *mongo.Client
-	logger *log.Logger
+	logger *logrus.Logger
 	client *http.Client
 	tracer trace.Tracer
 }
 
-func NewAppointmentRepo(ctx context.Context, logger *log.Logger, tracer trace.Tracer) (*AppointmentRepo, error) {
+func NewAppointmentRepo(ctx context.Context, logger *logrus.Logger, tracer trace.Tracer) (*AppointmentRepo, error) {
 	dburi := fmt.Sprintf("mongodb://%s:%s/", os.Getenv("APPOINTMENTS_DB_HOST"), os.Getenv("APPOINTMENTS_DB_PORT"))
 
 	client, err := mongo.NewClient(options.Client().ApplyURI(dburi))
@@ -95,16 +96,20 @@ func (rr *AppointmentRepo) Ping() {
 func (rr *AppointmentRepo) InsertAppointment(ctx context.Context, appointment *Appointment) error {
 	ctx, span := rr.tracer.Start(ctx, "AppointmentRepo.InsertAppointment")
 	defer span.End()
+
+	rr.logger.Infoln("AppointmentRepo.InsertAppointment : reached InsertAppointment in repo")
+
 	appointmentsCollection := rr.getCollection()
 
 	if appointment.PricePerGuest != 0 && appointment.PricePerAccommodation != 0 {
+		rr.logger.Errorf("AppointmentRepo.InsertAppointment : Error adding accommodation price and guest price at the same time")
 		span.SetStatus(codes.Error, "Error adding accommodation price and guest price at the same time.")
-		rr.logger.Printf("Error adding accommodation price and guest price at the same time.")
 		return errors.New("Error adding accommodation price and guest price at the same time.")
 	}
 
 	existingAppointments, err := rr.GetAppointmentsByAccommodation(ctx, appointment.AccommodationId)
 	if err != nil {
+		rr.logger.Errorf("AppointmentRepo.InsertAppointment : Error getting appointments by accommodation")
 		span.SetStatus(codes.Error, "Error getting appointments by accommodation")
 		return err
 	}
@@ -113,6 +118,7 @@ func (rr *AppointmentRepo) InsertAppointment(ctx context.Context, appointment *A
 		for _, existAppointment := range existingAppointment.Available {
 			for _, newAppointment := range appointment.Available {
 				if newAppointment.Equal(existAppointment) {
+					rr.logger.Errorf("AppointmentRepo.InsertAppointment : Error adding appointment. Date already exists")
 					return errors.New("Error adding appointment. Date already exists. ")
 				}
 			}
@@ -121,6 +127,7 @@ func (rr *AppointmentRepo) InsertAppointment(ctx context.Context, appointment *A
 
 	for _, newAppointment := range appointment.Available {
 		if time.Now().After(newAppointment) {
+			rr.logger.Errorf("AppointmentRepo.InsertAppointment : Error adding appointment. Cannot add appointment in the past")
 			span.SetStatus(codes.Error, "Error adding appointment. Cannot add appointment in the past.")
 			return errors.New("Error adding appointment. Cannot add appointment in the past.")
 		}
@@ -128,11 +135,13 @@ func (rr *AppointmentRepo) InsertAppointment(ctx context.Context, appointment *A
 
 	result, err := appointmentsCollection.InsertOne(ctx, &appointment)
 	if err != nil {
+		rr.logger.Errorf("AppointmentRepo.InsertAppointment : Error inserting appointment")
 		span.SetStatus(codes.Error, "Error inserting appointment")
-		rr.logger.Println(err)
 		return err
 	}
 	rr.logger.Printf("Documents ID: %v\n", result.InsertedID)
+	rr.logger.Infof("AppointmentRepo.InsertAppointment : Data of created appointment: %+v", appointment)
+	rr.logger.Infoln("AppointmentRepo.InsertAppointment : InsertAppointment success")
 	return nil
 }
 
@@ -155,6 +164,8 @@ func extractTokenFromHeader(request *http.Request) (string, error) {
 func (rr *AppointmentRepo) UpdateAppointment(ctx context.Context, id string, appointment *Appointment, token string) error {
 	ctx, span := rr.tracer.Start(ctx, "AppointmentRepository.UpdateAppointment")
 	defer span.End()
+
+	rr.logger.Infoln("AppointmentRepo.InsertAppointment : reached InsertAppointment in repo")
 
 	originalAppointment, err := rr.GetAppointmentByID(ctx, id)
 	if err != nil {

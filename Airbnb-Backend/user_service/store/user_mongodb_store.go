@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -42,35 +43,44 @@ var (
 type UserMongoDBStore struct {
 	users  *mongo.Collection
 	tracer trace.Tracer
+	logger *logrus.Logger
 }
 
-func NewUserMongoDBStore(client *mongo.Client, tracer trace.Tracer) domain.UserStore {
+func NewUserMongoDBStore(client *mongo.Client, tracer trace.Tracer, logger *logrus.Logger) domain.UserStore {
 	users := client.Database(DATABASE).Collection(COLLECTION)
 	return &UserMongoDBStore{
 		users:  users,
 		tracer: tracer,
+		logger: logger,
 	}
 }
 
 func (store *UserMongoDBStore) Register(ctx context.Context, user *domain.User) (*domain.User, error) {
 	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.Register")
 	defer span.End()
+
+	store.logger.Infoln("UserMongoDBStore.Register : reached Register in store")
+
 	user.Highlighted = false
 
 	fmt.Println(json.Marshal(user))
 	user.ID = primitive.NewObjectID()
 	result, err := store.users.InsertOne(context.TODO(), user)
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.Register.InsertOne() : %s", err)
 		span.SetStatus(codes.Error, "Error register user")
 		return nil, err
 	}
 	user.ID = result.InsertedID.(primitive.ObjectID)
+	store.logger.Infoln("UserMongoDBStore.Register : Register success")
 	return user, nil
 }
 
 func (store *UserMongoDBStore) GetAll(ctx context.Context) ([]*domain.User, error) {
 	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.GetAll")
 	defer span.End()
+
+	store.logger.Infoln("UserMongoDBStore.GetAll : reached GetAll in store")
 
 	filter := bson.D{{}}
 	return store.filter(ctx, filter)
@@ -80,6 +90,8 @@ func (store *UserMongoDBStore) Get(ctx context.Context, id primitive.ObjectID) (
 	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.Get")
 	defer span.End()
 
+	store.logger.Infoln("UserMongoDBStore.Get : reached Get in store")
+
 	filter := bson.M{"_id": id}
 	return store.filterOne(ctx, filter)
 }
@@ -88,10 +100,13 @@ func (store *UserMongoDBStore) GetOneUser(ctx context.Context, username string) 
 	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.GetOneUser")
 	defer span.End()
 
+	store.logger.Infoln("UserMongoDBStore.GetOneUser : reached GetOneUser in store")
+
 	filter := bson.M{"username": username}
 
 	user, err := store.filterOne(ctx, filter)
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.GetOneUser.filterOne() : %s", err)
 		span.SetStatus(codes.Error, ErrorGettingUser)
 		return nil, err
 	}
@@ -103,6 +118,8 @@ func (store *UserMongoDBStore) GetByEmail(ctx context.Context, email string) (*d
 	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.GetByEmail")
 	defer span.End()
 
+	store.logger.Infoln("UserMongoDBStore.GetByEmail : reached GetByEmail in store")
+
 	filter := bson.M{"email": email}
 	return store.filterOne(ctx, filter)
 }
@@ -111,19 +128,25 @@ func (store *UserMongoDBStore) UpdateUserUsername(ctx context.Context, user *dom
 	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.UpdateUserUsername")
 	defer span.End()
 
+	store.logger.Infoln("UserMongoDBStore.UpdateUserUsername : reached UpdateUserUsername in store")
+
 	fmt.Println(user)
 	newState, err := store.users.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": user})
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.UpdateOne : Error update user username")
 		span.SetStatus(codes.Error, "Error update user username")
 		return err
 	}
 	fmt.Println(newState)
+	store.logger.Infoln("UserMongoDBStore.UpdateUserUsername : UpdateUserUsername success")
 	return nil
 }
 
 func (store *UserMongoDBStore) UpdateUser(ctx context.Context, updateUser *domain.User) (*domain.User, error) {
 	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.UpdateUser")
 	defer span.End()
+
+	store.logger.Infoln("UserMongoDBStore.UpdateUser : reached UpdateUser in store")
 
 	updateData := bson.M{
 		"firstName": updateUser.Firstname,
@@ -139,6 +162,7 @@ func (store *UserMongoDBStore) UpdateUser(ctx context.Context, updateUser *domai
 
 	result, err := store.users.UpdateOne(ctx, filter, update)
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.UpdateUser.UpdateOne() : Error update user username")
 		span.SetStatus(codes.Error, ErrorUpdateUser)
 		return nil, err
 	}
@@ -147,6 +171,7 @@ func (store *UserMongoDBStore) UpdateUser(ctx context.Context, updateUser *domai
 		return nil, errors.New(NoUserUpdated)
 	}
 
+	store.logger.Infoln("UserMongoDBStore.UpdateUser : UpdateUser success")
 	return updateUser, nil
 }
 
@@ -154,15 +179,19 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.IsHighlighted")
 	defer span.End()
 
+	store.logger.Infoln("UserMongoDBStore.IsHighlighted : reached IsHighlighted in store")
+
 	accommodationEndpoint := fmt.Sprintf("https://%s:%s/averageRate/%s", accommodationServiceHost, accommodationServicePort, host)
 	accommodationResponse, err := store.HTTPSRequestWithouthBody(ctx, authToken, accommodationEndpoint, "GET")
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error sending accommodation request")
 		span.SetStatus(codes.Error, "Error sending accommodation request")
 		fmt.Println("Error sending accommodation request:", err)
 		return false, err
 	}
 
 	if accommodationResponse.StatusCode != http.StatusOK {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Accommodation service returned an error")
 		span.SetStatus(codes.Error, "Accommodation service returned an error")
 		fmt.Println("Accommodation service returned an error:", accommodationResponse.Status)
 		return false, errors.New("Accommodation service returned an error")
@@ -177,6 +206,7 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	//err = responseToType(accommodationResponse.Body, accommodations)
 	err = json.NewDecoder(accommodationResponse.Body).Decode(&response)
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error decoding accommodation response")
 		span.SetStatus(codes.Error, "Error decoding accommodation response")
 		fmt.Println("Error decoding accommodation response:", err)
 		return false, err
@@ -187,12 +217,14 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	reservationEndpoint := fmt.Sprintf("https://%s:%s/cancellationRate/%s", reservationServiceHost, reservationServicePort, host)
 	reservationResponse, err := store.HTTPSRequestWithouthBody(ctx, authToken, reservationEndpoint, "GET")
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error sending reservation request")
 		span.SetStatus(codes.Error, "Error sending reservation request")
 		fmt.Println("Error sending reservation request:", err)
 		return false, err
 	}
 
 	if reservationResponse.StatusCode != http.StatusOK {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Reservation service returned an error")
 		span.SetStatus(codes.Error, "Reservation service returned an error")
 		fmt.Println("Reservation service returned an error:", reservationResponse.Status)
 		return false, errors.New("Reservation service returned an error")
@@ -207,6 +239,7 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	//err = responseToType(accommodationResponse.Body, accommodations)
 	err = json.NewDecoder(reservationResponse.Body).Decode(&response2)
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error decoding accommodation response")
 		span.SetStatus(codes.Error, ErrorDecodingResponse2)
 		fmt.Println(ErrorDecodingResponse, err)
 		return false, err
@@ -217,12 +250,14 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	reservationEndpoint2 := fmt.Sprintf("https://%s:%s/numOfReservations/%s", reservationServiceHost, reservationServicePort, host)
 	reservationResponse2, err := store.HTTPSRequestWithouthBody(ctx, authToken, reservationEndpoint2, "GET")
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error sending reservation request")
 		span.SetStatus(codes.Error, "Error sending reservation request")
 		fmt.Println("Error sending reservation request:", err)
 		return false, err
 	}
 
 	if reservationResponse2.StatusCode != http.StatusOK {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Reservation service returned an error")
 		span.SetStatus(codes.Error, "Reservation service returned an error")
 		fmt.Println("Reservation service returned an error:", reservationResponse2.Status)
 		return false, errors.New("Reservation service returned an error")
@@ -237,6 +272,7 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	//err = responseToType(accommodationResponse.Body, accommodations)
 	err = json.NewDecoder(reservationResponse2.Body).Decode(&response3)
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error decoding accommodation response")
 		span.SetStatus(codes.Error, ErrorDecodingResponse2)
 		fmt.Println(ErrorDecodingResponse, err)
 		return false, err
@@ -247,12 +283,14 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	reservationEndpoint3 := fmt.Sprintf("https://%s:%s/durationOfReservations/%s", reservationServiceHost, reservationServicePort, host)
 	reservationResponse3, err := store.HTTPSRequestWithouthBody(ctx, authToken, reservationEndpoint3, "GET")
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error sending reservation request")
 		span.SetStatus(codes.Error, "Error sending reservation request")
 		fmt.Println("Error sending reservation request:", err)
 		return false, err
 	}
 
 	if reservationResponse3.StatusCode != http.StatusOK {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Reservation service returned an error")
 		span.SetStatus(codes.Error, "Reservation service returned an error")
 		fmt.Println("Reservation service returned an error:", reservationResponse3.Status)
 		return false, errors.New("Reservation service returned an error")
@@ -267,6 +305,7 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 	//err = responseToType(accommodationResponse.Body, accommodations)
 	err = json.NewDecoder(reservationResponse3.Body).Decode(&response4)
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error decoding accommodation response")
 		span.SetStatus(codes.Error, ErrorDecodingResponse2)
 		fmt.Println(ErrorDecodingResponse, err)
 		return false, err
@@ -280,6 +319,7 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 		response4.DurationOfReservations {
 		hostID, err := primitive.ObjectIDFromHex(host)
 		if err != nil {
+			store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error parsing string to ObjectID")
 			span.SetStatus(codes.Error, ErrorParsing)
 			fmt.Println(ErrorParsing, err)
 			return false, err
@@ -288,6 +328,7 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 
 		user, err := store.filterOne(ctx, filter)
 		if err != nil {
+			store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error getting user")
 			span.SetStatus(codes.Error, ErrorGettingUser)
 			return false, err
 		}
@@ -302,12 +343,14 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 
 			result, err := store.users.UpdateOne(ctx, filter, update)
 			if err != nil {
+				store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error update user")
 				span.SetStatus(codes.Error, ErrorUpdateUser)
 				fmt.Println(ErrorUpdateUser)
 				return false, err
 			}
 
 			if result.ModifiedCount == 0 {
+				store.logger.Errorf("UserMongoDBStore.IsHighlighted : No user updated")
 				return false, errors.New(NoUserUpdated)
 			}
 		}
@@ -317,6 +360,7 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 		!response4.DurationOfReservations {
 		hostID, err := primitive.ObjectIDFromHex(host)
 		if err != nil {
+			store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error parsing string to ObjectID")
 			span.SetStatus(codes.Error, ErrorParsing)
 			fmt.Println(ErrorParsing, err)
 			return false, err
@@ -325,6 +369,7 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 
 		user, err := store.filterOne(ctx, filter)
 		if err != nil {
+			store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error getting user")
 			span.SetStatus(codes.Error, ErrorGettingUser)
 			return false, err
 		}
@@ -339,12 +384,14 @@ func (store *UserMongoDBStore) IsHighlighted(ctx context.Context, host string, a
 
 			result, err := store.users.UpdateOne(ctx, filter, update)
 			if err != nil {
+				store.logger.Errorf("UserMongoDBStore.IsHighlighted : Error update user")
 				span.SetStatus(codes.Error, ErrorUpdateUser)
 				fmt.Println(ErrorUpdateUser)
 				return false, err
 			}
 
 			if result.ModifiedCount == 0 {
+				store.logger.Errorf("UserMongoDBStore.IsHighlighted : No user updated")
 				return false, errors.New(NoUserUpdated)
 			}
 		}
@@ -360,17 +407,22 @@ func (store *UserMongoDBStore) DeleteAccount(ctx context.Context, userID primiti
 	ctx, span := store.tracer.Start(ctx, "UserMongoDBStore.DeleteAccount")
 	defer span.End()
 
+	store.logger.Infoln("UserMongoDBStore.DeleteAccount : reached DeleteAccount in store")
+
 	filter := bson.M{"_id": userID}
 	result, err := store.users.DeleteOne(ctx, filter)
 	if err != nil {
+		store.logger.Errorf("UserMongoDBStore.DeleteAccount.DeleteOne() : Error deleting user")
 		span.SetStatus(codes.Error, "Error deleting user")
 		return err
 	}
 
 	if result.DeletedCount == 0 {
+		store.logger.Errorf("UserMongoDBStore.DeleteAccount : No user deleted")
 		return errors.New("No user deleted")
 	}
 
+	store.logger.Infoln("UserMongoDBStore.DeleteAccount : DeleteAccount success")
 	return nil
 }
 

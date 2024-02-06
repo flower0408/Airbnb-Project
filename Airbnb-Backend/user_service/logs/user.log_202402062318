@@ -1,0 +1,24 @@
+[2024-02-06T23:19:08Z] [info] [ID-1707261548909642711] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-06T23:19:08Z] [info] [ID-1707261548937192088] UserService.GetOneUser : GetOneUser service reached
+[2024-02-06T23:19:08Z] [info] [ID-1707261548938544678] UserMongoDBStore.GetOneUser : reached GetOneUser in store
+[2024-02-06T23:19:08Z] [info] [ID-1707261548967408908] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-06T23:19:08Z] [info] [ID-1707261548968849437] UserService.GetOneUser : GetOneUser service reached
+[2024-02-06T23:19:08Z] [info] [ID-1707261548970016707] UserMongoDBStore.GetOneUser : reached GetOneUser in store
+[2024-02-06T23:19:27Z] [info] [ID-1707261567864483447] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-06T23:19:27Z] [info] [ID-1707261567866936440] UserService.GetOneUser : GetOneUser service reached
+[2024-02-06T23:19:27Z] [info] [ID-1707261567868351480] UserMongoDBStore.GetOneUser : reached GetOneUser in store
+[2024-02-06T23:19:27Z] [info] [ID-1707261567920714594] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-06T23:19:27Z] [info] [ID-1707261567922451408] UserService.GetOneUser : GetOneUser service reached
+[2024-02-06T23:19:27Z] [info] [ID-1707261567923648176] UserMongoDBStore.GetOneUser : reached GetOneUser in store
+[2024-02-06T23:19:30Z] [info] [ID-1707261570488786437] UserHandler.IsHighlighted : IsHighlighted endpoint reached
+[2024-02-06T23:19:30Z] [info] [ID-1707261570490492394] UserService.IsHighlighted : IsHighlighted service reached
+[2024-02-06T23:19:30Z] [info] [ID-1707261570491700861] UserMongoDBStore.IsHighlighted : reached IsHighlighted in store
+[2024-02-06T23:19:31Z] [info] [ID-1707261571258921077] UserHandler.Get : Get endpoint reached
+[2024-02-06T23:19:31Z] [info] [ID-1707261571260422365] UserService.Get : Get service reached
+[2024-02-06T23:19:31Z] [info] [ID-1707261571261633171] UserMongoDBStore.Get : reached Get in store
+[2024-02-06T23:19:40Z] [info] [ID-1707261580846749086] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-06T23:19:40Z] [info] [ID-1707261580848202521] UserService.GetOneUser : GetOneUser service reached
+[2024-02-06T23:19:40Z] [info] [ID-1707261580849936040] UserMongoDBStore.GetOneUser : reached GetOneUser in store
+[2024-02-06T23:19:40Z] [info] [ID-1707261580879740021] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-06T23:19:40Z] [info] [ID-1707261580881241836] UserService.GetOneUser : GetOneUser service reached
+[2024-02-06T23:19:40Z] [info] [ID-1707261580882539533] UserMongoDBStore.GetOneUser : reached GetOneUser in store

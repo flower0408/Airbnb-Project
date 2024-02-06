@@ -6,6 +6,7 @@ import (
 	"github.com/casbin/casbin"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
@@ -28,12 +29,14 @@ var (
 type NotificationHandler struct {
 	service *application.NotificationService
 	tracer  trace.Tracer
+	logger  *logrus.Logger
 }
 
-func NewNotificationHandler(service *application.NotificationService, tracer trace.Tracer) *NotificationHandler {
+func NewNotificationHandler(service *application.NotificationService, tracer trace.Tracer, logger *logrus.Logger) *NotificationHandler {
 	return &NotificationHandler{
 		service: service,
 		tracer:  tracer,
+		logger:  logger,
 	}
 }
 
@@ -63,10 +66,13 @@ func (handler *NotificationHandler) CreateNotification(writer http.ResponseWrite
 	ctx, span := handler.tracer.Start(req.Context(), "NotificationHandler.CreateNotification")
 	defer span.End()
 
+	handler.logger.Infoln("NotificationHandler.CreateNotification : CreateNotification endpoint reached")
+
 	var notification domain.Notification
 	err := json.NewDecoder(req.Body).Decode(&notification)
 	if err != nil {
 		log.Println(err)
+		handler.logger.Errorf("NotificationHandler.CreateNotification : Error %s", err)
 		span.SetStatus(codes.Error, "Status bad request")
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
@@ -76,6 +82,7 @@ func (handler *NotificationHandler) CreateNotification(writer http.ResponseWrite
 
 	tokenString, err := extractTokenFromHeader(req)
 	if err != nil {
+		handler.logger.Errorf("NotificationHandler.CreateNotification : No token found")
 		span.SetStatus(codes.Error, "No token found")
 		writer.WriteHeader(http.StatusBadRequest)
 		writer.Write([]byte("No token found"))
@@ -85,15 +92,18 @@ func (handler *NotificationHandler) CreateNotification(writer http.ResponseWrite
 	err = handler.service.CreateNotification(ctx, &notification, tokenString)
 	if err != nil {
 		if err.Error() == "Database error" {
+			handler.logger.Errorf("NotificationHandler.CreateNotification : Internal server error")
 			span.SetStatus(codes.Error, "Internal server error")
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		} else {
+			handler.logger.Errorf("NotificationHandler.CreateNotification : Status bad request")
 			span.SetStatus(codes.Error, "Status bad request")
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 		}
 		return
 	}
 
+	handler.logger.Infoln("NotificationHandler.CreateNotification : CreateNotification success")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -117,8 +127,11 @@ func (handler *NotificationHandler) GetAllNotifications(writer http.ResponseWrit
 	ctx, span := handler.tracer.Start(req.Context(), "NotificationHandler.GetAllNotifications")
 	defer span.End()
 
+	handler.logger.Infoln("NotificationHandler.GetAllNotifications : GetAllNotifications endpoint reached")
+
 	users, err := handler.service.GetAllNotifications(ctx)
 	if err != nil {
+		handler.logger.Errorf("NotificationHandler.GetAllNotifications : Error getting all notifications")
 		span.SetStatus(codes.Error, "Error getting all notifications")
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
@@ -130,15 +143,19 @@ func (handler *NotificationHandler) GetNotificationByHostId(writer http.Response
 	ctx, span := handler.tracer.Start(req.Context(), "NotificationHandler.GetNotificationByHostId")
 	defer span.End()
 
+	handler.logger.Infoln("NotificationHandler.GetNotificationByHostId : GetNotificationByHostId endpoint reached")
+
 	vars := mux.Vars(req)
 	id, ok := vars["id"]
 	if !ok {
+		handler.logger.Errorf("NotificationHandler.GetNotificationByHostId : Status bad request")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	notification, err := handler.service.GetNotificationByHostId(ctx, id)
 	if err != nil {
+		handler.logger.Errorf("NotificationHandler.GetNotificationByHostId : Error getting notifications for host")
 		span.SetStatus(codes.Error, "Error getting notifications for host")
 		writer.WriteHeader(http.StatusNotFound)
 		return

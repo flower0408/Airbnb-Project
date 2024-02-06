@@ -32,6 +32,7 @@ services:
     dns:
       - 8.8.8.8
     volumes:
+      - ./notification_service/logs:/app/logs
       - ./api_gateway/cert/notification_service/notification_service-cert.pem:/notification_service-cert.pem
       - ./api_gateway/cert/notification_service/notification_service-key.pem:/notification_service-key.pem
       - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem
@@ -64,6 +65,7 @@ services:
     networks:
       - network
     volumes:
+      - ./user_service/logs:/app/logs
       - ./api_gateway/cert/user_service/user_service-cert.pem:/user_service-cert.pem
       - ./api_gateway/cert/user_service/user_service-key.pem:/user_service-key.pem
       - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem
@@ -107,6 +109,7 @@ services:
     dns:
       - 8.8.8.8
     volumes:
+      - ./auth_service/logs:/app/logs
       - ./api_gateway/cert/auth_service/auth_service-cert.pem:/auth_service-cert.pem
       - ./api_gateway/cert/auth_service/auth_service-key.pem:/auth_service-key.pem
       - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem
@@ -155,6 +158,7 @@ services:
     networks:
       - network
     volumes:
+      - ./accommodations_service/logs:/app/logs
       - ./files:/usr/bin/files
       - ./api_gateway/cert/accommodations_service/accommodations_service-cert.pem:/accommodations_service-cert.pem
       - ./api_gateway/cert/accommodations_service/accommodations_service-key.pem:/accommodations_service-key.pem
@@ -200,6 +204,7 @@ services:
     networks:
       - network
     volumes:
+      - ./reservations_service/logs:/app/logs
       - ./api_gateway/cert/reservations_service/reservations_service-cert.pem:/reservations_service-cert.pem
       - ./api_gateway/cert/reservations_service/reservations_service-key.pem:/reservations_service-key.pem
       - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem

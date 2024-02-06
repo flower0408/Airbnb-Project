@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
@@ -34,12 +35,12 @@ var (
 
 type ReservationRepo struct {
 	session *gocql.Session
-	logger  *log.Logger
+	logger  *logrus.Logger
 	client  *http.Client
 	tracer  trace.Tracer
 }
 
-func NewReservationRepo(tracer trace.Tracer, logger *log.Logger) (*ReservationRepo, error) {
+func NewReservationRepo(tracer trace.Tracer, logger *logrus.Logger) (*ReservationRepo, error) {
 
 	db := os.Getenv("RESERVATIONS_DB_HOST")
 

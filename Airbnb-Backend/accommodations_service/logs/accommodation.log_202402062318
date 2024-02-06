@@ -1,0 +1,129 @@
+[2024-02-06T23:18:18Z] [info] [ID-1707261498315789288] AccommodationHandler.SearchAccommodations : GetRatesByHost endpoint reached
+[2024-02-06T23:18:19Z] [info] [ID-1707261499277402841] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:19Z] [info] [ID-1707261499328025046] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:19Z] [info] [ID-1707261499332387304] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:19Z] [info] [ID-1707261499336327740] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:19Z] [info] [ID-1707261499340034372] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:19Z] [info] [ID-1707261499347519277] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:19Z] [info] [ID-1707261499351357090] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:19Z] [info] [ID-1707261499355212934] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:19Z] [info] [ID-1707261499358854196] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:19Z] [info] [ID-1707261499362238028] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:19Z] [info] [ID-1707261499366005988] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:19Z] [info] [ID-1707261499369940375] AccommodationHandler.SearchAccommodations : SearchAccommodations finished
+[2024-02-06T23:18:33Z] [info] [ID-1707261513539704367] AccommodationHandler.SearchAccommodations : GetRatesByHost endpoint reached
+[2024-02-06T23:18:33Z] [info] [ID-1707261513658279771] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:33Z] [info] [ID-1707261513671614459] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:33Z] [info] [ID-1707261513673426929] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:33Z] [info] [ID-1707261513674997027] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:33Z] [info] [ID-1707261513676432939] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:33Z] [info] [ID-1707261513677960254] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:33Z] [info] [ID-1707261513679492787] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:33Z] [info] [ID-1707261513680924333] AccommodationHandler.SearchAccommodations : SearchAccommodations finished
+[2024-02-06T23:18:37Z] [info] [ID-1707261517286450114] AccommodationHandler.SearchAccommodations : GetRatesByHost endpoint reached
+[2024-02-06T23:18:37Z] [info] [ID-1707261517333421218] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:37Z] [info] [ID-1707261517335882421] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:37Z] [info] [ID-1707261517337368051] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:37Z] [info] [ID-1707261517339380816] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:37Z] [info] [ID-1707261517340863533] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:37Z] [info] [ID-1707261517342198474] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:37Z] [info] [ID-1707261517343911860] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:37Z] [info] [ID-1707261517345376774] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:37Z] [info] [ID-1707261517347186767] AccommodationHandler.SearchAccommodations : SearchAccommodations finished
+[2024-02-06T23:18:46Z] [info] [ID-1707261526051714972] AccommodationHandler.SearchAccommodations : GetRatesByHost endpoint reached
+[2024-02-06T23:18:46Z] [info] [ID-1707261526190397238] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:46Z] [info] [ID-1707261526200369008] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:46Z] [info] [ID-1707261526202226580] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:46Z] [info] [ID-1707261526204486621] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:46Z] [info] [ID-1707261526206571896] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:46Z] [info] [ID-1707261526208376391] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:46Z] [info] [ID-1707261526210388725] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:46Z] [info] [ID-1707261526212605600] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:46Z] [info] [ID-1707261526214787820] AccommodationHandler.SearchAccommodations : SearchAccommodations finished
+[2024-02-06T23:18:50Z] [info] [ID-1707261530860530866] AccommodationHandler.SearchAccommodations : GetRatesByHost endpoint reached
+[2024-02-06T23:18:50Z] [info] [ID-1707261530926232766] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:50Z] [info] [ID-1707261530936063741] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:50Z] [info] [ID-1707261530937815963] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:50Z] [info] [ID-1707261530939261340] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:50Z] [info] [ID-1707261530940687183] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:50Z] [info] [ID-1707261530942008580] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:50Z] [info] [ID-1707261530944051972] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:50Z] [info] [ID-1707261530946154266] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:18:50Z] [info] [ID-1707261530948345045] AccommodationHandler.SearchAccommodations : SearchAccommodations finished
+[2024-02-06T23:19:01Z] [info] [ID-1707261541512453167] AccommodationHandler.FilterAccommodationsHandler : FilterAccommodationsHandler endpoint reached
+[2024-02-06T23:19:01Z] [error] [ID-1707261541515514295] AccommodationHandler.FilterAccommodationsHandler : minPrice must be non-negative
+[2024-02-06T23:19:09Z] [info] [ID-1707261549193125811] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:09Z] [info] [ID-1707261549195068030] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:09Z] [info] [ID-1707261549196942681] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:09Z] [info] [ID-1707261549198661080] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:09Z] [info] [ID-1707261549200365707] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:09Z] [info] [ID-1707261549201909096] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:09Z] [info] [ID-1707261549203402382] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:09Z] [info] [ID-1707261549205854745] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:09Z] [info] [ID-1707261549221594347] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:09Z] [info] [ID-1707261549223045005] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:09Z] [info] [ID-1707261549224704493] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:09Z] [info] [ID-1707261549227492980] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:09Z] [info] [ID-1707261549233370057] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:09Z] [info] [ID-1707261549237433266] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:09Z] [info] [ID-1707261549242240645] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:09Z] [info] [ID-1707261549244301271] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:09Z] [info] [ID-1707261549246642462] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:09Z] [info] [ID-1707261549249960050] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:13Z] [info] [ID-1707261553418644763] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:13Z] [info] [ID-1707261553421572929] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:13Z] [info] [ID-1707261553483845500] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:28Z] [info] [ID-1707261568107241348] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:28Z] [info] [ID-1707261568109004417] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:28Z] [info] [ID-1707261568109788353] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:28Z] [info] [ID-1707261568110652559] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:28Z] [info] [ID-1707261568122507072] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:28Z] [info] [ID-1707261568123518212] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:28Z] [info] [ID-1707261568140351652] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:28Z] [info] [ID-1707261568144968999] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:28Z] [info] [ID-1707261568147313483] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:28Z] [info] [ID-1707261568149273049] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:28Z] [info] [ID-1707261568150828205] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:28Z] [info] [ID-1707261568152474840] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:28Z] [info] [ID-1707261568161008569] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:28Z] [info] [ID-1707261568163944017] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:28Z] [info] [ID-1707261568167028924] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:28Z] [info] [ID-1707261568168922099] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:28Z] [info] [ID-1707261568170591030] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:28Z] [info] [ID-1707261568173516721] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:30Z] [info] [ID-1707261570395315337] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:30Z] [info] [ID-1707261570396876691] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:30Z] [info] [ID-1707261570405164436] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:30Z] [info] [ID-1707261570441844516] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:30Z] [info] [ID-1707261570443729980] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:30Z] [info] [ID-1707261570446698774] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:30Z] [info] [ID-1707261570515113662] AccommodationHandler.GetAverageRateForHost : GetAverageRateForHost endpoint reached
+[2024-02-06T23:19:30Z] [info] [ID-1707261570516423873] AccommodationRepo.AverageRate : reached AverageRate in repo
+[2024-02-06T23:19:30Z] [info] [ID-1707261570542634487] AccommodationHandler.GetAverageRateForHost : GetAverageRateForHost finished
+[2024-02-06T23:19:30Z] [info] [ID-1707261570578867009] AccommodationHandler.GetAccommodationsByOwner : GetRatesByHost endpoint reached
+[2024-02-06T23:19:30Z] [info] [ID-1707261570581146852] AccommodationRepo.GetAccommodationsByOwner : reached GetAccommodationsByOwner in repo
+[2024-02-06T23:19:30Z] [info] [ID-1707261570585763341] AccommodationHandler.GetAccommodationsByOwner : GetRatesByHost finished
+[2024-02-06T23:19:30Z] [info] [ID-1707261570618876335] AccommodationHandler.GetAccommodationsByOwner : GetRatesByHost endpoint reached
+[2024-02-06T23:19:30Z] [info] [ID-1707261570620495967] AccommodationRepo.GetAccommodationsByOwner : reached GetAccommodationsByOwner in repo
+[2024-02-06T23:19:30Z] [info] [ID-1707261570624035795] AccommodationHandler.GetAccommodationsByOwner : GetRatesByHost finished
+[2024-02-06T23:19:30Z] [info] [ID-1707261570669494231] AccommodationHandler.GetAccommodationsByOwner : GetRatesByHost endpoint reached
+[2024-02-06T23:19:30Z] [info] [ID-1707261570671281047] AccommodationRepo.GetAccommodationsByOwner : reached GetAccommodationsByOwner in repo
+[2024-02-06T23:19:30Z] [info] [ID-1707261570674439499] AccommodationHandler.GetAccommodationsByOwner : GetRatesByHost finished
+[2024-02-06T23:19:30Z] [info] [ID-1707261570709399518] AccommodationHandler.GetAccommodationsByOwner : GetRatesByHost endpoint reached
+[2024-02-06T23:19:30Z] [info] [ID-1707261570711241804] AccommodationRepo.GetAccommodationsByOwner : reached GetAccommodationsByOwner in repo
+[2024-02-06T23:19:30Z] [info] [ID-1707261570713914334] AccommodationHandler.GetAccommodationsByOwner : GetRatesByHost finished
+[2024-02-06T23:19:41Z] [info] [ID-1707261581069416940] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:41Z] [info] [ID-1707261581071263934] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:41Z] [info] [ID-1707261581073075771] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:41Z] [info] [ID-1707261581074782931] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:41Z] [info] [ID-1707261581099928491] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:41Z] [info] [ID-1707261581101528789] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:41Z] [info] [ID-1707261581121053886] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:41Z] [info] [ID-1707261581123110595] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:41Z] [info] [ID-1707261581124818517] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:41Z] [info] [ID-1707261581126531348] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:41Z] [info] [ID-1707261581128035939] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:41Z] [info] [ID-1707261581129235468] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:19:41Z] [info] [ID-1707261581137386581] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:19:41Z] [info] [ID-1707261581139945285] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:19:41Z] [info] [ID-1707261581142715666] AccommodationHandler.GetByID : GetByID finished

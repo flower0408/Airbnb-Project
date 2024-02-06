@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -20,13 +21,15 @@ const (
 type NotificationMongoDBStore struct {
 	notifications *mongo.Collection
 	tracer        trace.Tracer
+	logger        *logrus.Logger
 }
 
-func NewNotificationMongoDBStore(client *mongo.Client, tracer trace.Tracer) domain.NotificationStore {
+func NewNotificationMongoDBStore(client *mongo.Client, tracer trace.Tracer, logger *logrus.Logger) domain.NotificationStore {
 	notifications := client.Database(DATABASE).Collection(COLLECTION)
 	return &NotificationMongoDBStore{
 		notifications: notifications,
 		tracer:        tracer,
+		logger:        logger,
 	}
 }
 
@@ -34,20 +37,30 @@ func (store *NotificationMongoDBStore) CreateNotification(ctx context.Context, n
 	ctx, span := store.tracer.Start(ctx, "NotificationMongoDBStore.CreateNotification")
 	defer span.End()
 
+	store.logger.Infoln("NotificationMongoDBStore.CreateNotification : reached CreateNotification in store")
+
 	fmt.Println(json.Marshal(notification))
 	notification.ID = primitive.NewObjectID()
 	result, err := store.notifications.InsertOne(context.TODO(), notification)
 	if err != nil {
+		store.logger.Errorf("NotificationMongoDBStore.CreateNotification.InsertOne() : %s", err)
 		span.SetStatus(codes.Error, "Error creating notification")
 		return nil, err
 	}
 	notification.ID = result.InsertedID.(primitive.ObjectID)
+
+	store.logger.Infoln("NotificationMongoDBStore.CreateNotification : Data of created notification: %+v", notification)
+
+	store.logger.Infoln("NotificationMongoDBStore.CreateNotification : CreateNotification success")
+
 	return notification, nil
 }
 
 func (store *NotificationMongoDBStore) GetAllNotifications(ctx context.Context) ([]*domain.Notification, error) {
 	ctx, span := store.tracer.Start(ctx, "NotificationMongoDBStore.GetAllNotifications")
 	defer span.End()
+
+	store.logger.Infoln("NotificationMongoDBStore.GetAllNotifications : reached GetAllNotifications in store")
 
 	filter := bson.D{{}}
 	return store.filter(ctx, filter)
@@ -56,6 +69,8 @@ func (store *NotificationMongoDBStore) GetAllNotifications(ctx context.Context) 
 func (store *NotificationMongoDBStore) GetNotificationsByHostId(ctx context.Context, hostId string) ([]*domain.Notification, error) {
 	ctx, span := store.tracer.Start(ctx, "NotificationMongoDBStore.GetNotificationsByHostId")
 	defer span.End()
+
+	store.logger.Infoln("NotificationMongoDBStore.GetNotificationsByHostId : reached GetNotificationsByHostId in store")
 
 	filter := bson.M{"forHostId": hostId}
 	return store.filter(ctx, filter)

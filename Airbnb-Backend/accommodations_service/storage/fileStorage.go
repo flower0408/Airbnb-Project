@@ -4,21 +4,21 @@ import (
 	"context"
 	"fmt"
 	"github.com/colinmarc/hdfs/v2"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 )
 
 type FileStorage struct {
 	client *hdfs.Client
-	logger *log.Logger
+	logger *logrus.Logger
 	tracer trace.Tracer
 }
 
-func New(logger *log.Logger, tracer trace.Tracer) (*FileStorage, error) {
+func New(logger *logrus.Logger, tracer trace.Tracer) (*FileStorage, error) {
 
 	hdfsUri := os.Getenv("HDFS_URI")
 	fmt.Println("HDFS_URI:", hdfsUri)

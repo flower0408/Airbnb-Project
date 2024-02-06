@@ -1,0 +1,10 @@
+[2024-02-06T23:19:31Z] [info] [ID-1707261571136102293] NotificationHandler.CreateNotification : CreateNotification endpoint reached
+[2024-02-06T23:19:31Z] [info] [ID-1707261571157801659] NotificationService.CreateNotification : CreateNotification service reached
+[2024-02-06T23:19:31Z] [info] [ID-1707261571158966112] NotificationMongoDBStore.CreateNotification : reached CreateNotification in store
+[2024-02-06T23:19:31Z] [info] [ID-1707261571226127049] NotificationMongoDBStore.CreateNotification : Data of created notification: %+v &{ObjectID("65c2be83a85a319195008fc0") 65bdefb7d03a85351a91d5fd 65bf39f2a35042970be2d4b4 Guest for period [2024-02-20 23:00:00 +0000 UTC 2024-02-21 23:00:00 +0000 UTC] canceled reservation for accommodation  host2 2024-02-06 23:19:31.158936246 +0000 UTC m=+464.054569860}
+[2024-02-06T23:19:31Z] [info] [ID-1707261571227505549] NotificationMongoDBStore.CreateNotification : CreateNotification success
+[2024-02-06T23:19:31Z] [info] [ID-1707261571228676925] NotificationService.getUserDetails : getUserDetails service reached
+[2024-02-06T23:19:31Z] [info] [ID-1707261571265998357] NotificationService.sendValidationMail : sendValidationMail service reached
+[2024-02-06T23:19:38Z] [info] [ID-1707261578116416983] NotificationService.sendValidationMail : sendValidationMail service finished
+[2024-02-06T23:19:38Z] [info] [ID-1707261578119249878] NotificationService.CreateNotification : CreateNotification service finished
+[2024-02-06T23:19:38Z] [info] [ID-1707261578120133648] NotificationHandler.CreateNotification : CreateNotification success

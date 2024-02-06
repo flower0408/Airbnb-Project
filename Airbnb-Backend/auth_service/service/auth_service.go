@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.opentelemetry.io/otel"
@@ -48,20 +49,24 @@ type AuthService struct {
 	cache  domain.AuthCache
 	cb     *gobreaker.CircuitBreaker
 	tracer trace.Tracer
+	logger *logrus.Logger
 }
 
-func NewAuthService(store domain.AuthStore, cache domain.AuthCache, tracer trace.Tracer) *AuthService {
+func NewAuthService(store domain.AuthStore, cache domain.AuthCache, tracer trace.Tracer, logger *logrus.Logger) *AuthService {
 	return &AuthService{
 		store:  store,
 		cache:  cache,
 		cb:     CircuitBreaker("authService"),
 		tracer: tracer,
+		logger: logger,
 	}
 }
 
 func (service *AuthService) GetAll(ctx context.Context) ([]*domain.Credentials, error) {
 	ctx, span := service.tracer.Start(ctx, "AuthService.GetAll")
 	defer span.End()
+
+	service.logger.Infoln("AuthService.GetAll : getAll service reached")
 
 	return service.store.GetAll(ctx)
 }
@@ -83,22 +88,30 @@ func (service *AuthService) VerifyRecaptcha(ctx context.Context, recaptchaToken 
 	ctx, span := service.tracer.Start(ctx, "AuthService.VerifyRecaptcha")
 	defer span.End()
 
+	service.logger.Infoln("AuthService.Register : register service reached")
+
 	recaptchaEndpoint := "https://www.google.com/recaptcha/api/siteverify"
 	recaptchaSecret := recaptchaSecretKey
+
+	service.logger.Infoln("AuthService.VerifyRecaptcha : Making request to reCAPTCHA API")
 
 	// Pravimo zahtev ka reCAPTCHA API-ju
 	response, err := http.Post(recaptchaEndpoint, "application/x-www-form-urlencoded",
 		bytes.NewBuffer([]byte(fmt.Sprintf("secret=%s&response=%s", recaptchaSecret, recaptchaToken))))
 	if err != nil {
 		span.SetStatus(codes.Error, "Error")
+		service.logger.Errorf("AuthService.VerifyRecaptcha : Error making request to reCAPTCHA API: %v", err)
 		return false, err
 	}
 	defer response.Body.Close()
+
+	service.logger.Infoln("AuthService.VerifyRecaptcha : Successfully received response from reCAPTCHA API")
 
 	// Čitamo odgovor od reCAPTCHA API-ja
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error")
+		service.logger.Errorf("AuthService.VerifyRecaptcha : Error reading response body: %v", err)
 		return false, err
 	}
 
@@ -106,6 +119,7 @@ func (service *AuthService) VerifyRecaptcha(ctx context.Context, recaptchaToken 
 	var recaptchaResponse RecaptchaResponse
 	if err := json.Unmarshal(body, &recaptchaResponse); err != nil {
 		span.SetStatus(codes.Error, "Error unmarshal body")
+		service.logger.Errorf("AuthService.VerifyRecaptcha : Error parsing JSON response: %v", err)
 		return false, err
 	}
 
@@ -115,6 +129,8 @@ func (service *AuthService) VerifyRecaptcha(ctx context.Context, recaptchaToken 
 	}
 
 	log.Printf("ReCAPTCHA response: %v\n", recaptchaResponse)
+
+	service.logger.Printf("AuthService.VerifyRecaptcha : ReCAPTCHA verification failed: %v", recaptchaResponse)
 
 	// Ako nije uspešna provera ili nije postignut dobar rezultat, vraćamo grešku
 	span.SetStatus(codes.Error, "Invalid reCAPTCHA token or low score")
@@ -229,8 +245,12 @@ func (se StatusError) Error() string {
 func (service *AuthService) Register(ctx context.Context, user *domain.User) (string, int, error) {
 	ctx, span := service.tracer.Start(ctx, "AuthService.Register")
 	defer span.End()
+
+	service.logger.Infoln("AuthService.Register : register service reached")
+
 	if err := validateUser(user); err != nil {
 		span.SetStatus(codes.Error, "Error validating user")
+		service.logger.Errorln("AuthService.Register : error validating user")
 		return "", 400, err
 	}
 	checkUser, err := blackListChecking(user.Password)
@@ -239,17 +259,20 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 	if checkUser {
 		log.Println("Password is in blacklist")
 		span.SetStatus(codes.Error, err.Error())
+		service.logger.Errorln("AuthService.Register : password is in blacklist")
 		return "", 406, fmt.Errorf("Password is in black list, try with another one!")
 	}
 
 	existingUser, err := service.store.GetOneUser(ctx, user.Username)
 	if err != nil {
 		span.SetStatus(codes.Error, "That user already exists")
+		service.logger.Errorln("AuthService.Register : that user already exists in database")
 		return "", 500, err
 	}
 
 	if existingUser != nil {
 		//span.SetStatus(codes.Error, err.Error())
+		service.logger.Errorln("AuthService.Register : that username already exists in database")
 		return "", 409, fmt.Errorf(errors.UsernameExist)
 	}
 
@@ -259,6 +282,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 		response, err := service.HTTPSRequestGetToken(ctx, userServiceEndpointMail, "GET")
 		if err != nil {
 			span.SetStatus(codes.Error, "Email service error")
+			service.logger.Errorf("AuthService.Register : %s (user_service unavailable)", err)
 			fmt.Println(err)
 			return nil, fmt.Errorf("EmailServiceError")
 		}
@@ -266,6 +290,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 
 		if response.StatusCode != http.StatusNotFound {
 			span.SetStatus(codes.Error, "Email already exist")
+			service.logger.Errorln("AuthService.Register : email exists in database")
 			return nil, StatusError{Code: http.StatusMethodNotAllowed, Err: fmt.Errorf(errors.EmailAlreadyExist)}
 		}
 
@@ -275,19 +300,26 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 	if breakerErr != nil {
 		if statusErr, ok := breakerErr.(StatusError); ok {
 			span.SetStatus(codes.Error, "Breaker error")
+			service.logger.Errorln("AuthService.Register : breaker error")
 			return "", statusErr.Code, statusErr.Err
 		}
 		span.SetStatus(codes.Error, "Service is unavailable")
+		service.logger.Errorf("AuthService.Register : %s (user_service unavailable)", breakerErr)
 		return "", http.StatusServiceUnavailable, breakerErr
 	}
 
 	if result != nil {
 		fmt.Println("Received meaningful data:", result)
+		service.logger.Infoln("AuthService.Register : Received meaningful data: %s ", result)
 	}
 	pass := []byte(user.Password)
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
+
+	service.logger.Infoln("AuthService.Register : password successfully hashed")
+
 	if err != nil {
 		span.SetStatus(codes.Error, "Error hashing the password")
+		service.logger.Errorln("AuthService.Register : Error hashing the password")
 		return "", 500, err
 	}
 	user.Password = string(hash)
@@ -310,6 +342,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 		responseUser, err := service.HTTPSRequestWithoutToken(ctx, userServiceEndpoint, "POST", requestBody)
 		if err != nil {
 			span.SetStatus(codes.Error, "UserServiceError")
+			service.logger.Errorf("AuthService.Register : %s (user_service unavailable)", err)
 			return nil, fmt.Errorf("UserServiceError")
 		}
 		defer responseUser.Body.Close()
@@ -325,6 +358,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 		err = responseToType(responseUser.Body, newUser)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error response to type")
+			service.logger.Errorln("AuthService.Register : Error response to type")
 			return nil, err
 		}
 
@@ -339,19 +373,23 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 		err = service.store.Register(ctx, &credentials)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error register user")
+			service.logger.Errorln("AuthService.Register : Error register user")
 			return nil, err
 		}
 
+		service.logger.Infoln("AuthService.Register : UserRegistered in user_service")
 		return "UserRegistered", nil
 	})
 
 	if breakerErr != nil {
 		span.SetStatus(codes.Error, "UserServiceError")
+		service.logger.Errorln("AuthService.Register : breaker error")
 		return "UserServiceError", http.StatusServiceUnavailable, breakerErr
 	}
 
 	if result != nil {
 		fmt.Println("Received meaningful data:", result)
+		service.logger.Infoln("AuthService.Register : Received meaningful data: ", result)
 	}
 
 	validationToken := uuid.New()
@@ -361,6 +399,7 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 	err = service.cache.PostCacheData(ctx, user.Username, validationToken.String())
 	if err != nil {
 		span.SetStatus(codes.Error, "Failed to post validation data to redis")
+		service.logger.Errorln("AuthService.Register : Failed to post validation data to redis")
 		log.Fatalf("Failed to post validation data to redis: %s", err)
 		return "", 500, err
 	}
@@ -368,9 +407,11 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 	err = service.sendValidationMail(ctx, validationToken, user.Email)
 	if err != nil {
 		span.SetStatus(codes.Error, "Failed to send mail")
+		service.logger.Errorln("AuthService.Register : Failed to send mail")
 		return "", 500, err
 	}
 
+	service.logger.Infoln("AuthService.Register : register service finished")
 	return user.Username, 200, nil
 
 }
@@ -378,6 +419,8 @@ func (service *AuthService) Register(ctx context.Context, user *domain.User) (st
 func (service *AuthService) sendValidationMail(ctx context.Context, validationToken uuid.UUID, email string) error {
 	ctx, span := service.tracer.Start(ctx, "AuthService.sendValidationMail")
 	defer span.End()
+
+	service.logger.Infoln("AuthService.sendValidationMail : sendValidationMail service reached")
 
 	m := gomail.NewMessage()
 	m.SetHeader("From", smtpEmail)
@@ -391,19 +434,25 @@ func (service *AuthService) sendValidationMail(ctx context.Context, validationTo
 
 	if err := client.DialAndSend(m); err != nil {
 		span.SetStatus(codes.Error, "Failed to send verification mail")
+		service.logger.Errorf("AuthService.sendValidationMail : failed to send verification mail: %s \n", err)
 		log.Fatalf("Failed to send verification mail because of: %s", err)
 		return err
 	}
 
+	service.logger.Infoln("AuthService.sendValidationMail : sendValidationMail service finished")
 	return nil
 }
 
 func (service *AuthService) AccountConfirmation(ctx context.Context, validation *domain.RegisterValidation) error {
 	ctx, span := service.tracer.Start(ctx, "AuthService.VerifyAccount")
 	defer span.End()
+
+	service.logger.Infoln("AuthService.AccountConfirmation : AccountConfirmation service reached")
+
 	log.Printf("Validation token for verification: %s", validation.MailToken)
 	token, err := service.cache.GetCachedValue(ctx, validation.UserToken)
 	if err != nil {
+		service.logger.Errorf("AuthService.AccountConfirmation : error fetching validation token cached value: %s", err)
 		span.SetStatus(codes.Error, "Error fetching validation token from cache")
 		log.Printf("Error fetching validation token from cache: %s", err)
 		log.Println(errors.ExpiredTokenError)
@@ -414,6 +463,7 @@ func (service *AuthService) AccountConfirmation(ctx context.Context, validation 
 		err = service.cache.DelCachedValue(ctx, validation.UserToken)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error in deleting cached value")
+			service.logger.Errorf("AuthService.AccountConfirmation : error in deleting cached value: %s", err)
 			log.Printf("Error in deleting cached value: %s", err)
 			return err
 		}
@@ -423,6 +473,7 @@ func (service *AuthService) AccountConfirmation(ctx context.Context, validation 
 		user, err := service.store.GetOneUser(ctx, validation.UserToken)
 		if user == nil {
 			span.SetStatus(codes.Error, "User is not found")
+			service.logger.Errorf("AuthService.AccountConfirmation : user not found")
 			log.Println("User is not found")
 			return fmt.Errorf("User is not found")
 		}
@@ -431,6 +482,7 @@ func (service *AuthService) AccountConfirmation(ctx context.Context, validation 
 		err = service.store.UpdateUserUsername(ctx, user)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error in updating user after changing status of verify")
+			service.logger.Errorf("AuthService.AccountConfirmation : error in updating user after changing status of verify: %s", err)
 			log.Printf("Error in updating user after changing status of verify: %s", err.Error())
 			return err
 		}
@@ -446,8 +498,11 @@ func (service *AuthService) ResendVerificationToken(ctx context.Context, request
 	ctx, span := service.tracer.Start(ctx, "AuthService.ResendVerificationToken")
 	defer span.End()
 
+	service.logger.Infoln("AuthService.ResendVerificationToken : resendVerification service reached")
+
 	if len(request.UserMail) == 0 {
 		log.Println(errors.InvalidResendMailError)
+		service.logger.Errorf("AuthService.ResendVerificationToken : %s", errors.InvalidResendMailError)
 		return fmt.Errorf(errors.InvalidResendMailError)
 	}
 
@@ -456,6 +511,7 @@ func (service *AuthService) ResendVerificationToken(ctx context.Context, request
 	err := service.cache.PostCacheData(ctx, request.UserToken, tokenUUID.String())
 	if err != nil {
 		span.SetStatus(codes.Error, "Post cache problem")
+		service.logger.Errorf("AuthService.ResendVerificationToken.PostCacheData() : %s", err)
 		log.Println("Post cache problem")
 		return err
 	}
@@ -463,6 +519,7 @@ func (service *AuthService) ResendVerificationToken(ctx context.Context, request
 	err = service.sendValidationMail(ctx, tokenUUID, request.UserMail)
 	if err != nil {
 		span.SetStatus(codes.Error, "Send verification mail problem")
+		service.logger.Errorf("AuthService.ResendVerificationToken.sendValidationMail() : %s", err)
 		log.Println("Send verification mail problem")
 		return err
 	}
@@ -473,18 +530,23 @@ func (service *AuthService) ResendVerificationToken(ctx context.Context, request
 func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email string) (string, int, error) {
 	ctx, span := service.tracer.Start(ctx, "AuthService.SendRecoveryPasswordToken")
 	defer span.End()
+
+	service.logger.Infoln("AuthService.SendRecoveryPasswordToken : sendRecoveryPass service reached")
+
 	// Circuit breaker for communication with user service
 	result, breakerErr := service.cb.Execute(func() (interface{}, error) {
 		url := fmt.Sprintf("https://%s:%s/mailExist/%s", userServiceHost, userServicePort, email)
 		response, err := service.HTTPSRequestGetToken(ctx, url, "GET")
 		if err != nil {
 			span.SetStatus(codes.Error, "EmailServiceError")
+			service.logger.Errorf("AuthService.SendRecoveryPasswordToken: Email service error : %s", err)
 			return nil, fmt.Errorf("EmailServiceError")
 		}
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
 			if response.StatusCode == http.StatusNotFound {
+				service.logger.Errorf("AuthService.SendRecoveryPasswordToken: Email not found")
 				return nil, fmt.Errorf(errors.NotFoundMailError)
 			}
 			buf := new(strings.Builder)
@@ -500,11 +562,13 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 		userDetailsResponse, err := service.HTTPSRequestGetToken(ctx, userDetailsEndpoint, "GET")
 		if err != nil {
 			span.SetStatus(codes.Error, "UserServiceError")
+			service.logger.Errorf("AuthService.SendRecoveryPasswordToken: User service error : %s", err)
 			return nil, fmt.Errorf("UserServiceError")
 		}
 
 		body, err := ioutil.ReadAll(userDetailsResponse.Body)
 		if err != nil {
+			service.logger.Errorf("AuthService.SendRecoveryPasswordToken: Error reading user details response")
 			span.SetStatus(codes.Error, "Error reading user details response")
 			return nil, err
 		}
@@ -516,6 +580,7 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 		err = json.Unmarshal(body, &userDetails)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error unmarshalling JSON")
+			service.logger.Errorf("AuthService.SendRecoveryPasswordToken: Error unmarshalling JSON")
 			fmt.Println("Error unmarshalling JSON:", err)
 			return nil, err
 		}
@@ -525,6 +590,7 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 		userUsernameCredentials, err := service.store.GetOneUser(ctx, userDetails.Username)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error getting user")
+			service.logger.Errorf("AuthService.SendRecoveryPasswordToken: Error getting user")
 			return nil, err
 		}
 		userID = userUsernameCredentials.ID.Hex()
@@ -535,12 +601,14 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 		err = service.sendRecoverPasswordMail(ctx, recoverUUID, email)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error sending mail")
+			service.logger.Errorf("AuthService.SendRecoveryPasswordToken.sendRecoverPasswordMail() : %s", err)
 			return nil, err
 		}
 
 		err = service.cache.PostCacheData(ctx, userID, recoverUUID.String())
 		if err != nil {
 			span.SetStatus(codes.Error, "Error posting cache data")
+			service.logger.Errorf("AuthService.SendRecoveryPasswordToken.PostCacheData() : %s", err)
 			return nil, err
 		}
 
@@ -548,6 +616,7 @@ func (service *AuthService) SendRecoveryPasswordToken(ctx context.Context, email
 	})
 
 	if breakerErr != nil {
+		service.logger.Errorf("AuthService.SendRecoveryPasswordToken: Breaker error : %s", breakerErr)
 		return "", http.StatusServiceUnavailable, breakerErr
 	}
 
@@ -574,6 +643,8 @@ func (service *AuthService) sendRecoverPasswordMail(ctx context.Context, validat
 	ctx, span := service.tracer.Start(ctx, "AuthService.sendValidationMail")
 	defer span.End()
 
+	service.logger.Infoln("AuthService.sendRecoverPasswordMail : sendRecoveryMail service reached")
+
 	m := gomail.NewMessage()
 	m.SetHeader("From", smtpEmail)
 	m.SetHeader("To", email)
@@ -586,10 +657,12 @@ func (service *AuthService) sendRecoverPasswordMail(ctx context.Context, validat
 
 	if err := client.DialAndSend(m); err != nil {
 		span.SetStatus(codes.Error, "failed to send verification mail")
+		service.logger.Errorf("AuthService.SendRecoveryPasswordToken: failed to send verification mail because of: %s", err)
 		log.Fatalf("failed to send verification mail because of: %s", err)
 		return err
 	}
 
+	service.logger.Infoln("AuthService.sendRecoverPasswordMail : sendRecoveryMail service finished")
 	return nil
 }
 
@@ -597,18 +670,23 @@ func (service *AuthService) CheckRecoveryPasswordToken(ctx context.Context, requ
 	ctx, span := service.tracer.Start(ctx, "AuthService.CheckRecoveryPasswordToken")
 	defer span.End()
 
+	service.logger.Infoln("AuthService.CheckRecoveryPasswordToken : checkRecovery service reached")
+
 	if len(request.UserToken) == 0 {
+		service.logger.Errorln("AuthService.CheckRecoveryPasswordToken : invalid user token")
 		return fmt.Errorf(errors.InvalidUserTokenError)
 	}
 
 	token, err := service.cache.GetCachedValue(ctx, request.UserToken)
 	if err != nil {
 		span.SetStatus(codes.Error, "Invalid token error")
+		service.logger.Errorf("AuthService.CheckRecoveryPasswordToken.GetCachedValue() : %s", err)
 		return fmt.Errorf(errors.InvalidTokenError)
 	}
 
 	if request.MailToken != token {
 		span.SetStatus(codes.Error, "Invalid token error")
+		service.logger.Errorf("AuthService.CheckRecoveryPasswordToken : %s", err)
 		return fmt.Errorf(errors.InvalidTokenError)
 	}
 
@@ -621,6 +699,7 @@ func (service *AuthService) RecoverPassword(ctx context.Context, recoverPassword
 	defer span.End()
 
 	log.Println("Starting password recovery process...")
+	service.logger.Infoln("AuthService.RecoverPassword : recoverPassword service reached")
 
 	if recoverPassword.NewPassword == "" {
 		return "Password cannot be empty", http.StatusBadRequest, fmt.Errorf(errors.EmptyPassword)
@@ -632,12 +711,14 @@ func (service *AuthService) RecoverPassword(ctx context.Context, recoverPassword
 	checkPassword, err := blackListChecking(recoverPassword.NewPassword)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error checking password against blacklist")
+		service.logger.Errorln("AuthService.RecoverPassword : password against blacklist")
 		log.Println(err)
 		return "Error checking password against blacklist", http.StatusInternalServerError, err
 	}
 
 	if checkPassword {
 		log.Println("Password is in the blacklist")
+		service.logger.Errorln("AuthService.RecoverPassword : password is in blacklist")
 		return "Password is in the blacklist", http.StatusBadRequest, fmt.Errorf(errors.BlackList)
 	}
 
@@ -648,6 +729,7 @@ func (service *AuthService) RecoverPassword(ctx context.Context, recoverPassword
 	primitiveID, err := primitive.ObjectIDFromHex(recoverPassword.UserID)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error converting user ID to ObjectID")
+		service.logger.Errorln("AuthService.RecoverPassword : Error converting user ID to ObjectID: %s", err)
 		log.Printf("Error converting user ID to ObjectID: %s", err)
 		return "", http.StatusNotFound, err
 	}
@@ -657,6 +739,7 @@ func (service *AuthService) RecoverPassword(ctx context.Context, recoverPassword
 	credentials := service.store.GetOneUserByID(ctx, primitiveID)
 	if credentials == nil {
 		span.SetStatus(codes.Error, "User not found")
+		service.logger.Errorln("AuthService.RecoverPassword : Error user not found")
 		log.Printf("User not found for ID: %s", primitiveID.Hex())
 		return "", http.StatusNotFound, fmt.Errorf("User not found")
 	}
@@ -665,6 +748,7 @@ func (service *AuthService) RecoverPassword(ctx context.Context, recoverPassword
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error trying to hash password.")
+		service.logger.Errorf("AuthService.RecoverPassword.GenerateFromPassword() : %s", err)
 		return "Error trying to hash password.", http.StatusInternalServerError, err
 	}
 	credentials.Password = string(hash)
@@ -672,15 +756,19 @@ func (service *AuthService) RecoverPassword(ctx context.Context, recoverPassword
 	err = service.store.UpdateUser(ctx, credentials)
 	if err != nil {
 		span.SetStatus(codes.Error, "Internal server error")
+		service.logger.Errorf("AuthService.RecoverPassword.UpdateUser() : %s", err)
 		return "baseErr", http.StatusInternalServerError, err
 	}
 
+	service.logger.Infoln("AuthService.RecoverPassword : RecoverPassword service finished")
 	return "OK", http.StatusOK, nil
 }
 
 func (service *AuthService) ChangePassword(ctx context.Context, password domain.PasswordChange, token string) (string, int, error) {
 	ctx, span := service.tracer.Start(ctx, "AuthService.ChangePassword")
 	defer span.End()
+
+	service.logger.Infoln("AuthService.ChangePassword : ChangePassword service reached")
 
 	parsedToken := authorization.GetToken(token)
 	claims := authorization.GetMapClaims(parsedToken.Bytes())
@@ -690,12 +778,14 @@ func (service *AuthService) ChangePassword(ctx context.Context, password domain.
 	user, err := service.store.GetOneUser(ctx, username)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error getting user")
+		service.logger.Errorf("AuthService.ChangePassword.GetOneUser() : %s", err)
 		log.Println(err)
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password.OldPassword))
 	if err != nil {
 		span.SetStatus(codes.Error, "Old password is incorrect")
+		service.logger.Errorf("AuthService.ChangePassword.CompareHashAndPassword() : %s (old password not match)", err)
 		return "oldPassErr", http.StatusConflict, fmt.Errorf("Old password is incorrect")
 	}
 
@@ -709,12 +799,14 @@ func (service *AuthService) ChangePassword(ctx context.Context, password domain.
 	checkPassword, err := blackListChecking(password.NewPassword)
 	if err != nil {
 		span.SetStatus(codes.Error, "Error checking password against blacklist")
+		service.logger.Errorf("AuthService.ChangePassword : Error checking password against blacklist")
 		log.Println(err)
 		return "Error checking password against blacklist", http.StatusInternalServerError, err
 	}
 
 	if checkPassword {
 		log.Println("Password is in the blacklist")
+		service.logger.Errorf("AuthService.ChangePassword : Password is in the blacklist")
 		return "Password is in the blacklist", http.StatusBadRequest, fmt.Errorf(errors.BlackList)
 	}
 
@@ -728,6 +820,7 @@ func (service *AuthService) ChangePassword(ctx context.Context, password domain.
 		newEncryptedPassword, err := bcrypt.GenerateFromPassword([]byte(password.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
 			span.SetStatus(codes.Error, "Error trying to hash password.")
+			service.logger.Errorf("AuthService.ChangePassword : Error trying to hash password")
 			log.Println(err)
 			return "Error trying to hash password.", http.StatusInternalServerError, err
 		}
@@ -737,21 +830,26 @@ func (service *AuthService) ChangePassword(ctx context.Context, password domain.
 		err = service.store.UpdateUser(ctx, user)
 		if err != nil {
 			span.SetStatus(codes.Error, "Internal server error")
+			service.logger.Errorf("AuthService.ChangePassword.UpdateUser() : %s", err)
 			return "baseErr", http.StatusInternalServerError, err
 		}
 
 	} else {
 		span.SetStatus(codes.Error, "New password does not match confirmation")
+		service.logger.Errorf("AuthService.ChangePassword: New password does not match confirmation")
 		return "newPassErr", http.StatusNotAcceptable, fmt.Errorf("New password does not match confirmation")
 
 	}
 
+	service.logger.Infoln("AuthService.ChangePassword : ChangePassword service finished")
 	return "OK", http.StatusOK, nil
 }
 
 func (service *AuthService) ChangeUsername(ctx context.Context, username domain.UsernameChange, token string) (string, int, error) {
 	ctx, span := service.tracer.Start(ctx, "AuthService.ChangePassword")
 	defer span.End()
+
+	service.logger.Infoln("AuthService.ChangeUsername : ChangeUsername service reached")
 
 	parsedToken := authorization.GetToken(token)
 	claims := authorization.GetMapClaims(parsedToken.Bytes())
@@ -761,16 +859,19 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 
 	usernameRegex := regexp.MustCompile(`^[a-zA-Z0-9_-]{4,30}$`)
 	if !usernameRegex.MatchString(username.NewUsername) {
+		service.logger.Errorf("AuthService.ChangeUsername: Invalid username format")
 		return "InvalidUsername", http.StatusBadRequest, fmt.Errorf("Invalid username format. It must be 4-30 characters long and contain only letters, numbers, underscores, and hyphens")
 	}
 
 	existingUser, err := service.store.GetOneUser(ctx, username.NewUsername)
 	if err != nil {
 		span.SetStatus(codes.Error, "Internal server error")
+		service.logger.Errorf("AuthService.ChangeUsername: Error getting user")
 		return "GetUserErr", http.StatusInternalServerError, err
 	}
 
 	if existingUser != nil {
+		service.logger.Errorf("AuthService.ChangeUsername: User with that username already exist")
 		return "UsernameExist", http.StatusConflict, fmt.Errorf(errors.UsernameExist)
 	}
 
@@ -787,6 +888,7 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 		if err != nil {
 			fmt.Println(err)
 			span.SetStatus(codes.Error, "UserServiceError")
+			service.logger.Errorf("AuthService.ChangeUsername: User service error")
 			return nil, fmt.Errorf("UserServiceError")
 		}
 		defer responseUser.Body.Close()
@@ -806,6 +908,7 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 	}
 	if breakerErr != nil {
 		span.SetStatus(codes.Error, "UserServiceError")
+		service.logger.Errorf("AuthService.ChangeUsername: User service error")
 		return "UserServiceError", http.StatusServiceUnavailable, breakerErr
 	}
 
@@ -813,6 +916,7 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 	if err != nil {
 		fmt.Println(err)
 		span.SetStatus(codes.Error, "GetUserErr")
+		service.logger.Errorf("AuthService.ChangeUsername: Error getting user")
 		return "GetUserErr", http.StatusInternalServerError, err
 	}
 	fmt.Println("Retrieved User:", user)
@@ -822,21 +926,26 @@ func (service *AuthService) ChangeUsername(ctx context.Context, username domain.
 	err = service.store.UpdateUser(ctx, user)
 	if err != nil {
 		span.SetStatus(codes.Error, "Internal server error")
+		service.logger.Errorf("AuthService.ChangeUsername: Error updating user")
 		return "baseErr", http.StatusInternalServerError, err
 	}
 	fmt.Println("Username Updated Successfully")
-
+	service.logger.Infoln("AuthService.ChangeUsername : ChangeUsername service finished")
 	return "OK", http.StatusOK, nil
 }
 
 func (service *AuthService) Login(ctx context.Context, credentials *domain.Credentials) (string, error) {
 	ctx, span := service.tracer.Start(ctx, "AuthService.Login")
 	defer span.End()
+
+	service.logger.Infoln("AuthService.Login : login service reached")
+
 	user, err := service.store.GetOneUser(ctx, credentials.Username)
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		if err == sql.ErrNoRows {
 			span.SetStatus(codes.Error, "Invalid credentials")
+			service.logger.Errorf("AuthService.Login.GetOneUser() %s", err)
 			return "", fmt.Errorf(errors.InvalidCredentials)
 		}
 		return "", fmt.Errorf("Error retrieving user: %v", err)
@@ -850,6 +959,7 @@ func (service *AuthService) Login(ctx context.Context, credentials *domain.Crede
 	passError := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(credentials.Password))
 	if passError != nil {
 		span.SetStatus(codes.Error, "Invalid password")
+		service.logger.Errorln("AuthService.Login.CompareHashAndPassword() : password not same")
 		return "not_same", err
 	}
 
@@ -857,6 +967,7 @@ func (service *AuthService) Login(ctx context.Context, credentials *domain.Crede
 
 	if err != nil {
 		span.SetStatus(codes.Error, "Error")
+		service.logger.Errorf("AuthService.Login.GenerateJWT() : %s", err)
 		return "", err
 	}
 
@@ -883,21 +994,27 @@ func (service *AuthService) DeleteUser(ctx context.Context, username string) (st
 	ctx, span := service.tracer.Start(ctx, "AuthService.Login")
 	defer span.End()
 
+	service.logger.Infoln("AuthService.DeleteUser : DeleteUser service reached")
+
 	existingUser, err := service.store.GetOneUser(ctx, username)
 	if err != nil {
 		span.SetStatus(codes.Error, "Internal server error")
+		service.logger.Errorf("AuthService.DeleteUser.GetOneUser() %s", err)
 		return "baseErr", http.StatusInternalServerError, err
 	}
 
 	if existingUser == nil {
+		service.logger.Errorf("AuthService.DeleteUser: User not found")
 		return "notFound", http.StatusNotFound, fmt.Errorf("User not found")
 	}
 
 	if err := service.store.DeleteUser(ctx, username); err != nil {
 		span.SetStatus(codes.Error, "Internal server error")
+		service.logger.Errorf("AuthService.DeleteUser.DeleteUser() %s", err)
 		return "baseErr", http.StatusInternalServerError, err
 	}
 
+	service.logger.Infoln("AuthService.DeleteUser : DeleteUser service finished")
 	return "OK", http.StatusOK, nil
 }
 

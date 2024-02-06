@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"github.com/casbin/casbin"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	"github.com/sony/gobreaker"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
@@ -37,6 +38,7 @@ type AuthHandler struct {
 	store   *store.AuthMongoDBStore
 	cb      *gobreaker.CircuitBreaker
 	tracer  trace.Tracer
+	logger  *logrus.Logger
 }
 
 var (
@@ -48,11 +50,12 @@ var (
 	accommodationServicePort = os.Getenv("ACCOMMODATIONS_SERVICE_PORT")
 )
 
-func NewAuthHandler(service *application.AuthService, tracer trace.Tracer) *AuthHandler {
+func NewAuthHandler(service *application.AuthService, tracer trace.Tracer, logger *logrus.Logger) *AuthHandler {
 	return &AuthHandler{
 		service: service,
 		cb:      CircuitBreaker("accommodationService"),
 		tracer:  tracer,
+		logger:  logger,
 	}
 }
 
@@ -140,9 +143,12 @@ func (handler *AuthHandler) GetAll(writer http.ResponseWriter, req *http.Request
 	ctx, span := handler.tracer.Start(req.Context(), "AuthHandler.GetAll")
 	defer span.End()
 
+	handler.logger.Infoln("AuthHandler.GetAll : getAll endpoint reached")
+
 	users, err := handler.service.GetAll(ctx)
 	if err != nil {
 		span.SetStatus(codes.Error, "Internal server error")
+		handler.logger.Errorf("AuthHandler.GetAll : %s", err)
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -248,6 +254,8 @@ func (handler *AuthHandler) VerifyRecaptcha(writer http.ResponseWriter, req *htt
 	ctx, span := handler.tracer.Start(req.Context(), "AuthHandler.VerifyRecaptcha")
 	defer span.End()
 
+	handler.logger.Infoln("AuthHandler.VerifyRecaptcha : VerifyRecaptcha endpoint reached")
+
 	var recaptchaToken struct {
 		Token string `json:"token"`
 	}
@@ -255,6 +263,7 @@ func (handler *AuthHandler) VerifyRecaptcha(writer http.ResponseWriter, req *htt
 	err := json.NewDecoder(req.Body).Decode(&recaptchaToken)
 	if err != nil {
 		log.Println(err)
+		handler.logger.Errorf("AuthHandler.VerifyRecaptcha : Status bad request")
 		span.SetStatus(codes.Error, "Status bad request")
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
@@ -263,6 +272,7 @@ func (handler *AuthHandler) VerifyRecaptcha(writer http.ResponseWriter, req *htt
 	// Pozivamo funkciju za proveru reCAPTCHA tokena iz servisa
 	isCaptchaValid, err := handler.service.VerifyRecaptcha(ctx, recaptchaToken.Token)
 	if err != nil {
+		handler.logger.Errorf("AuthHandler.VerifyRecaptcha : Internal server error")
 		span.SetStatus(codes.Error, "Internal server error")
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
@@ -282,9 +292,12 @@ func (handler *AuthHandler) Register(writer http.ResponseWriter, req *http.Reque
 	ctx, span := handler.tracer.Start(req.Context(), "AuthHandler.Register")
 	defer span.End()
 
+	handler.logger.Infoln("AuthHandler.Register : Register endpoint reached")
+
 	myUser := req.Context().Value(domain.User{}).(domain.User)
 
 	if err := validateUser(&myUser); err != nil {
+		handler.logger.Errorf("AuthHandler.Register : Error validating user")
 		span.SetStatus(codes.Error, "Status bad request")
 		http.Error(writer, err.Message, http.StatusBadRequest)
 		return
@@ -292,6 +305,7 @@ func (handler *AuthHandler) Register(writer http.ResponseWriter, req *http.Reque
 
 	token, statusCode, err := handler.service.Register(ctx, &myUser)
 	if statusCode == EmailServiceUnavailableStatusCode {
+		handler.logger.Errorf("AuthHandler.Register : %s", err)
 		writer.WriteHeader(http.StatusFound)
 		span.SetStatus(codes.Error, "Email service unavailable")
 		http.Error(writer, err.Error(), http.StatusFound)
@@ -301,17 +315,21 @@ func (handler *AuthHandler) Register(writer http.ResponseWriter, req *http.Reque
 		switch err.Error() {
 		case "EmailServiceError":
 			http.Error(writer, "Email service is currently unavailable. Please try again later.", http.StatusServiceUnavailable)
+			handler.logger.Errorf("AuthHandler.Register : %s", err)
 			span.SetStatus(codes.Error, "Email service is currently unavailable")
 		case "UserServiceError":
 			http.Error(writer, "User service is currently unavailable. Please try again later.", http.StatusServiceUnavailable)
+			handler.logger.Errorf("AuthHandler.Register : %s", err)
 			span.SetStatus(codes.Error, "Email service is currently unavailable")
 		default:
 			span.SetStatus(codes.Error, "Error")
+			handler.logger.Errorf("AuthHandler.Register : %s", err)
 			http.Error(writer, err.Error(), statusCode)
 		}
 		return
 	}
 
+	handler.logger.Infoln("AuthHandler.Register : Registration success")
 	jsonResponse(token, writer)
 }
 
@@ -319,16 +337,20 @@ func (handler *AuthHandler) AccountConfirmation(writer http.ResponseWriter, req 
 	ctx, span := handler.tracer.Start(req.Context(), "AuthHandler.VerifyAccount")
 	defer span.End()
 
+	handler.logger.Infoln("AuthHandler.AccountConfirmation : AccountConfirmation endpoint reached")
+
 	var request domain.RegisterValidation
 	err := json.NewDecoder(req.Body).Decode(&request)
 	if err != nil {
 		log.Println(err)
+		handler.logger.Errorln(err)
 		span.SetStatus(codes.Error, "Status bad request")
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if len(request.UserToken) == 0 {
+		handler.logger.Errorln("AuthHandler.AccountConfirmation : bad token (token is empty)")
 		http.Error(writer, errors.InvalidUserTokenError, http.StatusBadRequest)
 		return
 	}
@@ -337,16 +359,18 @@ func (handler *AuthHandler) AccountConfirmation(writer http.ResponseWriter, req 
 	if err != nil {
 		if err.Error() == errors.InvalidTokenError {
 			log.Println(err.Error())
+			handler.logger.Errorln("AuthHandler.AccountConfirmation : invalid token error")
 			span.SetStatus(codes.Error, "Invalid token error")
 			http.Error(writer, errors.InvalidTokenError, http.StatusNotAcceptable)
 		} else if err.Error() == errors.ExpiredTokenError {
 			log.Println(err.Error())
+			handler.logger.Errorln("AuthHandler.AccountConfirmation : expired token")
 			span.SetStatus(codes.Error, "Expired token error")
 			http.Error(writer, errors.ExpiredTokenError, http.StatusNotFound)
 		}
 		return
 	}
-
+	handler.logger.Infoln("AuthHandler.AccountConfirmation : Verified account")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -354,10 +378,13 @@ func (handler *AuthHandler) ResendVerificationToken(writer http.ResponseWriter, 
 	ctx, span := handler.tracer.Start(req.Context(), "AuthHandler.ResendVerificationToken")
 	defer span.End()
 
+	handler.logger.Infoln("AuthHandler.ResendVerificationToken : ResendVerificationToken endpoint reached")
+
 	var request domain.ResendVerificationRequest
 	err := json.NewDecoder(req.Body).Decode(&request)
 	if err != nil {
 		span.SetStatus(codes.Error, "Invalid request format error")
+		handler.logger.Errorf("AuthHandler.ResendVerificationToken : %s", err)
 		http.Error(writer, errors.InvalidRequestFormatError, http.StatusBadRequest)
 		log.Fatal(err.Error())
 		return
@@ -367,10 +394,12 @@ func (handler *AuthHandler) ResendVerificationToken(writer http.ResponseWriter, 
 	if err != nil {
 		if err.Error() == errors.InvalidResendMailError {
 			span.SetStatus(codes.Error, "Invalid resend mail error")
+			handler.logger.Errorf("AuthHandler.ResendVerificationToken : %s (Invalid mail)", err)
 			http.Error(writer, err.Error(), http.StatusNotAcceptable)
 			return
 		} else {
 			span.SetStatus(codes.Error, "Internal server error")
+			handler.logger.Errorf("AuthHandler.ResendVerificationToken : %s", err)
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -383,10 +412,13 @@ func (handler *AuthHandler) SendRecoveryPasswordToken(writer http.ResponseWriter
 	ctx, span := handler.tracer.Start(req.Context(), "AuthHandler.SendRecoveryPasswordToken")
 	defer span.End()
 
+	handler.logger.Infoln("AuthHandler.SendRecoveryPasswordToken : SendRecoveryPassword endpoint reached")
+
 	buf := new(strings.Builder)
 	_, err := io.Copy(buf, req.Body)
 	if err != nil {
 		span.SetStatus(codes.Error, "Invalid request format error")
+		handler.logger.Errorf("AuthHandler.SendRecoveryPasswordToken : %s", err)
 		http.Error(writer, errors.InvalidRequestFormatError, http.StatusBadRequest)
 		log.Fatal(err.Error())
 		return
@@ -396,12 +428,15 @@ func (handler *AuthHandler) SendRecoveryPasswordToken(writer http.ResponseWriter
 	if err != nil {
 		switch err.Error() {
 		case "EmailServiceError":
+			handler.logger.Errorf("AuthHandler.SendRecoveryPasswordToken : %s (service send recovery failed)", err)
 			http.Error(writer, "Email service is currently unavailable. Please try again later.", http.StatusServiceUnavailable)
 			span.SetStatus(codes.Error, "Email service is currently unavailable")
 		case "UserServiceError":
+			handler.logger.Errorf("AuthHandler.SendRecoveryPasswordToken : %s (service send recovery failed)", err)
 			http.Error(writer, "User service is currently unavailable. Please try again later.", http.StatusServiceUnavailable)
 			span.SetStatus(codes.Error, "Email service is currently unavailable")
 		default:
+			handler.logger.Errorf("AuthHandler.SendRecoveryPasswordToken : %s (service send recovery failed)", err)
 			http.Error(writer, err.Error(), statusCode)
 			span.SetStatus(codes.Error, "Error")
 		}
@@ -431,6 +466,7 @@ func (handler *AuthHandler) CheckRecoveryPasswordToken(writer http.ResponseWrite
 		return
 	}
 
+	handler.logger.Errorf("AuthHandler.SendRecoveryPasswordToken : %s (recovery password sent)", err)
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -438,10 +474,13 @@ func (handler *AuthHandler) RecoverPassword(writer http.ResponseWriter, req *htt
 	ctx, span := handler.tracer.Start(req.Context(), "AuthHandler.RecoverPassword")
 	defer span.End()
 
+	handler.logger.Infoln("AuthHandler.CheckRecoveryPasswordToken : check recovery endpoint reached")
+
 	var request domain.RecoverPasswordRequest
 	err := json.NewDecoder(req.Body).Decode(&request)
 	if err != nil {
 		span.SetStatus(codes.Error, "Invalid request format error")
+		handler.logger.Errorf("AuthHandler.CheckRecoveryPasswordToken : %s", err)
 		http.Error(writer, errors.InvalidRequestFormatError, http.StatusBadRequest)
 		log.Fatal(err.Error())
 		return
@@ -460,17 +499,20 @@ func (handler *AuthHandler) RecoverPassword(writer http.ResponseWriter, req *htt
 			errorMessage = "An error occurred"
 		}
 
+		handler.logger.Errorf("AuthHandler.CheckRecoveryPasswordToken : %s (service check recovery failed)", err)
 		span.SetStatus(codes.Error, "Error")
 		http.Error(writer, errorMessage, statusCode)
 		return
 	}
-
+	handler.logger.Infoln("AuthHandler.CheckRecoveryPasswordToken : check recovery password success")
 	writer.WriteHeader(http.StatusOK)
 }
 
 func (handler *AuthHandler) ChangePassword(writer http.ResponseWriter, request *http.Request) {
 	ctx, span := handler.tracer.Start(request.Context(), "AuthHandler.ChangePassword")
 	defer span.End()
+
+	handler.logger.Infoln("AuthHandler.ChangePassword : change password endpoint reached")
 
 	var token string = request.Header.Get("Authorization")
 	bearerToken := strings.Split(token, "Bearer ")
@@ -483,6 +525,7 @@ func (handler *AuthHandler) ChangePassword(writer http.ResponseWriter, request *
 	if err != nil {
 		log.Println(err)
 		span.SetStatus(codes.Error, "Status bad request")
+		handler.logger.Errorf("AuthHandler.ChangePassword : %s", err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -504,10 +547,12 @@ func (handler *AuthHandler) ChangePassword(writer http.ResponseWriter, request *
 		}
 
 		span.SetStatus(codes.Error, "Error")
+		handler.logger.Errorf("AuthHandler.ChangePassword : %s", err)
 		http.Error(writer, errorMessage, statusCode)
 		return
 	}
 
+	handler.logger.Infoln("AuthHandler.ChangePassword : ChangePassword success")
 	writer.WriteHeader(http.StatusOK)
 
 }
@@ -515,6 +560,8 @@ func (handler *AuthHandler) ChangePassword(writer http.ResponseWriter, request *
 func (handler *AuthHandler) ChangeUsername(writer http.ResponseWriter, request *http.Request) {
 	ctx, span := handler.tracer.Start(request.Context(), "AuthHandler.ChangeUsername")
 	defer span.End()
+
+	handler.logger.Infoln("AuthHandler.ChangeUsername : change username endpoint reached")
 
 	var token string = request.Header.Get("Authorization")
 	bearerToken := strings.Split(token, "Bearer ")
@@ -527,6 +574,7 @@ func (handler *AuthHandler) ChangeUsername(writer http.ResponseWriter, request *
 	if err != nil {
 		log.Println(err)
 		span.SetStatus(codes.Error, "Status bad request")
+		handler.logger.Errorf("AuthHandler.ChangeUsername : %s", err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -550,6 +598,7 @@ func (handler *AuthHandler) ChangeUsername(writer http.ResponseWriter, request *
 		}
 
 		span.SetStatus(codes.Error, "Error")
+		handler.logger.Errorf("AuthHandler.ChangeUsername : %s", err)
 		http.Error(writer, errorMessage, statusCode)
 		return
 	}
@@ -561,10 +610,13 @@ func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request)
 	ctx, span := handler.tracer.Start(req.Context(), "AuthHandler.Login")
 	defer span.End()
 
+	handler.logger.Info("AuthHandler.Login : endpoint login reached")
+
 	var request domain.Credentials
 	err := json.NewDecoder(req.Body).Decode(&request)
 	if err != nil {
 		span.SetStatus(codes.Error, "Status bad request")
+		handler.logger.Errorf("AuthHandler.Login : %s", err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -572,10 +624,12 @@ func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request)
 	token, err := handler.service.Login(ctx, &request)
 	if err != nil {
 		if err.Error() == errors.NotVerificatedUser {
+			handler.logger.Errorf("AuthHandler.Login : %s", err)
 			http.Error(writer, token, http.StatusLocked)
 			span.SetStatus(codes.Error, "Not verification user")
 			return
 		}
+		handler.logger.Errorf("AuthHandler.Login : %s (username not exist)", err)
 		span.SetStatus(codes.Error, "Username not exist!")
 		http.Error(writer, "Username not exist!", http.StatusBadRequest)
 		return
@@ -583,10 +637,12 @@ func (handler *AuthHandler) Login(writer http.ResponseWriter, req *http.Request)
 
 	if token == "not_same" {
 		span.SetStatus(codes.Error, "Wrong password")
+		handler.logger.Errorln("AuthHandler.Login : wrong password")
 		http.Error(writer, "Wrong password", http.StatusUnauthorized)
 		return
 	}
 
+	handler.logger.Info("AuthHandler.Login : endpoint login successful")
 	writer.Write([]byte(token))
 }
 
@@ -594,10 +650,13 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 	ctx, span := handler.tracer.Start(req.Context(), "AuthHandler.DeleteUser")
 	defer span.End()
 
+	handler.logger.Info("AuthHandler.DeleteUser : endpoint delete user reached")
+
 	tokenString, err := extractTokenFromHeader(req)
 	if err != nil {
 		span.SetStatus(codes.Error, "No token found")
 		writer.WriteHeader(http.StatusBadRequest)
+		handler.logger.Errorln("AuthHandler.DeleteUser : Error no token found")
 		writer.Write([]byte("No token found"))
 		return
 	}
@@ -606,6 +665,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 	if err != nil {
 		fmt.Println("Error extracting username:", err)
 		span.SetStatus(codes.Error, "Error parsing token")
+		handler.logger.Errorln("AuthHandler.DeleteUser : Error no parsing found")
 		writer.WriteHeader(http.StatusBadRequest)
 		writer.Write([]byte("Error parsing token"))
 		return
@@ -623,6 +683,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 	if breakerErr != nil {
 		log.Println("Circuit breaker open:", breakerErr)
 		span.SetStatus(codes.Error, "Service Unavailable")
+		handler.logger.Errorf("AuthHandler.Login : Service unavailable:  %s", breakerErr)
 		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -630,6 +691,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 	if userIDErr != nil {
 		fmt.Println("Error getting userId by username:", userIDErr)
 		span.SetStatus(codes.Error, "Error getting user ID")
+		handler.logger.Errorln("AuthHandler.DeleteUser : Error getting user ID")
 		http.Error(writer, "Error getting user ID", http.StatusInternalServerError)
 		return
 	}
@@ -650,6 +712,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 		if breakerErr != nil {
 			log.Println("Circuit breaker open:", breakerErr)
 			span.SetStatus(codes.Error, "Service Unavailable")
+			handler.logger.Errorf("AuthHandler.DeleteUser : Service unavailable:  %s", breakerErr)
 			http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 			return
 		}
@@ -658,30 +721,25 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 		if !ok {
 			log.Println("Internal server error: Unexpected result type")
 			span.SetStatus(codes.Error, "Internal server error")
+			handler.logger.Errorf("AuthHandler.DeleteUser : Internal server error: Unexpected result type:  %s", err)
 			http.Error(writer, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		if hasReservations {
 			http.Error(writer, "Host has reservations, cannot delete account", http.StatusForbidden)
+			handler.logger.Errorln("AuthHandler.DeleteUser : Host has reservations, cannot delete account")
 			span.SetStatus(codes.Error, "Host has reservations, cannot delete account")
 			return
 		} else {
 			// Circuit breaker for deleting accommodations
 			deleteAccommodationsResult, breakerErr := handler.cb.Execute(func() (interface{}, error) {
 				deleteAccommodationsEndpoint := fmt.Sprintf("https://%s:%s/delete_accommodations/%s", accommodationServiceHost, accommodationServicePort, userID)
-				/*deleteAccommodationsRequest, err := http.NewRequest("DELETE", deleteAccommodationsEndpoint, nil)
-				otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(deleteAccommodationsRequest.Header))
-				deleteAccommodationsRequest.Header.Set("Authorization", "Bearer "+tokenString)
-				if err != nil {
-					span.SetStatus(codes.Error, "Error creating deleteAccommodationsRequest")
-					log.Println("Error creating deleteAccommodationsRequest:", err)
-					return nil, err
-				}*/
-
 				deleteAccommodationsResponse, err := handler.HTTPSRequest(ctx, tokenString, deleteAccommodationsEndpoint, "DELETE")
 				if err != nil {
 					span.SetStatus(codes.Error, "Error sending deleteAccommodationsRequest")
+					handler.logger.Errorf("AuthHandler.DeleteUser : Error sending deleteAccommodationsRequest:  %s", err)
+					handler.logger.Errorf("AuthHandler.DeleteUser : Service unavailable:  %s", err)
 					log.Println("Error sending deleteAccommodationsRequest:", err)
 					return nil, err
 				}
@@ -689,6 +747,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 
 				if deleteAccommodationsResponse.StatusCode != http.StatusOK {
 					span.SetStatus(codes.Error, "Error deleting accommodations")
+					handler.logger.Errorln("AuthHandler.DeleteUser : Error deleting accommodations")
 					log.Println("Error deleting accommodations:", deleteAccommodationsResponse.Status)
 					return nil, fmt.Errorf("Error deleting accommodations: %s", err)
 
@@ -700,12 +759,14 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 			if breakerErr != nil {
 				log.Println("Circuit breaker open:", breakerErr)
 				span.SetStatus(codes.Error, "Service Unavailable")
+				handler.logger.Errorf("AuthHandler.DeleteUser : Service unavailable:  %s", breakerErr)
 				http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 				return
 			}
 
 			if _, ok := deleteAccommodationsResult.(error); ok {
 				http.Error(writer, "Error deleting accommodations", http.StatusInternalServerError)
+				handler.logger.Errorln("AuthHandler.DeleteUser : Error deleting accommodations")
 				span.SetStatus(codes.Error, "Error deleting accommodations")
 				return
 			}
@@ -718,6 +779,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 
 		if breakerErr != nil {
 			log.Println("Circuit breaker open:", breakerErr)
+			handler.logger.Errorf("AuthHandler.DeleteUser : Circuit breaker open:  %s", breakerErr)
 			span.SetStatus(codes.Error, "Service Unavailable")
 			http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 			return
@@ -727,6 +789,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 		if !ok {
 			log.Println("Internal server error: Unexpected result type")
 			span.SetStatus(codes.Error, "Internal server error")
+			handler.logger.Errorln("AuthHandler.DeleteUser : Internal server error: Unexpected result type")
 			http.Error(writer, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -734,6 +797,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 
 	if hasReservations {
 		http.Error(writer, "User has reservations, cannot delete account", http.StatusForbidden)
+		handler.logger.Errorln("AuthHandler.DeleteUser : User has reservations, cannot delete account")
 		span.SetStatus(codes.Error, "User has reservations, cannot delete account")
 		return
 	}
@@ -746,6 +810,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 	if breakerErr != nil {
 		log.Println("Circuit breaker open:", breakerErr)
 		span.SetStatus(codes.Error, "Service Unavailable")
+		handler.logger.Errorf("AuthHandler.DeleteUser : Circuit breaker open:  %s", breakerErr)
 		http.Error(writer, "Service Unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -753,6 +818,7 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 	if _, ok := deleteUserErrResult.(error); ok {
 		log.Println("User not found in user service")
 		http.Error(writer, "User not found", http.StatusNotFound)
+		handler.logger.Errorln("AuthHandler.DeleteUser : User not found in user service")
 		span.SetStatus(codes.Error, "User not found in user service")
 		return
 	}
@@ -771,10 +837,12 @@ func (handler *AuthHandler) DeleteUser(writer http.ResponseWriter, req *http.Req
 		}
 
 		span.SetStatus(codes.Error, "Error")
+		handler.logger.Errorf("AuthHandler.DeleteUser : %s", err)
 		http.Error(writer, errorMessage, statusCode)
 		return
 	}
 
+	handler.logger.Info("AuthHandler.DeleteUser : endpoint delete successful")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -782,21 +850,13 @@ func (handler *AuthHandler) hasHostReservations(ctx context.Context, userID stri
 	ctx, span := handler.tracer.Start(ctx, "AuthHandler.hasHostReservations")
 	defer span.End()
 
+	handler.logger.Info("AuthHandler.hasHostReservations : endpoint hasHostReservations reached")
+
 	reservationEndpoint := fmt.Sprintf("https://%s:%s/reservationsByHost/%s", reservationServiceHost, reservationServicePort, userID)
-
-	/*reservationRequest, err := http.NewRequest("GET", reservationEndpoint, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest.Header))
-	if err != nil {
-		log.Println("Error creating reservation request:", err)
-		span.SetStatus(codes.Error, "Error creating reservation request")
-		return false, err
-	}
-
-	reservationRequest.Header.Set("Authorization", "Bearer "+authToken)*/
-
 	reservationResponse, err := handler.HTTPSRequest(ctx, authToken, reservationEndpoint, "GET")
 	if err != nil {
 		log.Println("Error sending reservation request:", err)
+		handler.logger.Errorf("AuthHandler.hasHostReservations : Error sending reservation request:  %s", err)
 		span.SetStatus(codes.Error, "Error sending reservation request")
 		return false, err
 	}
@@ -804,6 +864,7 @@ func (handler *AuthHandler) hasHostReservations(ctx context.Context, userID stri
 	if reservationResponse.StatusCode != http.StatusOK {
 		log.Println(reservationResponse.StatusCode, reservationResponse)
 		log.Printf("Error getting host reservations. Status code: %d\n", reservationResponse.StatusCode)
+		handler.logger.Errorln("AuthHandler.hasHostReservations : Error getting host reservations")
 		span.SetStatus(codes.Error, "Error getting host reservations")
 		return false, nil
 	}
@@ -815,10 +876,12 @@ func (handler *AuthHandler) hasHostReservations(ctx context.Context, userID stri
 	err = json.NewDecoder(reservationResponse.Body).Decode(&hasReservations)
 	if err != nil {
 		log.Println("Error decoding reservation response:", err)
+		handler.logger.Errorln("AuthHandler.hasHostReservations : Error decoding reservation response")
 		span.SetStatus(codes.Error, "Error decoding reservation response")
 		return false, err
 	}
 
+	handler.logger.Info("AuthHandler.hasHostReservations : endpoint hasHostReservations successful")
 	return hasReservations, nil
 }
 
@@ -826,26 +889,19 @@ func (handler *AuthHandler) hasGuestReservations(ctx context.Context, authToken 
 	ctx, span := handler.tracer.Start(ctx, "AuthHandler.hasGuestReservations")
 	defer span.End()
 
+	handler.logger.Info("AuthHandler.hasGuestReservations : endpoint hasGuestReservations reached")
+
 	reservationEndpoint := fmt.Sprintf("https://%s:%s/reservationsByUser", reservationServiceHost, reservationServicePort)
-
-	/*reservationRequest, err := http.NewRequest("GET", reservationEndpoint, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reservationRequest.Header))
-	if err != nil {
-		log.Println("Error creating reservation request:", err)
-		span.SetStatus(codes.Error, "Error creating reservation request")
-		return false, err
-	}
-
-	reservationRequest.Header.Set("Authorization", "Bearer "+authToken)*/
-
 	reservationResponse, err := handler.HTTPSRequest(ctx, authToken, reservationEndpoint, "GET")
 	if err != nil {
 		log.Println("Error sending reservation request:", err)
+		handler.logger.Errorf("AuthHandler.hasGuestReservations : Error sending reservation request:  %s", err)
 		span.SetStatus(codes.Error, "Error sending reservation request")
 		return false, err
 	}
 
 	if reservationResponse.StatusCode != http.StatusOK {
+		handler.logger.Errorln("AuthHandler.hasGuestReservations : Error getting guest reservations")
 		log.Printf("Error getting guest reservations. Status code: %d\n", reservationResponse.StatusCode)
 		span.SetStatus(codes.Error, "Error getting guest reservations")
 		return false, err
@@ -854,6 +910,7 @@ func (handler *AuthHandler) hasGuestReservations(ctx context.Context, authToken 
 	body, err := ioutil.ReadAll(reservationResponse.Body)
 	if err != nil {
 		log.Println("Error reading response body:", err)
+		handler.logger.Errorln("AuthHandler.hasGuestReservations : Error reading response body")
 		span.SetStatus(codes.Error, "Error reading response body")
 		return false, err
 	}
@@ -863,6 +920,7 @@ func (handler *AuthHandler) hasGuestReservations(ctx context.Context, authToken 
 	}
 
 	defer reservationResponse.Body.Close()
+	handler.logger.Info("AuthHandler.hasGuestReservations : endpoint hasGuestReservations successful")
 	return true, nil
 }
 
@@ -870,21 +928,13 @@ func (handler *AuthHandler) getUserIDByUsername(ctx context.Context, username st
 	ctx, span := handler.tracer.Start(ctx, "AuthHandler.getUserIDByUsername")
 	defer span.End()
 
+	handler.logger.Info("AuthHandler.getUserIDByUsername : endpoint getUserIDByUsername reached")
+
 	userserviceEndpoint := fmt.Sprintf("https://%s:%s/getId/%s", userServiceHost, userServicePort, username)
-
-	/*userserviceRequest, err := http.NewRequest("GET", userserviceEndpoint, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userserviceRequest.Header))
-	if err != nil {
-		log.Println("Error creating user request:", err)
-		span.SetStatus(codes.Error, "Error creating user request")
-		return "", err
-	}
-
-	userserviceRequest.Header.Set("Authorization", "Bearer "+authToken)*/
-
 	userserviceResponse, err := handler.HTTPSRequest(ctx, authToken, userserviceEndpoint, "GET")
 	if err != nil {
 		log.Println("Error sending user request:", err)
+		handler.logger.Errorf("AuthHandler.getUserIDByUsername : Error sending user request:  %s", err)
 		span.SetStatus(codes.Error, "Error sending user request")
 		return "", err
 	}
@@ -892,6 +942,7 @@ func (handler *AuthHandler) getUserIDByUsername(ctx context.Context, username st
 	defer userserviceResponse.Body.Close()
 
 	if userserviceResponse.StatusCode != http.StatusOK {
+		handler.logger.Errorln("AuthHandler.getUserIDByUsername : Error getting user ID")
 		log.Printf("Error getting user ID. Status code: %d\n", userserviceResponse.StatusCode)
 		span.SetStatus(codes.Error, "Error getting user ID")
 		return "", err
@@ -902,10 +953,12 @@ func (handler *AuthHandler) getUserIDByUsername(ctx context.Context, username st
 	err = json.NewDecoder(userserviceResponse.Body).Decode(&userID)
 	if err != nil {
 		log.Println("Error decoding user ID response:", err)
+		handler.logger.Errorln("AuthHandler.getUserIDByUsername : Error decoding user ID")
 		span.SetStatus(codes.Error, "Error decoding user ID response")
 		return "", err
 	}
 
+	handler.logger.Info("AuthHandler.getUserIDByUsername : endpoint getUserIDByUsername successful")
 	return userID, nil
 }
 
@@ -913,21 +966,13 @@ func (handler *AuthHandler) userServiceDeleteUser(ctx context.Context, userID st
 	ctx, span := handler.tracer.Start(ctx, "AuthHandler.userServiceDeleteUser")
 	defer span.End()
 
+	handler.logger.Info("AuthHandler.userServiceDeleteUser : endpoint userServiceDeleteUser reached")
+
 	userserviceEndpoint := fmt.Sprintf("https://%s:%s/%s/delete", userServiceHost, userServicePort, userID)
-
-	/*userserviceRequest, err := http.NewRequest("DELETE", userserviceEndpoint, nil)
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(userserviceRequest.Header))
-	if err != nil {
-		log.Println("Error creating user request:", err)
-		span.SetStatus(codes.Error, "Error creating user request")
-		return err
-	}
-
-	userserviceRequest.Header.Set("Authorization", "Bearer "+authToken)*/
-
 	userserviceResponse, err := handler.HTTPSRequest(ctx, authToken, userserviceEndpoint, "DELETE")
 	if err != nil {
 		log.Println("Error sending user request:", err)
+		handler.logger.Errorf("AuthHandler.userServiceDeleteUser : Error sending user request:  %s", err)
 		span.SetStatus(codes.Error, "Error sending user request")
 		return err
 	}
@@ -936,10 +981,12 @@ func (handler *AuthHandler) userServiceDeleteUser(ctx context.Context, userID st
 
 	if userserviceResponse.StatusCode != http.StatusOK {
 		log.Printf("Error deleting user. Status code: %d\n", userserviceResponse.StatusCode)
+		handler.logger.Errorln("AuthHandler.userServiceDeleteUser : Error deleting user")
 		span.SetStatus(codes.Error, "Error deleting user.")
 		return err
 	}
 
+	handler.logger.Info("AuthHandler.userServiceDeleteUser : endpoint userServiceDeleteUser successful")
 	return nil
 }
 

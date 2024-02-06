@@ -6,6 +6,7 @@ import (
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.opentelemetry.io/otel"
@@ -25,21 +26,21 @@ import (
 )
 
 var (
-	jwtKey                 = []byte(os.Getenv("SECRET_KEY"))
-	verifier, _            = jwt.NewVerifierHS(jwt.HS256, jwtKey)
-	reservationServiceHost = os.Getenv("RESERVATIONS_SERVICE_HOST")
-	reservationServicePort = os.Getenv("RESERVATIONS_SERVICE_PORT")
+	jwtKey      = []byte(os.Getenv("SECRET_KEY"))
+	verifier, _ = jwt.NewVerifierHS(jwt.HS256, jwtKey)
 )
 
 type UserHandler struct {
 	service *application.UserService
 	tracer  trace.Tracer
+	logger  *logrus.Logger
 }
 
-func NewUserHandler(service *application.UserService, tracer trace.Tracer) *UserHandler {
+func NewUserHandler(service *application.UserService, tracer trace.Tracer, logger *logrus.Logger) *UserHandler {
 	return &UserHandler{
 		service: service,
 		tracer:  tracer,
+		logger:  logger,
 	}
 }
 
@@ -128,16 +129,20 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.Register")
 	defer span.End()
 
+	handler.logger.Infoln("UserHandler.Register : Register endpoint reached")
+
 	var user domain.User
 	err := json.NewDecoder(req.Body).Decode(&user)
 	if err != nil {
 		log.Println(err)
+		handler.logger.Errorf("UserHandler.Register : Status bad request")
 		span.SetStatus(codes.Error, "Status bad request")
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if err := validateUser(&user); err != nil {
+		handler.logger.Errorf("UserHandler.Register : Error validating user")
 		http.Error(writer, err.Message, http.StatusBadRequest)
 		return
 	}
@@ -145,9 +150,11 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 	saved, err := handler.service.Register(ctx, &user)
 	if err != nil {
 		if err.Error() == errors.DatabaseError {
+			handler.logger.Errorf("UserHandler.Register : Internal server error")
 			span.SetStatus(codes.Error, "Internal server error")
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		} else {
+			handler.logger.Errorf("UserHandler.Register : Status bad request")
 			span.SetStatus(codes.Error, "Status bad request")
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 		}
@@ -155,6 +162,7 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 	}
 	newUser, err := json.Marshal(saved)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.Register : Internal server error")
 		span.SetStatus(codes.Error, "Internal server error")
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
@@ -162,15 +170,20 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 	writer.WriteHeader(200)
 	jsonResponse(newUser, writer)
 
+	handler.logger.Infoln("UserHandler.Register : Registration success")
+
 }
 
 func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Request) {
 	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.UpdateUser")
 	defer span.End()
 
+	handler.logger.Infoln("UserHandler.UpdateUser : UpdateUser endpoint reached")
+
 	vars := mux.Vars(req)
 	userID, err := primitive.ObjectIDFromHex(vars["userID"])
 	if err != nil {
+		handler.logger.Errorf("UserHandler.UpdateUser : Invalid user ID")
 		span.SetStatus(codes.Error, "Invalid user ID")
 		http.Error(writer, "Invalid user ID", http.StatusBadRequest)
 		return
@@ -178,6 +191,7 @@ func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Req
 
 	existingUser, err := handler.service.Get(ctx, userID)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.UpdateUser : User not found")
 		span.SetStatus(codes.Error, "User not found")
 		http.Error(writer, "User not found", http.StatusBadRequest)
 		return
@@ -185,18 +199,21 @@ func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Req
 
 	var updatePayload map[string]interface{}
 	if err := json.NewDecoder(req.Body).Decode(&updatePayload); err != nil {
+		handler.logger.Errorf("UserHandler.UpdateUser : Status bad request")
 		span.SetStatus(codes.Error, "Status bad request")
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if err := validateUserFields(updatePayload); err != nil {
+		handler.logger.Errorf("UserHandler.UpdateUser :Error validating user")
 		http.Error(writer, err.Message, http.StatusBadRequest)
 		return
 	}
 
 	if newEmail, ok := updatePayload["email"].(string); ok && newEmail != existingUser.Email {
 		if _, err := handler.service.DoesEmailExist(ctx, newEmail); err == nil {
+			handler.logger.Errorf("UserHandler.UpdateUser : Updated email already exists")
 			http.Error(writer, "Updated email already exists", http.StatusMethodNotAllowed)
 			span.SetStatus(codes.Error, "Updated email already exists")
 			return
@@ -211,6 +228,7 @@ func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Req
 	}
 
 	if err := mapstructure.Decode(updatePayload, &existingUser); err != nil {
+		handler.logger.Errorf("UserHandler.UpdateUser : Internal server error")
 		span.SetStatus(codes.Error, "Internal server error")
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
@@ -218,11 +236,13 @@ func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Req
 
 	updatedUser, err := handler.service.UpdateUser(ctx, existingUser)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.UpdateUser : Internal server error")
 		span.SetStatus(codes.Error, "Internal server error")
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	handler.logger.Infoln("UserHandler.UpdateUser : UpdateUser success")
 	jsonResponse(updatedUser, writer)
 }
 
@@ -279,10 +299,13 @@ func (handler *UserHandler) ChangeUsername(writer http.ResponseWriter, request *
 	ctx, span := handler.tracer.Start(request.Context(), "UserHandler.ChangeUsername")
 	defer span.End()
 
+	handler.logger.Infoln("UserHandler.ChangeUsername : ChangeUsername endpoint reached")
+
 	var username domain.UsernameChange
 	err := json.NewDecoder(request.Body).Decode(&username)
 	if err != nil {
 		log.Println(err)
+		handler.logger.Errorf("UserHandler.ChangeUsername : Status bad request")
 		span.SetStatus(codes.Error, "Status bad request")
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
@@ -291,6 +314,7 @@ func (handler *UserHandler) ChangeUsername(writer http.ResponseWriter, request *
 	status, statusCode, err := handler.service.ChangeUsername(ctx, username)
 
 	if err != nil {
+		handler.logger.Errorf("UserHandler.ChangeUsername : Error in ChangeUsername %s", err)
 		span.SetStatus(codes.Error, err.Error())
 		log.Println("Error in ChangeUsername:", err)
 		var errorMessage string
@@ -304,11 +328,13 @@ func (handler *UserHandler) ChangeUsername(writer http.ResponseWriter, request *
 			errorMessage = "An error occurred: " + err.Error()
 		}
 
+		handler.logger.Errorf("UserHandler.ChangeUsername : Error %s ", err)
 		span.SetStatus(codes.Error, "Error")
 		http.Error(writer, errorMessage, statusCode)
 		return
 	}
 
+	handler.logger.Infoln("UserHandler.ChangeUsername : ChangeUsername success")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -316,8 +342,11 @@ func (handler *UserHandler) GetAll(writer http.ResponseWriter, req *http.Request
 	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.GetAll")
 	defer span.End()
 
+	handler.logger.Infoln("UserHandler.GetAll : GetAll endpoint reached")
+
 	users, err := handler.service.GetAll(ctx)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.ChangeUsername : Error %s ", err)
 		span.SetStatus(codes.Error, "Internal server error")
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
@@ -329,15 +358,19 @@ func (handler *UserHandler) Get(writer http.ResponseWriter, req *http.Request) {
 	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.Get")
 	defer span.End()
 
+	handler.logger.Infoln("UserHandler.Get : Get endpoint reached")
+
 	vars := mux.Vars(req)
 	id, ok := vars["id"]
 	if !ok {
+		handler.logger.Errorf("UserHandler.Get : Status bad request")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.Get : Error %s ", err)
 		span.SetStatus(codes.Error, "Status bad request")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
@@ -345,6 +378,7 @@ func (handler *UserHandler) Get(writer http.ResponseWriter, req *http.Request) {
 
 	user, err := handler.service.Get(ctx, objectID)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.Get : Error %s ", err)
 		span.SetStatus(codes.Error, "Status not found")
 		writer.WriteHeader(http.StatusNotFound)
 		return
@@ -356,12 +390,15 @@ func (handler *UserHandler) GetOne(writer http.ResponseWriter, request *http.Req
 	ctx, span := handler.tracer.Start(request.Context(), "UserHandler.GetOne")
 	defer span.End()
 
+	handler.logger.Infoln("UserHandler.GetOne : GetOne endpoint reached")
+
 	vars := mux.Vars(request)
 	username := vars["username"]
 
 	user, err := handler.service.GetOneUser(ctx, username)
 	if err != nil {
 		log.Println(err)
+		handler.logger.Errorf("UserHandler.GetOneUser : Error %s ", err)
 		span.SetStatus(codes.Error, "Status not found")
 		writer.WriteHeader(http.StatusNotFound)
 	}
@@ -372,12 +409,15 @@ func (handler *UserHandler) GetId(writer http.ResponseWriter, request *http.Requ
 	ctx, span := handler.tracer.Start(request.Context(), "UserHandler.GetId")
 	defer span.End()
 
+	handler.logger.Infoln("UserHandler.GetId : GetId endpoint reached")
+
 	vars := mux.Vars(request)
 	username := vars["username"]
 
 	userId, err := handler.service.GetOneUserId(ctx, username)
 	if err != nil {
 		log.Println(err)
+		handler.logger.Errorf("UserHandler.GetId : Error %s ", err)
 		span.SetStatus(codes.Error, "Status not found")
 		writer.WriteHeader(http.StatusNotFound)
 	}
@@ -388,6 +428,8 @@ func (handler *UserHandler) IsHighlighted(writer http.ResponseWriter, req *http.
 	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.IsHighlighted")
 	defer span.End()
 
+	handler.logger.Infoln("UserHandler.IsHighlighted : IsHighlighted endpoint reached")
+
 	vars := mux.Vars(req)
 	userID := vars["id"]
 
@@ -395,6 +437,7 @@ func (handler *UserHandler) IsHighlighted(writer http.ResponseWriter, req *http.
 	authToken := extractBearerToken(authHeader)
 
 	if authToken == "" {
+		handler.logger.Errorf("UserHandler.IsHighlighted : Host ID or Auth Token missing in headers")
 		span.SetStatus(codes.Error, "Host ID or Auth Token missing in headers")
 		http.Error(writer, "Host ID or Auth Token missing in headers", http.StatusUnauthorized)
 		return
@@ -402,6 +445,7 @@ func (handler *UserHandler) IsHighlighted(writer http.ResponseWriter, req *http.
 
 	isHighlighted, err := handler.service.IsHighlighted(ctx, userID, authToken)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.IsHighlighted : Error checking if host is highlighted  %s ", err)
 		span.SetStatus(codes.Error, "Error checking if host is highlighted")
 		http.Error(writer, "Error checking if host is highlighted", http.StatusInternalServerError)
 		return
@@ -414,20 +458,25 @@ func (handler *UserHandler) DeleteAccount(writer http.ResponseWriter, req *http.
 	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.DeleteAccount")
 	defer span.End()
 
+	handler.logger.Infoln("UserHandler.DeleteAccount : DeleteAccount endpoint reached")
+
 	vars := mux.Vars(req)
 	userID, err := primitive.ObjectIDFromHex(vars["id"])
 	if err != nil {
+		handler.logger.Errorf("UserHandler.DeleteAccount : Invalid user ID  %s ", err)
 		span.SetStatus(codes.Error, "Invalid user ID")
 		http.Error(writer, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
 	err = handler.service.DeleteAccount(ctx, userID)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.DeleteAccount : Error deleting account  %s ", err)
 		span.SetStatus(codes.Error, "Error deleting account")
 		http.Error(writer, "Error deleting account", http.StatusInternalServerError)
 		return
 	}
 
+	handler.logger.Infoln("UserHandler.DeleteAccount : DeleteAccount success")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -444,8 +493,11 @@ func (handler *UserHandler) Profile(writer http.ResponseWriter, req *http.Reques
 	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.Profile")
 	defer span.End()
 
+	handler.logger.Infoln("UserHandler.Profile : Profile endpoint reached")
+
 	bearer := req.Header.Get("Authorization")
 	if bearer == "" {
+		handler.logger.Errorf("UserHandler.Profile : Authorization header missing")
 		log.Println("Authorization header missing")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -453,6 +505,7 @@ func (handler *UserHandler) Profile(writer http.ResponseWriter, req *http.Reques
 
 	bearerToken := strings.Split(bearer, "Bearer ")
 	if len(bearerToken) != 2 {
+		handler.logger.Errorf("UserHandler.Profile : Malformed Authorization header")
 		log.Println("Malformed Authorization header")
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -463,6 +516,7 @@ func (handler *UserHandler) Profile(writer http.ResponseWriter, req *http.Reques
 
 	token, err := jwt.Parse([]byte(tokenString), verifier)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.Profile : Token parsing error")
 		span.SetStatus(codes.Error, "Token parsing error")
 		log.Println("Token parsing error:", err)
 		http.Error(writer, "Unauthorized", http.StatusUnauthorized)
@@ -475,6 +529,7 @@ func (handler *UserHandler) Profile(writer http.ResponseWriter, req *http.Reques
 
 	user, err := handler.service.GetOneUser(ctx, username)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.Profile : User not found")
 		span.SetStatus(codes.Error, "User not found")
 		log.Println("GetOneUser error:", err)
 		http.Error(writer, "User not found", http.StatusNotFound)
@@ -488,15 +543,19 @@ func (handler *UserHandler) MailExist(writer http.ResponseWriter, req *http.Requ
 	ctx, span := handler.tracer.Start(req.Context(), "UserHandler.MailExist")
 	defer span.End()
 
+	handler.logger.Infoln("UserHandler.MailExist : Profile endpoint reached")
+
 	vars := mux.Vars(req)
 	mail, ok := vars["mail"]
 	if !ok {
+		handler.logger.Errorf("UserHandler.MailExist : StatusBadRequest")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	id, err := handler.service.DoesEmailExist(ctx, mail)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.MailExist : Mail not found")
 		span.SetStatus(codes.Error, "Mail not found")
 		writer.WriteHeader(http.StatusNotFound)
 		return
@@ -504,6 +563,7 @@ func (handler *UserHandler) MailExist(writer http.ResponseWriter, req *http.Requ
 
 	_, err = writer.Write([]byte(id))
 	if err != nil {
+		handler.logger.Errorf("UserHandler.MailExist : Error in response user service")
 		span.SetStatus(codes.Error, "Error in response user service")
 		log.Println("error in response user service")
 		log.Println(err.Error())

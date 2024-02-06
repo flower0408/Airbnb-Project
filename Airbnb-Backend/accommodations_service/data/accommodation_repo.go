@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -28,7 +29,7 @@ import (
 
 type AccommodationRepo struct {
 	cli    *mongo.Client
-	logger *log.Logger
+	logger *logrus.Logger
 	client *http.Client
 	tracer trace.Tracer
 }
@@ -40,7 +41,7 @@ var (
 	usersServicePort       = os.Getenv("USER_SERVICE_PORT")
 )
 
-func New(ctx context.Context, logger *log.Logger, tracer trace.Tracer) (*AccommodationRepo, error) {
+func New(ctx context.Context, logger *logrus.Logger, tracer trace.Tracer) (*AccommodationRepo, error) {
 	dburi := fmt.Sprintf("mongodb://%s:%s/", os.Getenv("ACCOMMODATIONS_DB_HOST"), os.Getenv("ACCOMMODATIONS_DB_PORT"))
 
 	client, err := mongo.NewClient(options.Client().ApplyURI(dburi))
@@ -102,22 +103,27 @@ func (rr *AccommodationRepo) InsertAccommodation(ctx context.Context, accommodat
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.InsertAccommodation")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.InsertAccommodation : reached InsertAccommodation in repo")
+
 	accommodationCollection := rr.getCollection(ctx)
 
 	result, err := accommodationCollection.InsertOne(ctx, accommodation)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.InsertAccommodation.InsertOne() : %s", err)
 		span.SetStatus(codes.Error, err.Error())
-		rr.logger.Println(err)
 		return "", err
 	}
 
 	insertedID, ok := result.InsertedID.(primitive.ObjectID)
 	if !ok {
+		rr.logger.Errorf("AccommodationRepo.InsertAccommodation Failed to convert InsertedID")
 		span.AddEvent("Failed to convert InsertedID to ObjectID")
-		rr.logger.Println("Failed to convert InsertedID to ObjectID")
 		return "", errors.New("Failed to convert InsertedID")
 	}
 
+	rr.logger.Infof("AccommodationRepo.InsertAccommodation : Data of created accommodation: %+v", accommodation)
+
+	rr.logger.Infoln("AccommodationRepo.InsertAccommodation : InsertAccommodation success")
 	return insertedID.Hex(), nil
 }
 
@@ -125,15 +131,20 @@ func (rr *AccommodationRepo) InsertRateForAccommodation(ctx context.Context, rat
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.InsertRateForAccommodation")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.InsertRateForAccommodation : reached InsertRateForAccommodation in repo")
+
 	rateCollection := rr.getRateCollection(ctx)
 
 	_, err := rateCollection.InsertOne(ctx, rate)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.InsertRateForAccommodation.InsertOne() : Error insert rate for accommodation")
 		span.SetStatus(codes.Error, "Error insert rate for accommodation")
-		rr.logger.Println(err)
 		return "", err
 	}
 
+	rr.logger.Infof("AccommodationRepo.InsertRateForAccommodation : Data of created rate: %+v", rate)
+
+	rr.logger.Infoln("AccommodationRepo.InsertRateForAccommodation : InsertRateForAccommodation success")
 	return "", nil
 }
 
@@ -141,24 +152,28 @@ func (rr *AccommodationRepo) InsertRateForHost(ctx context.Context, rate *Rate, 
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.InsertRateForHost")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.InsertRateForHost : reached InsertRateForHost in repo")
+
 	rateCollection := rr.getRateCollection(ctx)
 
 	_, err := rateCollection.InsertOne(ctx, rate)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.InsertRateForHost.InsertOne : Error insert rate for host")
 		span.SetStatus(codes.Error, "Error insert rate for host")
-		rr.logger.Println(err)
 		return "", err
 	}
 
 	usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, rate.ForHostId)
 	usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.InsertRateForHost.InsertOne : Error sending users request")
 		span.SetStatus(codes.Error, "Error sending users request")
 		fmt.Println("Error sending users request:", err)
 		return "Error sending users request:", err
 	}
 
 	if usersResponse.StatusCode != http.StatusOK {
+		rr.logger.Errorf("AccommodationRepo.InsertRateForHost.InsertOne : Users service returned an error")
 		span.SetStatus(codes.Error, "Users service returned an error")
 		fmt.Println("Users service returned an error:", usersResponse.Status)
 		return "Users service returned an error:", errors.New("Users service returned an error")
@@ -169,6 +184,7 @@ func (rr *AccommodationRepo) InsertRateForHost(ctx context.Context, rate *Rate, 
 	//err = responseToType(accommodationResponse.Body, accommodations)
 	err = json.NewDecoder(usersResponse.Body).Decode(&response2)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.InsertRateForHost.InsertOne : Error decoding users response")
 		span.SetStatus(codes.Error, "Error decoding users response")
 		fmt.Println("Error decoding users response:", err)
 		return "Error decoding users response:", err
@@ -176,6 +192,9 @@ func (rr *AccommodationRepo) InsertRateForHost(ctx context.Context, rate *Rate, 
 
 	defer usersResponse.Body.Close()
 
+	rr.logger.Infof("AccommodationRepo.InsertRateForHost : Data of created rate: %+v", rate)
+
+	rr.logger.Infoln("AccommodationRepo.InsertRateForHost : InsertRateForHost success")
 	return "", nil
 }
 
@@ -183,10 +202,12 @@ func (rr *AccommodationRepo) DeleteRateForHost(ctx context.Context, rateID strin
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.DeleteRateForHost")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.DeleteRateForHost : reached DeleteRateForHost in repo")
+
 	objID, err := primitive.ObjectIDFromHex(rateID)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.DeleteRateForHost.ObjectIDFromHex() : Error decoding users response")
 		span.SetStatus(codes.Error, err.Error())
-		rr.logger.Println(err)
 		return err
 	}
 
@@ -197,27 +218,29 @@ func (rr *AccommodationRepo) DeleteRateForHost(ctx context.Context, rateID strin
 	var rate Rate
 	err = rateCollection.FindOne(ctx, filter).Decode(&rate)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.DeleteRateForHost : Error finding rate")
 		span.SetStatus(codes.Error, "Error finding rate")
-		rr.logger.Println(err)
 		return err
 	}
 
 	_, err2 := rateCollection.DeleteOne(ctx, filter)
 	if err2 != nil {
+		rr.logger.Errorf("AccommodationRepo.DeleteRateForHost : Error delete rate")
 		span.SetStatus(codes.Error, "Error delete rate")
-		rr.logger.Println(err2)
 		return err2
 	}
 
 	usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, rate.ForHostId)
 	usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.DeleteRateForHost : Error sending users request")
 		span.SetStatus(codes.Error, "Error sending users request")
 		fmt.Println("Error sending users request:", err)
 		return err
 	}
 
 	if usersResponse.StatusCode != http.StatusOK {
+		rr.logger.Errorf("AccommodationRepo.DeleteRateForHost : Users service returned an error")
 		span.SetStatus(codes.Error, "Users service returned an error")
 		fmt.Println("Users service returned an error:", usersResponse.Status)
 		return errors.New("Users service returned an error")
@@ -228,6 +251,7 @@ func (rr *AccommodationRepo) DeleteRateForHost(ctx context.Context, rateID strin
 	//err = responseToType(accommodationResponse.Body, accommodations)
 	err = json.NewDecoder(usersResponse.Body).Decode(&response2)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.DeleteRateForHost : Error decoding users response")
 		span.SetStatus(codes.Error, "Error decoding users response")
 		fmt.Println("Error decoding users response:", err)
 		return err
@@ -235,14 +259,20 @@ func (rr *AccommodationRepo) DeleteRateForHost(ctx context.Context, rateID strin
 
 	defer usersResponse.Body.Close()
 
+	rr.logger.Infof("AccommodationRepo.DeleteRateForHost : Data of deleted rate: %+v", rate)
+
+	rr.logger.Infoln("AccommodationRepo.DeleteRateForHost : DeleteRateForHost success")
 	return nil
 }
 func (rr *AccommodationRepo) UpdateRateForHost(ctx context.Context, rateID string, rate *Rate, authToken string) error {
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.UpdateRateForHost")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.UpdateRateForHost : reached UpdateRateForHost in repo")
+
 	rateId, err := primitive.ObjectIDFromHex(rateID)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.UpdateRateForHost : Error converting ID to ObjectID")
 		span.SetStatus(codes.Error, "Error converting ID to ObjectID")
 		fmt.Println("Error converting ID to ObjectID:", err)
 		return err
@@ -253,12 +283,14 @@ func (rr *AccommodationRepo) UpdateRateForHost(ctx context.Context, rateID strin
 	var foundRate Rate
 	err = rr.getRateCollection(ctx).FindOne(ctx, filter).Decode(&foundRate)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.UpdateRateForHost : Error finding rate by ID")
 		span.SetStatus(codes.Error, "Error finding rate by ID")
 		fmt.Println("Error finding rate by ID:", err)
 		return err
 	}
 
 	if rate.Rate <= 0 || rate.Rate > 5 {
+		rr.logger.Errorf("AccommodationRepo.UpdateRateForHost : Invalid rate value")
 		span.SetStatus(codes.Error, "Invalid rate value")
 		return fmt.Errorf("Invalid rate value: %v. Rate must be between 0 and 5", rate.Rate)
 	}
@@ -268,8 +300,8 @@ func (rr *AccommodationRepo) UpdateRateForHost(ctx context.Context, rateID strin
 	result, err := rr.getRateCollection(ctx).UpdateOne(ctx, filter, update)
 
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.UpdateRateForHost : Error updating rate")
 		span.SetStatus(codes.Error, "Error updating rate")
-		rr.logger.Println("Error updating rate:", err)
 		return err
 	}
 
@@ -279,12 +311,14 @@ func (rr *AccommodationRepo) UpdateRateForHost(ctx context.Context, rateID strin
 	usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, foundRate.ForHostId)
 	usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.UpdateRateForHost : Error sending users request")
 		span.SetStatus(codes.Error, "Error sending users request")
 		fmt.Println("Error sending users request:", err)
 		return err
 	}
 
 	if usersResponse.StatusCode != http.StatusOK {
+		rr.logger.Errorf("AccommodationRepo.UpdateRateForHost : Error decoding users response")
 		span.SetStatus(codes.Error, "Users service returned an error")
 		fmt.Println("Users service returned an error:", usersResponse.Status)
 		return errors.New("Users service returned an error")
@@ -295,12 +329,16 @@ func (rr *AccommodationRepo) UpdateRateForHost(ctx context.Context, rateID strin
 	//err = responseToType(accommodationResponse.Body, accommodations)
 	err = json.NewDecoder(usersResponse.Body).Decode(&response2)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.UpdateRateForHost : Error decoding users response")
 		span.SetStatus(codes.Error, "Error decoding users response")
 		fmt.Println("Error decoding users response:", err)
 		return err
 	}
 
 	defer usersResponse.Body.Close()
+	rr.logger.Infof("AccommodationRepo.UpdateRateForHost : Data of updated rate: %+v", rate)
+
+	rr.logger.Infoln("AccommodationRepo.UpdateRateForHost : UpdateRateForHost success")
 
 	return nil
 }
@@ -327,6 +365,8 @@ func (rr *AccommodationRepo) GetAll(ctx context.Context) ([]*Accommodation, erro
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.GetAll")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.GetAll : reached GetAll in repo")
+
 	filter := bson.D{{}}
 	return rr.filter(ctx, filter)
 }
@@ -334,6 +374,8 @@ func (rr *AccommodationRepo) GetAll(ctx context.Context) ([]*Accommodation, erro
 func (rr *AccommodationRepo) GetAllRate(ctx context.Context) ([]*Rate, error) {
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.GetAllRate")
 	defer span.End()
+
+	rr.logger.Infoln("AccommodationRepo.GetAllRate : reached GetAllRate in repo")
 
 	filter := bson.D{{}}
 	return rr.filterRate(ctx, filter)
@@ -343,6 +385,8 @@ func (rr *AccommodationRepo) GetRateById(ctx context.Context, id primitive.Objec
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.GetRateById")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.GetRateById : reached GetRateById in repo")
+
 	filter := bson.D{{"_id", id}}
 	return rr.getRateByFilter(ctx, filter)
 }
@@ -350,6 +394,8 @@ func (rr *AccommodationRepo) GetRateById(ctx context.Context, id primitive.Objec
 func (rr *AccommodationRepo) GetByID(ctx context.Context, id primitive.ObjectID) (*Accommodation, error) {
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.GetByID")
 	defer span.End()
+
+	rr.logger.Infoln("AccommodationRepo.GetByID : reached GetByID in repo")
 
 	filter := bson.D{{"_id", id}}
 	return rr.getByFilter(ctx, filter)
@@ -359,6 +405,8 @@ func (rr *AccommodationRepo) GetRatesByAccommodation(ctx context.Context, id str
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.GetRatesByAccommodation")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.GetRatesByAccommodation : reached GetRatesByAccommodation in repo")
+
 	filter := bson.D{{"forAccommodationId", id}}
 	return rr.filterRate(ctx, filter)
 }
@@ -366,6 +414,8 @@ func (rr *AccommodationRepo) GetRatesByAccommodation(ctx context.Context, id str
 func (rr *AccommodationRepo) GetRatesByHost(ctx context.Context, id string) ([]*Rate, error) {
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.GetRatesByHost")
 	defer span.End()
+
+	rr.logger.Infoln("AccommodationRepo.GetRatesByHost : reached GetRatesByHost in repo")
 
 	filter := bson.D{{"forHostId", id}}
 	return rr.filterRate(ctx, filter)
@@ -413,6 +463,8 @@ func (rr *AccommodationRepo) GetAccommodationsByOwner(ctx context.Context, owner
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.GetAccommodationsByOwner")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.GetAccommodationsByOwner : reached GetAccommodationsByOwner in repo")
+
 	filter := bson.D{{"ownerId", ownerID}}
 	return rr.filterIDs(ctx, filter)
 }
@@ -421,8 +473,11 @@ func (rr *AccommodationRepo) DeleteAccommodationsByOwner(ctx context.Context, ow
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.GetAccommodationsByOwner")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.DeleteAccommodationsByOwner : reached DeleteAccommodationsByOwner in repo")
+
 	owner, err := primitive.ObjectIDFromHex(ownerID)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.DeleteAccommodationsByOwner : Error converting ID to ObjectID")
 		span.SetStatus(codes.Error, "Error converting ID to ObjectID")
 		fmt.Println("Error converting ID to ObjectID:", owner, err)
 		return err
@@ -434,17 +489,20 @@ func (rr *AccommodationRepo) DeleteAccommodationsByOwner(ctx context.Context, ow
 
 	_, err2 := accommodationsCollection.DeleteMany(ctx, filter)
 	if err2 != nil {
+		rr.logger.Errorf("AccommodationRepo.AccommodationRepo : Error deleting accommodations by owner")
 		span.SetStatus(codes.Error, "Error deleting accommodations by owner")
-		rr.logger.Println(err2)
 		return err2
 	}
 
+	rr.logger.Infoln("AccommodationRepo.AccommodationRepo : AccommodationRepo finished")
 	return nil
 }
 
 func (rr *AccommodationRepo) HasUserRatedHost(ctx context.Context, userID string, hostID string) (bool, error) {
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.HasUserRatedHost")
 	defer span.End()
+
+	rr.logger.Infoln("AccommodationRepo.HasUserRatedHost : reached HasUserRatedHost in repo")
 
 	rateCollection := rr.getRateCollection(ctx)
 
@@ -455,6 +513,7 @@ func (rr *AccommodationRepo) HasUserRatedHost(ctx context.Context, userID string
 
 	count, err := rateCollection.CountDocuments(ctx, filter)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.HasUserRatedHost : Error counting rates")
 		span.SetStatus(codes.Error, "Error counting rates")
 		return false, err
 	}
@@ -466,6 +525,8 @@ func (rr *AccommodationRepo) HasUserRatedAccommodation(ctx context.Context, user
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.HasUserRatedAccommodation")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.HasUserRatedAccommodation : reached HasUserRatedAccommodation in repo")
+
 	rateCollection := rr.getRateCollection(ctx)
 
 	filter := bson.D{
@@ -475,6 +536,7 @@ func (rr *AccommodationRepo) HasUserRatedAccommodation(ctx context.Context, user
 
 	count, err := rateCollection.CountDocuments(ctx, filter)
 	if err != nil {
+		rr.logger.Errorf("AccommodationRepo.HasUserRatedAccommodation : Error counting rates")
 		span.SetStatus(codes.Error, "Error counting rates")
 		return false, err
 	}
@@ -485,6 +547,8 @@ func (rr *AccommodationRepo) HasUserRatedAccommodation(ctx context.Context, user
 func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken string, params FilterParams, minPrice int, maxPrice int, minPriceBool bool, maxPriceBool bool) ([]*Accommodation, error) {
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.FilterAccommodations")
 	defer span.End()
+
+	rr.logger.Infoln("AccommodationRepo.FilterAccommodations : reached FilterAccommodations in repo")
 
 	var filteredAccommodations []*Accommodation
 
@@ -509,6 +573,7 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 			//reservationServiceRequest, _ := http.NewRequest("GET", reservationServiceEndpoint, nil)
 			responseAppointments, err := rr.HTTPSRequestWithouthBody(ctx, authToken, reservationServiceEndpoint, "GET")
 			if err != nil {
+				rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Error fetching reservation service")
 				span.SetStatus(codes.Error, "Error fetching reservation service")
 				return nil, fmt.Errorf("Error fetching reservation service: %v", err)
 			}
@@ -520,6 +585,7 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 
 			if responseAppointments.StatusCode == http.StatusOK {
 				if err := json.NewDecoder(responseAppointments.Body).Decode(&accommodationIds); err != nil {
+					rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Error decoding appointment data")
 					return nil, fmt.Errorf("Error decoding appointment data: %v", err)
 				}
 			} else if responseAppointments.StatusCode == http.StatusNoContent {
@@ -528,6 +594,7 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 				buf := new(strings.Builder)
 				_, _ = io.Copy(buf, responseAppointments.Body)
 				errorMessage := fmt.Sprintf("ReservationServiceError: %s", buf.String())
+				rr.logger.Errorf("AccommodationRepo.FilterAccommodations : ReservationServiceError: %s", errorMessage)
 				return nil, fmt.Errorf(errorMessage)
 			}
 
@@ -542,6 +609,7 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 				for _, id := range accommodationIDsFound {
 					objectID, err := primitive.ObjectIDFromHex(id)
 					if err != nil {
+						rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Invalid ObjectID")
 						log.Printf("Invalid ObjectID (%s): %v\n", id, err)
 						span.SetStatus(codes.Error, "Invalid ObjectID")
 						continue
@@ -551,6 +619,7 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 						accommodation, err := rr.GetByID(ctx, objectID)
 						if err != nil {
 							log.Printf("Accommodation not found for ObjectID (%s)\n", id)
+							rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Accommodation not found for ObjectID %s", id)
 							span.SetStatus(codes.Error, "Accommodation not found for ObjectID")
 							continue
 						}
@@ -588,12 +657,14 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 						usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
 						usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 						if err != nil {
+							rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Error sending users request")
 							span.SetStatus(codes.Error, "Error sending users request")
 							fmt.Println("Error sending users request:", err)
 							return nil, err
 						}
 
 						if usersResponse.StatusCode != http.StatusOK {
+							rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Users service returned an error")
 							span.SetStatus(codes.Error, "Users service returned an error")
 							fmt.Println("Users service returned an error:", usersResponse.Status)
 							return nil, errors.New("Users service returned an error")
@@ -604,6 +675,7 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 						//err = responseToType(accommodationResponse.Body, accommodations)
 						err = json.NewDecoder(usersResponse.Body).Decode(&highlighted)
 						if err != nil {
+							rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Error decoding users response")
 							span.SetStatus(codes.Error, "Error decoding users response")
 							fmt.Println("Error decoding users response:", err)
 							return nil, err
@@ -626,7 +698,7 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 
 	accommodations, err := rr.GetAll(ctx)
 	if err != nil {
-		rr.logger.Print("Database exception: ", err)
+		rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Database exception: %s ", err)
 		span.SetStatus(codes.Error, "Error getting all accommodations")
 	}
 
@@ -657,12 +729,14 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 					usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
 					usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 					if err != nil {
+						rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Error sending users request")
 						span.SetStatus(codes.Error, "Error sending users request")
 						fmt.Println("Error sending users request:", err)
 						return nil, err
 					}
 
 					if usersResponse.StatusCode != http.StatusOK {
+						rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Users service returned an error")
 						span.SetStatus(codes.Error, "Users service returned an error")
 						fmt.Println("Users service returned an error:", usersResponse.Status)
 						return nil, errors.New("Users service returned an error")
@@ -673,6 +747,7 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 					//err = responseToType(accommodationResponse.Body, accommodations)
 					err = json.NewDecoder(usersResponse.Body).Decode(&highlighted)
 					if err != nil {
+						rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Error decoding users response")
 						span.SetStatus(codes.Error, "Error decoding users response")
 						fmt.Println("Error decoding users response:", err)
 						return nil, err
@@ -699,12 +774,14 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 			usersEndpoint := fmt.Sprintf("https://%s:%s/isHighlighted/%s", usersServiceHost, usersServicePort, accommodation.OwnerId)
 			usersResponse, err := rr.HTTPSRequestWithouthBody(ctx, authToken, usersEndpoint, "GET")
 			if err != nil {
+				rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Error sending users request")
 				span.SetStatus(codes.Error, "Error sending users request")
 				fmt.Println("Error sending users request:", err)
 				return nil, err
 			}
 
 			if usersResponse.StatusCode != http.StatusOK {
+				rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Users service returned an error")
 				span.SetStatus(codes.Error, "Users service returned an error")
 				fmt.Println("Users service returned an error:", usersResponse.Status)
 				return nil, errors.New("Users service returned an error")
@@ -715,6 +792,7 @@ func (rr *AccommodationRepo) FilterAccommodations(ctx context.Context, authToken
 			//err = responseToType(accommodationResponse.Body, accommodations)
 			err = json.NewDecoder(usersResponse.Body).Decode(&highlighted)
 			if err != nil {
+				rr.logger.Errorf("AccommodationRepo.FilterAccommodations : Error decoding users response")
 				span.SetStatus(codes.Error, "Error decoding users response")
 				fmt.Println("Error decoding users response:", err)
 				return nil, err
@@ -740,6 +818,8 @@ func (rr *AccommodationRepo) AverageRate(ctx context.Context, hostID string) (fl
 	ctx, span := rr.tracer.Start(ctx, "AccommodationRepo.averageRate")
 	defer span.End()
 
+	rr.logger.Infoln("AccommodationRepo.AverageRate : reached AverageRate in repo")
+
 	rateCollection := rr.getRateCollection(ctx)
 
 	filter := bson.D{
@@ -759,6 +839,7 @@ func (rr *AccommodationRepo) AverageRate(ctx context.Context, hostID string) (fl
 	for cursor.Next(ctx) {
 		var rate Rate
 		if err := cursor.Decode(&rate); err != nil {
+			rr.logger.Errorf("AccommodationRepo.AverageRate : Error %s", err)
 			return 0, err
 		}
 		sum += float64(rate.Rate)

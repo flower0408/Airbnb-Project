@@ -1,0 +1,8 @@
+[2024-02-06T23:18:18Z] [info] [ID-1707261498509252657] AppointmentHandler.GetAppointmentsByDate : GetAppointmentsByDate endpoint reached
+[2024-02-06T23:18:33Z] [info] [ID-1707261513593983748] AppointmentHandler.GetAppointmentsByDate : GetAppointmentsByDate endpoint reached
+[2024-02-06T23:18:37Z] [info] [ID-1707261517316060644] AppointmentHandler.GetAppointmentsByDate : GetAppointmentsByDate endpoint reached
+[2024-02-06T23:18:46Z] [info] [ID-1707261526150358431] AppointmentHandler.GetAppointmentsByDate : GetAppointmentsByDate endpoint reached
+[2024-02-06T23:18:50Z] [info] [ID-1707261530893824521] AppointmentHandler.GetAppointmentsByDate : GetAppointmentsByDate endpoint reached
+[2024-02-06T23:19:13Z] [info] [ID-1707261553490930341] Can not cancel reservation. You can only cancel it before it starts. 
+[2024-02-06T23:19:38Z] [info] [ID-1707261578137619681] Code after circuit breaker execution
+[2024-02-06T23:19:38Z] [info] [ID-1707261578140972643] Reservation cancelled succesfully
