@@ -96,6 +96,7 @@ func (rr *AccommodationRepo) InsertAccommodation(accommodation *Accommodation) (
 
 	insertedID, ok := result.InsertedID.(primitive.ObjectID)
 	if !ok {
+		rr.writeError("Failed to convert InsertedID to ObjectID")
 		rr.logger.Println("Failed to convert InsertedID to ObjectID")
 		return "", errors.New("Failed to convert InsertedID")
 	}
@@ -111,6 +112,7 @@ func (rr *AccommodationRepo) InsertRateForAccommodation(rate *Rate) (string, err
 	_, err := rateCollection.InsertOne(ctx, rate)
 	if err != nil {
 		rr.logger.Println(err)
+		rr.writeError("Failed to insert rate for accommodation into database: " + err.Error())
 		return "", err
 	}
 
@@ -125,6 +127,7 @@ func (rr *AccommodationRepo) InsertRateForHost(rate *Rate) (string, error) {
 	_, err := rateCollection.InsertOne(ctx, rate)
 	if err != nil {
 		rr.logger.Println(err)
+		rr.writeError("Failed to insert rate for host into database: " + err.Error())
 		return "", err
 	}
 
@@ -137,7 +140,9 @@ func (rr *AccommodationRepo) DeleteRateForHost(rateID string) error {
 
 	objID, err := primitive.ObjectIDFromHex(rateID)
 	if err != nil {
+
 		rr.logger.Println(err)
+		rr.writeError("Failed to convert rate ID to ObjectID: " + err.Error())
 		return err
 	}
 
@@ -148,6 +153,7 @@ func (rr *AccommodationRepo) DeleteRateForHost(rateID string) error {
 	_, err2 := rateCollection.DeleteOne(ctx, filter)
 	if err2 != nil {
 		rr.logger.Println(err2)
+		rr.writeError("Failed to delete rate for host from database: " + err2.Error())
 		return err2
 	}
 
@@ -160,6 +166,7 @@ func (rr *AccommodationRepo) UpdateRateForHost(rateID string, rate *Rate) error 
 	rateId, err := primitive.ObjectIDFromHex(rateID)
 	if err != nil {
 		fmt.Println("Error converting ID to ObjectID:", err)
+		rr.writeError("Failed to convert rate ID to ObjectID: " + err.Error())
 		return err
 	}
 
@@ -174,12 +181,13 @@ func (rr *AccommodationRepo) UpdateRateForHost(rateID string, rate *Rate) error 
 
 	if err != nil {
 		rr.logger.Println("Error updating rate:", err)
+		rr.writeError("Failed to update rate for host in database: " + err.Error())
 		return err
 	}
 
 	rr.logger.Printf("Documents matched: %v\n", result.MatchedCount)
 	rr.logger.Printf("Documents updated: %v\n", result.ModifiedCount)
-
+	// rr.writeInfo("Rate for host successfully updated")
 	return nil
 }
 
