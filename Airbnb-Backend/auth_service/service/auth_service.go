@@ -11,13 +11,13 @@ import (
 	"fmt"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/sony/gobreaker"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/gomail.v2"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -37,16 +37,26 @@ var (
 )
 
 type AuthService struct {
-	store domain.AuthStore
-	cache domain.AuthCache
-	cb    *gobreaker.CircuitBreaker
+	store             domain.AuthStore
+	cache             domain.AuthCache
+	cb                *gobreaker.CircuitBreaker
+	logger            *log.Logger
+	writeError        func(msg string)
+	writeInfo         func(msg string)
+	writeRequestError func(r *http.Request, msg string)
+	writeRequestInfo  func(r *http.Request, msg string)
 }
 
-func NewAuthService(store domain.AuthStore, cache domain.AuthCache) *AuthService {
+func NewAuthService(l *log.Logger, e func(msg string), i func(msg string), re func(r *http.Request, msg string), ri func(r *http.Request, msg string), store domain.AuthStore, cache domain.AuthCache) *AuthService {
 	return &AuthService{
-		store: store,
-		cache: cache,
-		cb:    CircuitBreaker("authService"),
+		store:             store,
+		cache:             cache,
+		cb:                CircuitBreaker("authService"),
+		logger:            l,
+		writeError:        e,
+		writeInfo:         i,
+		writeRequestError: re,
+		writeRequestInfo:  ri,
 	}
 }
 
@@ -75,30 +85,33 @@ func (service *AuthService) VerifyRecaptcha(recaptchaToken string) (bool, error)
 	response, err := http.Post(recaptchaEndpoint, "application/x-www-form-urlencoded",
 		bytes.NewBuffer([]byte(fmt.Sprintf("secret=%s&response=%s", recaptchaSecret, recaptchaToken))))
 	if err != nil {
+		service.writeError(err.Error())
 		return false, err
 	}
 	defer response.Body.Close()
 
-	// Čitamo odgovor od reCAPTCHA API-ja
+	// ÄŚitamo odgovor od reCAPTCHA API-ja
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
+		service.writeError(err.Error())
 		return false, err
 	}
 
 	// Parsiramo JSON odgovor
 	var recaptchaResponse RecaptchaResponse
 	if err := json.Unmarshal(body, &recaptchaResponse); err != nil {
+		service.writeError(err.Error())
 		return false, err
 	}
 
-	// Proveravamo da li je reCAPTCHA uspešno proverena i da li je postignut dobar rezultat
+	// Proveravamo da li je reCAPTCHA uspeĹˇno proverena i da li je postignut dobar rezultat
 	if recaptchaResponse.Success /* && recaptchaResponse.Score >= 0.5*/ {
 		return true, nil
 	}
 
 	log.Printf("ReCAPTCHA response: %v\n", recaptchaResponse)
 
-	// Ako nije uspešna provera ili nije postignut dobar rezultat, vraćamo grešku
+	// Ako nije uspeĹˇna provera ili nije postignut dobar rezultat, vraÄ‡amo greĹˇku
 	return false, fmt.Errorf("Invalid reCAPTCHA token or low score")
 }
 
@@ -216,16 +229,19 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 	log.Println(checkUser)
 
 	if checkUser {
+		service.writeError("Password is in blacklist")
 		log.Println("Password is in blacklist")
 		return "", 406, fmt.Errorf("Password is in black list, try with another one!")
 	}
 
 	existingUser, err := service.store.GetOneUser(user.Username)
 	if err != nil {
+		service.writeError(err.Error())
 		return "", 500, err
 	}
 
 	if existingUser != nil {
+		service.writeError("UsernameExist")
 		return "", 409, fmt.Errorf(errors.UsernameExist)
 	}
 
@@ -261,12 +277,14 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 	pass := []byte(user.Password)
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
 	if err != nil {
+		service.writeError(err.Error())
 		return "", 500, err
 	}
 	user.Password = string(hash)
 
 	body, err := json.Marshal(user)
 	if err != nil {
+		service.writeError(err.Error())
 		return "", 500, err
 	}
 
@@ -292,6 +310,7 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 
 		err = responseToType(responseUser.Body, newUser)
 		if err != nil {
+			service.writeError(err.Error())
 			return nil, err
 		}
 
@@ -305,6 +324,7 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 
 		err = service.store.Register(&credentials)
 		if err != nil {
+			service.writeError(err.Error())
 			return nil, err
 		}
 
@@ -312,6 +332,7 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 	})
 
 	if breakerErr != nil {
+		service.writeError("UserServiceError")
 		return "UserServiceError", http.StatusServiceUnavailable, breakerErr
 	}
 
@@ -325,12 +346,14 @@ func (service *AuthService) Register(user *domain.User) (string, int, error) {
 
 	err = service.cache.PostCacheData(user.Username, validationToken.String())
 	if err != nil {
+		service.writeError(err.Error())
 		log.Fatalf("Failed to post validation data to redis: %s", err)
 		return "", 500, err
 	}
 
 	err = sendValidationMail(validationToken, user.Email)
 	if err != nil {
+		service.writeError(err.Error())
 		return "", 500, err
 	}
 
@@ -362,6 +385,7 @@ func (service *AuthService) AccountConfirmation(validation *domain.RegisterValid
 	log.Printf("Validation token for verification: %s", validation.MailToken)
 	token, err := service.cache.GetCachedValue(validation.UserToken)
 	if err != nil {
+		service.writeError(err.Error())
 		log.Printf("Error fetching validation token from cache: %s", err)
 		log.Println(errors.ExpiredTokenError)
 		return fmt.Errorf(errors.ExpiredTokenError)
@@ -370,6 +394,7 @@ func (service *AuthService) AccountConfirmation(validation *domain.RegisterValid
 	if validation.MailToken == token {
 		err = service.cache.DelCachedValue(validation.UserToken)
 		if err != nil {
+			service.writeError(err.Error())
 			log.Printf("Error in deleting cached value: %s", err)
 			return err
 		}
@@ -385,6 +410,7 @@ func (service *AuthService) AccountConfirmation(validation *domain.RegisterValid
 
 		err = service.store.UpdateUserUsername(user)
 		if err != nil {
+			service.writeError(err.Error())
 			log.Printf("Error in updating user after changing status of verify: %s", err.Error())
 			return err
 		}
@@ -405,12 +431,14 @@ func (service *AuthService) ResendVerificationToken(request *domain.ResendVerifi
 
 	err := service.cache.PostCacheData(request.UserToken, tokenUUID.String())
 	if err != nil {
+		service.writeError(err.Error())
 		log.Println("Post cache problem")
 		return err
 	}
 
 	err = sendValidationMail(tokenUUID, request.UserMail)
 	if err != nil {
+		service.writeError(err.Error())
 		log.Println("Send verification mail problem")
 		return err
 	}
@@ -425,6 +453,7 @@ func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int
 		userServiceRequest, _ := http.NewRequest("GET", userServiceEndpoint, nil)
 		response, err := http.DefaultClient.Do(userServiceRequest)
 		if err != nil {
+			service.writeError(err.Error())
 			return nil, fmt.Errorf("EmailServiceError")
 		}
 		defer response.Body.Close()
@@ -451,6 +480,7 @@ func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int
 
 		body, err := ioutil.ReadAll(userDetailsResponse.Body)
 		if err != nil {
+			service.writeError(err.Error())
 			return nil, err
 		}
 
@@ -460,6 +490,7 @@ func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int
 		var userDetails UserDetails
 		err = json.Unmarshal(body, &userDetails)
 		if err != nil {
+			service.writeError(err.Error())
 			fmt.Println("Error unmarshaling JSON:", err)
 			return nil, err
 		}
@@ -468,6 +499,7 @@ func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int
 
 		userUsernameCredentials, err := service.store.GetOneUser(userDetails.Username)
 		if err != nil {
+			service.writeError(err.Error())
 			return nil, err
 		}
 		userID = userUsernameCredentials.ID.Hex()
@@ -477,11 +509,13 @@ func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int
 		recoverUUID, _ := uuid.NewUUID()
 		err = sendRecoverPasswordMail(recoverUUID, email)
 		if err != nil {
+			service.writeError(err.Error())
 			return nil, err
 		}
 
 		err = service.cache.PostCacheData(userID, recoverUUID.String())
 		if err != nil {
+			service.writeError(err.Error())
 			return nil, err
 		}
 
@@ -489,6 +523,7 @@ func (service *AuthService) SendRecoveryPasswordToken(email string) (string, int
 	})
 
 	if breakerErr != nil {
+		service.writeError("StatusServiceUnavailable")
 		return "", http.StatusServiceUnavailable, breakerErr
 	}
 
@@ -538,6 +573,7 @@ func (service *AuthService) CheckRecoveryPasswordToken(request *domain.RegisterV
 
 	token, err := service.cache.GetCachedValue(request.UserToken)
 	if err != nil {
+		service.writeError(err.Error())
 		return fmt.Errorf(errors.InvalidTokenError)
 	}
 
@@ -561,6 +597,7 @@ func (service *AuthService) RecoverPassword(recoverPassword *domain.RecoverPassw
 
 	checkPassword, err := blackListChecking(recoverPassword.NewPassword)
 	if err != nil {
+		service.writeError(err.Error())
 		log.Println(err)
 		return "Error checking password against blacklist", http.StatusInternalServerError, err
 	}
@@ -591,12 +628,14 @@ func (service *AuthService) RecoverPassword(recoverPassword *domain.RecoverPassw
 	pass := []byte(recoverPassword.NewPassword)
 	hash, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
 	if err != nil {
+		service.writeError(err.Error())
 		return "Error trying to hash password.", http.StatusInternalServerError, err
 	}
 	credentials.Password = string(hash)
 
 	err = service.store.UpdateUser(credentials)
 	if err != nil {
+		service.writeError(err.Error())
 		return "baseErr", http.StatusInternalServerError, err
 	}
 
@@ -612,11 +651,13 @@ func (service *AuthService) ChangePassword(password domain.PasswordChange, token
 
 	user, err := service.store.GetOneUser(username)
 	if err != nil {
+		service.writeError(err.Error())
 		log.Println(err)
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password.OldPassword))
 	if err != nil {
+		service.writeError(err.Error())
 		return "oldPassErr", http.StatusConflict, fmt.Errorf("Old password is incorrect")
 	}
 
@@ -629,6 +670,7 @@ func (service *AuthService) ChangePassword(password domain.PasswordChange, token
 
 	checkPassword, err := blackListChecking(password.NewPassword)
 	if err != nil {
+		service.writeError(err.Error())
 		log.Println(err)
 		return "Error checking password against blacklist", http.StatusInternalServerError, err
 	}
@@ -655,6 +697,7 @@ func (service *AuthService) ChangePassword(password domain.PasswordChange, token
 
 		err = service.store.UpdateUser(user)
 		if err != nil {
+			service.writeError(err.Error())
 			return "baseErr", http.StatusInternalServerError, err
 		}
 
@@ -680,6 +723,7 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 
 	existingUser, err := service.store.GetOneUser(username.NewUsername)
 	if err != nil {
+		service.writeError(err.Error())
 		return "GetUserErr", http.StatusInternalServerError, err
 	}
 
@@ -694,6 +738,7 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 
 	body, err := json.Marshal(requestBody)
 	if err != nil {
+		service.writeError(err.Error())
 		return "MarshalError", http.StatusInternalServerError, err
 	}
 
@@ -704,6 +749,7 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 		responseUser, err := http.DefaultClient.Do(userServiceRequest)
 
 		if err != nil {
+			service.writeError(err.Error())
 			fmt.Println(err)
 			return nil, fmt.Errorf("UserServiceError")
 		}
@@ -728,6 +774,7 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 
 	user, err := service.store.GetOneUser(currentUsername)
 	if err != nil {
+		service.writeError(err.Error())
 		fmt.Println(err)
 		return "GetUserErr", http.StatusInternalServerError, err
 	}
@@ -737,6 +784,7 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 
 	err = service.store.UpdateUser(user)
 	if err != nil {
+		service.writeError(err.Error())
 		return "baseErr", http.StatusInternalServerError, err
 	}
 	fmt.Println("Username Updated Successfully")
@@ -747,6 +795,7 @@ func (service *AuthService) ChangeUsername(username domain.UsernameChange, token
 func (service *AuthService) Login(credentials *domain.Credentials) (string, error) {
 	user, err := service.store.GetOneUser(credentials.Username)
 	if err != nil {
+		service.writeError(err.Error())
 		if err == sql.ErrNoRows {
 			return "", fmt.Errorf(errors.InvalidCredentials)
 		}
@@ -765,6 +814,7 @@ func (service *AuthService) Login(credentials *domain.Credentials) (string, erro
 	tokenString, err := GenerateJWT(user)
 
 	if err != nil {
+		service.writeError(err.Error())
 		return "", err
 	}
 
@@ -790,6 +840,7 @@ func responseToType(response io.ReadCloser, any any) error {
 func (service *AuthService) DeleteUser(username string) (string, int, error) {
 	existingUser, err := service.store.GetOneUser(username)
 	if err != nil {
+		service.writeError(err.Error())
 		return "baseErr", http.StatusInternalServerError, err
 	}
 
@@ -798,6 +849,7 @@ func (service *AuthService) DeleteUser(username string) (string, int, error) {
 	}
 
 	if err := service.store.DeleteUser(username); err != nil {
+		service.writeError(err.Error())
 		return "baseErr", http.StatusInternalServerError, err
 	}
 
@@ -833,6 +885,7 @@ func (service *AuthService) ExtractUsernameFromToken(tokenString string) (string
 
 	token, err := jwt.Parse([]byte(tokenString), verifier)
 	if err != nil {
+		service.writeError(err.Error())
 		return "", fmt.Errorf("Error parsing token: %s", err)
 	}
 
@@ -845,7 +898,8 @@ func (service *AuthService) ExtractUsernameFromToken(tokenString string) (string
 	var mapa map[string]interface{}
 	err = json.Unmarshal(byteSlice, &mapa)
 	if err != nil {
-		fmt.Println("Greška prilikom dekodiranja JSON-a:", err)
+		service.writeError(err.Error())
+		fmt.Println("GreĹˇka prilikom dekodiranja JSON-a:", err)
 		return "", fmt.Errorf("Error decoding token")
 	}
 

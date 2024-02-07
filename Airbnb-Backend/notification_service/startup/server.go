@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/andjelabjekovic/logovi"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
 	"net/http"
 	"notification_service/domain"
 	"notification_service/handlers"
@@ -18,6 +18,8 @@ import (
 	"syscall"
 	"time"
 )
+
+var logger, loggingMiddleware, writeInfo, writeError, writeRequestInfo, writeRequestError = logovi.LogInit("/logs/logfile.log", "accommodation_service")
 
 type Server struct {
 	config *config.Config
@@ -38,7 +40,7 @@ func (server *Server) initMongoClient() *mongo.Client {
 }
 
 func (server *Server) initNotificationStore(client *mongo.Client) domain.NotificationStore {
-	store := store.NewNotificationMongoDBStore(client)
+	store := store.NewNotificationMongoDBStore(logger, writeError, writeInfo, writeRequestInfo, writeRequestError, client)
 
 	return store
 }
@@ -60,11 +62,11 @@ func (server *Server) Start() {
 }
 
 func (server *Server) initNotificationService(store domain.NotificationStore) *application.NotificationService {
-	return application.NewNotificationService(store)
+	return application.NewNotificationService(logger, writeError, writeInfo, writeRequestInfo, writeRequestError, store)
 }
 
 func (server *Server) initNotificationHandler(service *application.NotificationService) *handlers.NotificationHandler {
-	return handlers.NewNotificationHandler(service)
+	return handlers.NewNotificationHandler(logger, writeError, writeInfo, writeRequestInfo, writeRequestError, service)
 }
 
 func (server *Server) start(notificationHandler *handlers.NotificationHandler) {
@@ -72,7 +74,6 @@ func (server *Server) start(notificationHandler *handlers.NotificationHandler) {
 	router.Use(MiddlewareContentTypeSet)
 	notificationHandler.Init(router)
 
-	_, loggingMiddleware, _, _, _, _ := logovi.LogInit("/logs/logfile.log", "notification_service")
 	router.Use(loggingMiddleware)
 
 	srv := &http.Server{

@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"github.com/sony/gobreaker"
 	"gopkg.in/gomail.v2"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"notification_service/domain"
 	"os"
@@ -25,14 +25,24 @@ var (
 )
 
 type NotificationService struct {
-	store domain.NotificationStore
-	cb    *gobreaker.CircuitBreaker
+	logger            *log.Logger
+	store             domain.NotificationStore
+	cb                *gobreaker.CircuitBreaker
+	writeError        func(msg string)
+	writeInfo         func(msg string)
+	writeRequestError func(r *http.Request, msg string)
+	writeRequestInfo  func(r *http.Request, msg string)
 }
 
-func NewNotificationService(store domain.NotificationStore) *NotificationService {
+func NewNotificationService(l *log.Logger, e func(msg string), i func(msg string), re func(r *http.Request, msg string), ri func(r *http.Request, msg string), store domain.NotificationStore) *NotificationService {
 	return &NotificationService{
-		store: store,
-		cb:    CircuitBreaker("notificationService"),
+		store:             store,
+		logger:            l,
+		cb:                CircuitBreaker("notificationService"),
+		writeError:        e,
+		writeInfo:         i,
+		writeRequestError: re,
+		writeRequestInfo:  ri,
 	}
 }
 
@@ -108,6 +118,7 @@ func getUserDetails(userID string) (*UserDetails, error) {
 	var userDetails UserDetails
 	err = json.Unmarshal(body, &userDetails)
 	if err != nil {
+
 		fmt.Println("Error unmarshaling JSON:", err)
 		return nil, err
 	}

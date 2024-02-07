@@ -14,8 +14,12 @@ import (
 )
 
 type AppointmentHandler struct {
-	logger          *log.Logger
-	appointmentRepo *data.AppointmentRepo
+	logger            *log.Logger
+	appointmentRepo   *data.AppointmentRepo
+	writeError        func(msg string)
+	writeInfo         func(msg string)
+	writeRequestError func(r *http.Request, msg string)
+	writeRequestInfo  func(r *http.Request, msg string)
 }
 
 var (
@@ -23,8 +27,8 @@ var (
 	accommodationServicePort = os.Getenv("ACCOMMODATIONS_SERVICE_PORT")
 )
 
-func NewAppointmentHandler(l *log.Logger, r *data.AppointmentRepo) *AppointmentHandler {
-	return &AppointmentHandler{l, r}
+func NewAppointmentHandler(l *log.Logger, e func(msg string), i func(msg string), re func(r *http.Request, msg string), ri func(r *http.Request, msg string), r *data.AppointmentRepo) *AppointmentHandler {
+	return &AppointmentHandler{l, r, e, i, re, ri}
 }
 
 // mongo
@@ -62,6 +66,7 @@ func (r *AppointmentHandler) GetAllAppointment(rw http.ResponseWriter, h *http.R
 
 	err = appointments.ToJSON(rw)
 	if err != nil {
+		r.writeRequestError(h, "Unable to convert to json")
 		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
 		r.logger.Fatal("Unable to convert to json")
 		return
@@ -74,6 +79,7 @@ func (r *AppointmentHandler) GetAppointmentsByAccommodation(rw http.ResponseWrit
 
 	appointments, err := r.appointmentRepo.GetAppointmentsByAccommodation(id)
 	if err != nil {
+		r.writeRequestError(h, "Database exception")
 		r.logger.Print("Database exception")
 	}
 
@@ -83,6 +89,7 @@ func (r *AppointmentHandler) GetAppointmentsByAccommodation(rw http.ResponseWrit
 
 	err = appointments.ToJSON(rw)
 	if err != nil {
+		r.writeRequestError(h, "Unable to convert to json")
 		http.Error(rw, "Unable to convert to json", http.StatusInternalServerError)
 		r.logger.Fatal("Unable to convert to json")
 		return
@@ -96,12 +103,14 @@ func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *ht
 	// Parse dates with the specified time zone
 	startDate, err := time.Parse(time.RFC3339, startDateStr)
 	if err != nil {
+		r.writeRequestError(h, "Invalid startDate parameter")
 		http.Error(rw, "Invalid startDate parameter", http.StatusBadRequest)
 		return
 	}
 
 	endDate, err := time.Parse(time.RFC3339, endDateStr)
 	if err != nil {
+		r.writeRequestError(h, "Invalid startDate parameter")
 		http.Error(rw, "Invalid endDate parameter", http.StatusBadRequest)
 		return
 	}
@@ -109,6 +118,7 @@ func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *ht
 	appointments, err := r.appointmentRepo.GetAppointmentsByDate(startDate, endDate)
 	if err != nil {
 		r.logger.Print("Database exception")
+		r.writeRequestError(h, "Unable to retrieve appointments")
 		http.Error(rw, "Unable to retrieve appointments", http.StatusInternalServerError)
 		return
 	}
@@ -131,6 +141,7 @@ func (r *AppointmentHandler) GetAppointmentsByDate(rw http.ResponseWriter, h *ht
 
 	err = appointments.ToJSON(rw)
 	if err != nil {
+		r.writeRequestError(h, "Unable to convert to JSON")
 		http.Error(rw, "Unable to convert to JSON", http.StatusInternalServerError)
 		r.logger.Fatal("Unable to convert to JSON")
 		return
@@ -191,12 +202,14 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 
 	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
 	if err != nil {
+		r.writeRequestError(h, "Error sending accommodation request")
 		r.logger.Println("Error sending accommodation request:", err)
 		rw.Write([]byte("Error sending accommodation request"))
 		return
 	}
 
 	if accommodationResponse.StatusCode != http.StatusOK {
+		r.writeRequestError(h, "Accommodation service returned an error")
 		r.logger.Println("Accommodation service returned an error:", accommodationResponse.Status)
 		rw.Write([]byte("Accommodation service returned an error"))
 		return
@@ -206,6 +219,7 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 
 	err = json.NewDecoder(accommodationResponse.Body).Decode(&accommodations)
 	if err != nil {
+		r.writeRequestError(h, "Error decoding accommodation response")
 		r.logger.Println("Error decoding accommodation response:", err)
 		rw.Write([]byte("Error decoding accommodation response"))
 		return
@@ -215,6 +229,7 @@ func (r *AppointmentHandler) DeleteAppointmentsByAccommodationIDs(rw http.Respon
 	for _, accommodationID := range accommodations {
 		err := r.appointmentRepo.DeleteAppointmentsByAccommodationID(accommodationID.Hex())
 		if err != nil {
+			r.writeRequestError(h, "Database exception")
 			r.logger.Print("Database exception:", err)
 			rw.WriteHeader(http.StatusInternalServerError)
 			rw.Write([]byte("Error deleting appointments"))
@@ -232,6 +247,7 @@ func (s *AppointmentHandler) MiddlewareAppointmentDeserialization(next http.Hand
 		appointments := &data.Appointment{}
 		err := appointments.FromJSON(h.Body)
 		if err != nil {
+			s.writeRequestError(h, "Unable to decode json")
 			http.Error(rw, "Unable to decode json", http.StatusBadRequest)
 			s.logger.Fatal(err)
 			return

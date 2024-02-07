@@ -32,12 +32,22 @@ var (
 )
 
 type UserHandler struct {
-	service *application.UserService
+	logger            *log.Logger
+	service           *application.UserService
+	writeError        func(msg string)
+	writeInfo         func(msg string)
+	writeRequestError func(r *http.Request, msg string)
+	writeRequestInfo  func(r *http.Request, msg string)
 }
 
-func NewUserHandler(service *application.UserService) *UserHandler {
+func NewUserHandler(l *log.Logger, e func(msg string), i func(msg string), re func(r *http.Request, msg string), ri func(r *http.Request, msg string), service *application.UserService) *UserHandler {
 	return &UserHandler{
-		service: service,
+		logger:            l,
+		service:           service,
+		writeError:        e,
+		writeInfo:         i,
+		writeRequestError: re,
+		writeRequestInfo:  ri,
 	}
 }
 
@@ -125,6 +135,7 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 	var user domain.User
 	err := json.NewDecoder(req.Body).Decode(&user)
 	if err != nil {
+		handler.writeRequestError(req, "Failed to decode the user registration request")
 		log.Println(err)
 
 		http.Error(writer, err.Error(), http.StatusBadRequest)
@@ -132,6 +143,7 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 	}
 
 	if err := validateUser(&user); err != nil {
+		handler.writeRequestError(req, "Failed to validate user registration request")
 		http.Error(writer, err.Message, http.StatusBadRequest)
 		return
 	}
@@ -152,7 +164,7 @@ func (handler *UserHandler) Register(writer http.ResponseWriter, req *http.Reque
 	}
 	writer.WriteHeader(200)
 	jsonResponse(newUser, writer)
-
+	handler.writeRequestInfo(req, "Successfully registered user")
 }
 
 func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Request) {
@@ -160,12 +172,14 @@ func (handler *UserHandler) UpdateUser(writer http.ResponseWriter, req *http.Req
 	vars := mux.Vars(req)
 	userID, err := primitive.ObjectIDFromHex(vars["userID"])
 	if err != nil {
+		handler.writeRequestError(req, "Invalid user ID")
 		http.Error(writer, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
 
 	existingUser, err := handler.service.Get(userID)
 	if err != nil {
+		handler.writeRequestError(req, "User not found")
 		http.Error(writer, "User not found", http.StatusBadRequest)
 		return
 	}
@@ -262,6 +276,7 @@ func (handler *UserHandler) ChangeUsername(writer http.ResponseWriter, request *
 	var username domain.UsernameChange
 	err := json.NewDecoder(request.Body).Decode(&username)
 	if err != nil {
+		handler.writeRequestError(request, "Failed to decode the username change request")
 		log.Println(err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
@@ -270,6 +285,7 @@ func (handler *UserHandler) ChangeUsername(writer http.ResponseWriter, request *
 	status, statusCode, err := handler.service.ChangeUsername(username)
 
 	if err != nil {
+		handler.writeRequestError(request, "Error in ChangeUsername ")
 		log.Println("Error in ChangeUsername:", err)
 		var errorMessage string
 
@@ -292,6 +308,7 @@ func (handler *UserHandler) ChangeUsername(writer http.ResponseWriter, request *
 func (handler *UserHandler) GetAll(writer http.ResponseWriter, req *http.Request) {
 	users, err := handler.service.GetAll()
 	if err != nil {
+		handler.writeRequestError(req, "Failed to get all users")
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -302,22 +319,26 @@ func (handler *UserHandler) Get(writer http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	id, ok := vars["id"]
 	if !ok {
+		handler.writeRequestError(req, "Invalid user ID")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	objectID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
+		handler.writeRequestError(req, "Invalid user ID")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	user, err := handler.service.Get(objectID)
 	if err != nil {
+		handler.writeRequestError(req, "User not found")
 		writer.WriteHeader(http.StatusNotFound)
 		return
 	}
 	jsonResponse(user, writer)
+	handler.writeRequestInfo(req, "User successfully retrieved")
 }
 
 func (handler *UserHandler) GetOne(writer http.ResponseWriter, request *http.Request) {
@@ -326,6 +347,7 @@ func (handler *UserHandler) GetOne(writer http.ResponseWriter, request *http.Req
 
 	user, err := handler.service.GetOneUser(username)
 	if err != nil {
+		handler.writeRequestError(request, "User not found")
 		log.Println(err)
 		writer.WriteHeader(http.StatusNotFound)
 	}
@@ -338,6 +360,7 @@ func (handler *UserHandler) GetId(writer http.ResponseWriter, request *http.Requ
 
 	userId, err := handler.service.GetOneUserId(username)
 	if err != nil {
+		handler.writeRequestError(request, "User ID not found")
 		log.Println(err)
 		writer.WriteHeader(http.StatusNotFound)
 	}
@@ -348,11 +371,13 @@ func (handler *UserHandler) DeleteAccount(writer http.ResponseWriter, req *http.
 	vars := mux.Vars(req)
 	userID, err := primitive.ObjectIDFromHex(vars["id"])
 	if err != nil {
+		handler.writeRequestError(req, "Invalid user ID")
 		http.Error(writer, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
 	err = handler.service.DeleteAccount(userID)
 	if err != nil {
+		handler.writeRequestError(req, "Error deleting account")
 		http.Error(writer, "Error deleting account", http.StatusInternalServerError)
 		return
 	}
@@ -413,12 +438,14 @@ func (handler *UserHandler) MailExist(writer http.ResponseWriter, req *http.Requ
 	vars := mux.Vars(req)
 	mail, ok := vars["mail"]
 	if !ok {
+		handler.writeRequestError(req, "Invalid mail parameter")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	id, err := handler.service.DoesEmailExist(mail)
 	if err != nil {
+		handler.writeRequestError(req, "Email not found")
 		writer.WriteHeader(http.StatusNotFound)
 		return
 	}

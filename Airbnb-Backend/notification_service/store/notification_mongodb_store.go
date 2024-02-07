@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"net/http"
 	"notification_service/domain"
 )
 
@@ -16,13 +18,23 @@ const (
 )
 
 type NotificationMongoDBStore struct {
-	notifications *mongo.Collection
+	notifications     *mongo.Collection
+	logger            *log.Logger
+	writeError        func(msg string)
+	writeInfo         func(msg string)
+	writeRequestError func(r *http.Request, msg string)
+	writeRequestInfo  func(r *http.Request, msg string)
 }
 
-func NewNotificationMongoDBStore(client *mongo.Client) domain.NotificationStore {
+func NewNotificationMongoDBStore(l *log.Logger, e func(msg string), i func(msg string), re func(r *http.Request, msg string), ri func(r *http.Request, msg string), client *mongo.Client) domain.NotificationStore {
 	notifications := client.Database(DATABASE).Collection(COLLECTION)
 	return &NotificationMongoDBStore{
-		notifications: notifications,
+		notifications:     notifications,
+		logger:            l,
+		writeError:        e,
+		writeInfo:         i,
+		writeRequestError: re,
+		writeRequestInfo:  ri,
 	}
 }
 

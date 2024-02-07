@@ -11,8 +11,8 @@ import (
 	"github.com/andjelabjekovic/logovi"
 	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -76,7 +76,7 @@ func (server *Server) initRedisClient() *redis.Client {
 }
 
 func (server *Server) initAuthStore(client *mongo.Client) domain.AuthStore {
-	store := store2.NewAuthMongoDBStore(client)
+	store := store2.NewAuthMongoDBStore(logger, writeError, writeInfo, writeRequestInfo, writeRequestError, client)
 	return store
 }
 
@@ -86,7 +86,7 @@ func (server *Server) initAuthCache(client *redis.Client) domain.AuthCache {
 }
 
 func (server *Server) initAuthService(store domain.AuthStore, cache domain.AuthCache) *application.AuthService {
-	return application.NewAuthService(store, cache)
+	return application.NewAuthService(logger, writeError, writeInfo, writeRequestInfo, writeRequestError, store, cache)
 }
 
 func (server *Server) initAuthHandler(service *application.AuthService) *handlers.AuthHandler {

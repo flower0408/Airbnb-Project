@@ -9,12 +9,22 @@ import (
 )
 
 type UserService struct {
-	store domain.UserStore
+	store             domain.UserStore
+	logger            *log.Logger
+	writeError        func(msg string)
+	writeInfo         func(msg string)
+	writeRequestError func(r *http.Request, msg string)
+	writeRequestInfo  func(r *http.Request, msg string)
 }
 
-func NewUserService(store domain.UserStore) *UserService {
+func NewUserService(l *log.Logger, e func(msg string), i func(msg string), re func(r *http.Request, msg string), ri func(r *http.Request, msg string), store domain.UserStore) *UserService {
 	return &UserService{
-		store: store,
+		store:             store,
+		logger:            l,
+		writeError:        e,
+		writeInfo:         i,
+		writeRequestError: re,
+		writeRequestInfo:  ri,
 	}
 }
 
@@ -29,6 +39,7 @@ func (service *UserService) GetAll() ([]*domain.User, error) {
 func (service *UserService) GetOneUser(username string) (*domain.User, error) {
 	retUser, err := service.store.GetOneUser(username)
 	if err != nil {
+		service.writeError(err.Error())
 		log.Println(err)
 		return nil, fmt.Errorf("User not found")
 	}
@@ -38,6 +49,7 @@ func (service *UserService) GetOneUser(username string) (*domain.User, error) {
 func (service *UserService) GetOneUserId(username string) (primitive.ObjectID, error) {
 	retUser, err := service.store.GetOneUser(username)
 	if err != nil {
+		service.writeError(err.Error())
 		log.Println(err)
 		return primitive.NilObjectID, fmt.Errorf("User not found")
 	}
@@ -91,6 +103,7 @@ func (service *UserService) ChangeUsername(username domain.UsernameChange) (stri
 
 	user, err := service.store.GetOneUser(currentUsername)
 	if err != nil {
+		service.writeError(err.Error())
 		log.Println(err)
 		return "GetUserErr", http.StatusInternalServerError, err
 	}

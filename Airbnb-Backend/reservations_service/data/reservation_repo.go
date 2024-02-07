@@ -23,9 +23,11 @@ var (
 )
 
 type ReservationRepo struct {
-	session *gocql.Session
-	logger  *log.Logger
-	client  *http.Client
+	session    *gocql.Session
+	logger     *log.Logger
+	client     *http.Client
+	writeError func(msg string)
+	writeInfo  func(msg string)
 }
 
 func NewReservationRepo(logger *log.Logger) (*ReservationRepo, error) {
@@ -81,6 +83,7 @@ func NewReservationRepo(logger *log.Logger) (*ReservationRepo, error) {
 // Disconnect from database
 func (sr *ReservationRepo) CloseSession() {
 	sr.session.Close()
+
 }
 
 // Create tables
@@ -93,6 +96,7 @@ func (sr *ReservationRepo) CreateTables() {
 					WITH CLUSTERING ORDER BY (reservation_id ASC)`, "reservation_by_user")).Exec()
 	if err != nil {
 		sr.logger.Println(err)
+		sr.writeError("Failed to create reservation_by_user table: " + err.Error())
 	}
 
 	err = sr.session.Query(
@@ -102,6 +106,7 @@ func (sr *ReservationRepo) CreateTables() {
 					WITH CLUSTERING ORDER BY (reservation_id ASC)`, "reservation_by_accommodation")).Exec()
 	if err != nil {
 		sr.logger.Println(err)
+		sr.writeError("Failed to create reservation_by_accommodation table: " + err.Error())
 	}
 
 }
@@ -172,6 +177,7 @@ func (sr *ReservationRepo) InsertReservation(reservation *Reservation) (*Reserva
 		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price).Exec()
 	if err != nil {
 		sr.logger.Println(err)
+		sr.writeError("Failed to insert reservation into reservation_by_user table: " + err.Error())
 		return nil, err
 	}
 
@@ -181,6 +187,7 @@ func (sr *ReservationRepo) InsertReservation(reservation *Reservation) (*Reserva
 		reservation.ByUserId, reservationId, reservation.Period, reservation.AccommodationId, reservation.Price).Exec()
 	if err != nil {
 		sr.logger.Println(err)
+		sr.writeError("Failed to insert reservation into reservation_by_accommodation table: " + err.Error())
 		return nil, err
 	}
 
@@ -221,6 +228,7 @@ func (sr *ReservationRepo) HasReservationsForHost(userID string, authToken strin
 	accommodationRequest, err := http.NewRequest("GET", accommodationEndpoint, nil)
 	if err != nil {
 		sr.logger.Println("Error creating accommodation request:", err)
+		sr.writeError("Error creating accommodation request: " + err.Error())
 		return false, err
 	}
 
@@ -229,6 +237,8 @@ func (sr *ReservationRepo) HasReservationsForHost(userID string, authToken strin
 	accommodationResponse, err := http.DefaultClient.Do(accommodationRequest)
 	if err != nil {
 		sr.logger.Println("Error sending accommodation request:", err)
+		sr.writeError("Error sending accommodation request: " + err.Error())
+
 		return false, err
 	}
 

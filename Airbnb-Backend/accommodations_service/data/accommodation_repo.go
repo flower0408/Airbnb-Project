@@ -205,6 +205,7 @@ func (rr *AccommodationRepo) getRateCollection() *mongo.Collection {
 
 func (rr *AccommodationRepo) GetAll() ([]*Accommodation, error) {
 	filter := bson.D{{}}
+
 	return rr.filter(filter)
 }
 

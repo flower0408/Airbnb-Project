@@ -4,10 +4,11 @@ import (
 	"auth_service/domain"
 	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
+	"net/http"
 )
 
 const (
@@ -16,14 +17,23 @@ const (
 )
 
 type AuthMongoDBStore struct {
-	credentials *mongo.Collection
+	credentials       *mongo.Collection
+	logger            *log.Logger
+	writeError        func(msg string)
+	writeInfo         func(msg string)
+	writeRequestError func(r *http.Request, msg string)
+	writeRequestInfo  func(r *http.Request, msg string)
 }
 
-func NewAuthMongoDBStore(client *mongo.Client) domain.AuthStore {
+func NewAuthMongoDBStore(l *log.Logger, e func(msg string), i func(msg string), re func(r *http.Request, msg string), ri func(r *http.Request, msg string), client *mongo.Client) domain.AuthStore {
 	auths := client.Database(DATABASE).Collection(COLLECTION)
 	return &AuthMongoDBStore{
-		credentials: auths,
-	}
+		credentials:       auths,
+		logger:            l,
+		writeError:        e,
+		writeInfo:         i,
+		writeRequestError: re,
+		writeRequestInfo:  ri}
 
 }
 func (store *AuthMongoDBStore) GetAll() ([]*domain.Credentials, error) {

@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+var _, loggingMiddleware, writeError, writeInfo, writeRequestInfo, writeRequestError = logovi.LogInit("/logs/logfile.log", "reservation_service")
+
 func main() {
 
 	port := os.Getenv("RESERVATIONS_SERVICE_PORT")
@@ -47,14 +49,13 @@ func main() {
 	store.CreateTables()
 	store2.Ping()
 
-	reservationHandler := handlers.NewReservationHandler(logger, store)
-	appointmentHandler := handlers.NewAppointmentHandler(logger, store2)
+	reservationHandler := handlers.NewReservationHandler(logger, writeError, writeInfo, writeRequestInfo, writeRequestError, store)
+	appointmentHandler := handlers.NewAppointmentHandler(logger, writeError, writeInfo, writeRequestInfo, writeRequestError, store2)
 
 	//Initialize the router and add a middleware for all the requests
 	router := mux.NewRouter()
 	router.Use(MiddlewareContentTypeSet)
 
-	_, loggingMiddleware, _, _, _, _ := logovi.LogInit("/logs/logfile.log", "reservation_service")
 	router.Use(loggingMiddleware)
 
 	casbinMiddleware, err := InitializeCasbinMiddleware("./rbac_model.conf", "./policy.csv")

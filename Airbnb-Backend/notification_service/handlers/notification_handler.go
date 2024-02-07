@@ -5,9 +5,9 @@ import (
 	"github.com/casbin/casbin"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
-	"log"
 	"net/http"
 	"notification_service/casbinAuthorization"
 	"notification_service/domain"
@@ -22,12 +22,22 @@ var (
 )
 
 type NotificationHandler struct {
-	service *application.NotificationService
+	logger            *log.Logger
+	service           *application.NotificationService
+	writeError        func(msg string)
+	writeInfo         func(msg string)
+	writeRequestError func(r *http.Request, msg string)
+	writeRequestInfo  func(r *http.Request, msg string)
 }
 
-func NewNotificationHandler(service *application.NotificationService) *NotificationHandler {
+func NewNotificationHandler(l *log.Logger, e func(msg string), i func(msg string), re func(r *http.Request, msg string), ri func(r *http.Request, msg string), service *application.NotificationService) *NotificationHandler {
 	return &NotificationHandler{
-		service: service,
+		logger:            l,
+		service:           service,
+		writeError:        e,
+		writeInfo:         i,
+		writeRequestError: re,
+		writeRequestInfo:  ri,
 	}
 }
 
@@ -57,6 +67,7 @@ func (handler *NotificationHandler) CreateNotification(writer http.ResponseWrite
 	var notification domain.Notification
 	err := json.NewDecoder(req.Body).Decode(&notification)
 	if err != nil {
+		handler.writeRequestError(req, "Failed to decode the request")
 		log.Println(err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
 		return
@@ -80,6 +91,7 @@ func (handler *NotificationHandler) CreateNotification(writer http.ResponseWrite
 func (handler *NotificationHandler) GetAllNotifications(writer http.ResponseWriter, req *http.Request) {
 	users, err := handler.service.GetAllNotifications()
 	if err != nil {
+		handler.writeRequestError(req, "Failed to get all notifications")
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -96,6 +108,7 @@ func (handler *NotificationHandler) GetNotificationByHostId(writer http.Response
 
 	notification, err := handler.service.GetNotificationByHostId(id)
 	if err != nil {
+		handler.writeRequestError(req, "Failed to get notification by host ID")
 		writer.WriteHeader(http.StatusNotFound)
 		return
 	}
