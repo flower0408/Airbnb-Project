@@ -519,12 +519,17 @@ func (sr *ReservationRepo) HasReservationsForAccommodation(ctx context.Context, 
 
 	sr.logger.Infoln("ReservationRepo.HasReservationsForAccommodation : reached HasReservationsForAccommodation in repo")
 
+	/*scanner := sr.session.Query(
+	`SELECT COUNT(*) FROM reservation_by_accommodation WHERE accommodation_id = ?`, accommodationID.Hex()).
+	Iter().Scanner()*/
+
 	scanner := sr.session.Query(
-		`SELECT COUNT(*) FROM reservation_by_accommodation WHERE accommodation_id = ?`, accommodationID.Hex()).
+		`SELECT * FROM reservation_by_accommodation WHERE accommodation_id = ?`, accommodationID.Hex()).
 		Iter().Scanner()
 
 	var count int
-	if scanner.Next() {
+	var reservationsByAccommodation []Reservation
+	/*if scanner.Next() {
 		err := scanner.Scan(&count)
 		if err != nil {
 			sr.logger.Errorf("ReservationRepo.HasReservationsForAccommodation : Error checking reservations for accommodation")
@@ -533,12 +538,27 @@ func (sr *ReservationRepo) HasReservationsForAccommodation(ctx context.Context, 
 		}
 	} else {
 		return false, nil
+	}*/
+	for scanner.Next() {
+		var reservation Reservation
+		if err := scanner.Scan(&reservation); err != nil {
+			span.SetStatus(codes.Error, "Error scanning reservations for accommodation")
+			sr.logger.Errorf("ReservationRepo.HasReservationsForAccommodation : Error scanning reservations for accommodation")
+			return false, err
+		}
+		reservationsByAccommodation = append(reservationsByAccommodation, reservation)
 	}
 
 	if err := scanner.Err(); err != nil {
 		sr.logger.Errorf("ReservationRepo.HasReservationsForAccommodation : Error checking reservations for accommodation")
 		span.SetStatus(codes.Error, "Error checking reservations for accommodation")
 		return false, err
+	}
+
+	for _, reservation := range reservationsByAccommodation {
+		if !reservation.Canceled {
+			count++
+		}
 	}
 	return count > 0, nil
 }
@@ -935,7 +955,7 @@ func (sr *ReservationRepo) GetReservationByID(ctx context.Context, reservationID
 	}
 
 	scanner := sr.session.Query(
-		`SELECT by_userId, reservation_id, periodd, accommodation_id, price FROM reservation_by_user WHERE reservation_id = ? ALLOW FILTERING`,
+		`SELECT by_userId, reservation_id, periodd, accommodation_id, price, canceled FROM reservation_by_user WHERE reservation_id = ? ALLOW FILTERING`,
 		parsedUUID).Iter().Scanner()
 
 	var reservation Reservation
@@ -946,6 +966,7 @@ func (sr *ReservationRepo) GetReservationByID(ctx context.Context, reservationID
 			&reservation.Period,
 			&reservation.AccommodationId,
 			&reservation.Price,
+			&reservation.Canceled,
 		)
 		if err != nil {
 			sr.logger.Errorf("ReservationRepo.GetReservationByID : Error getting reservation by ID")
@@ -958,6 +979,13 @@ func (sr *ReservationRepo) GetReservationByID(ctx context.Context, reservationID
 		sr.logger.Errorf("ReservationRepo.GetReservationByID : Error getting reservation by ID")
 		span.SetStatus(codes.Error, "Error getting reservation by ID")
 		return nil, err
+	}
+
+	if reservation.Canceled {
+		errMsg := "Reservation is canceled"
+		span.SetStatus(codes.Error, errMsg)
+		sr.logger.Errorf("ReservationRepo.GetReservationByID : Error getting reservation by ID: %s", errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	return &reservation, nil
