@@ -1,0 +1,61 @@
+[2024-02-07T03:40:30Z] [info] [ID-1707277230355505566] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T03:40:30Z] [info] [ID-1707277230437526516] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:40:30Z] [info] [ID-1707277230439531263] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:40:30Z] [info] [ID-1707277230441023771] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:41:46Z] [info] [ID-1707277306555122699] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T03:41:46Z] [info] [ID-1707277306556904276] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:46Z] [info] [ID-1707277306558327740] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:41:46Z] [info] [ID-1707277306560193023] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:41:51Z] [info] [ID-1707277311728937204] ReservationHandler.CreateReservation : CreateReservation endpoint reached
+[2024-02-07T03:41:51Z] [info] [ID-1707277311730081331] ReservationRepo.InsertReservation : reached InsertReservation in repo
+[2024-02-07T03:41:51Z] [info] [ID-1707277311730855536] ReservationRepo.ReservationExistsForAppointment : reached ReservationExistsForAppointment in repo
+[2024-02-07T03:41:51Z] [info] [ID-1707277311731521089] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:51Z] [info] [ID-1707277311767058806] ReservationRepo.getAppointmentsByAccommodation : reached getAppointmentsByAccommodation in repo
+[2024-02-07T03:41:51Z] [info] [ID-1707277311813350402] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:41:51Z] [info] [ID-1707277311815184458] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:41:51Z] [info] [ID-1707277311971428095] ReservationHandler.CheckCancellationRateBelowThreshold : CheckCancellationRateBelowThreshold endpoint reached
+[2024-02-07T03:41:51Z] [info] [ID-1707277311972404591] ReservationRepo.IsCancellationRateBelowThreshold : reached IsCancellationRateBelowThreshold in repo
+[2024-02-07T03:41:51Z] [info] [ID-1707277311973340938] ReservationRepo.GetAllReservationsByHost : reached GetAllReservationsByHost in repo
+[2024-02-07T03:41:51Z] [error] [ID-1707277311989673112] ReservationRepo.GetAllReservationsByHost : Error getting reservations for accommodation
+[2024-02-07T03:41:51Z] [info] [ID-1707277311990387588] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:51Z] [error] [ID-1707277311996227880] ReservationRepo.GetAllReservationsByHost : Error getting reservations for accommodation
+[2024-02-07T03:41:51Z] [info] [ID-1707277311997130707] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [error] [ID-1707277312002074752] ReservationRepo.GetAllReservationsByHost : Error getting reservations for accommodation
+[2024-02-07T03:41:52Z] [info] [ID-1707277312003272950] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [error] [ID-1707277312007736549] ReservationRepo.GetAllReservationsByHost : Error getting reservations for accommodation
+[2024-02-07T03:41:52Z] [info] [ID-1707277312008611073] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [error] [ID-1707277312014460059] ReservationRepo.GetAllReservationsByHost : Error getting reservations for accommodation
+[2024-02-07T03:41:52Z] [info] [ID-1707277312015305570] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [error] [ID-1707277312028182879] ReservationRepo.GetAllReservationsByHost : Error getting reservations for accommodation
+[2024-02-07T03:41:52Z] [info] [ID-1707277312029334217] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312034856225] ReservationRepo.GetCancelledReservationsByHost : reached GetCancelledReservationsByHost in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312050930564] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312056089189] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312061003209] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312065392056] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312070266377] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312076745944] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312093831251] ReservationHandler.HasEnoughCompletedReservations : HasEnoughCompletedReservations endpoint reached
+[2024-02-07T03:41:52Z] [info] [ID-1707277312094930360] ReservationRepo.HasEnoughCompletedReservations : reached HasEnoughCompletedReservations in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312096165252] ReservationRepo.GetReservationsByHost : reached GetReservationsByHost in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312110377775] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312115068662] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312118819387] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312122905132] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312127609810] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312133324906] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312148544090] ReservationHandler.CheckReservationsMoreThan50Days : CheckReservationsMoreThan50Days endpoint reached
+[2024-02-07T03:41:52Z] [info] [ID-1707277312149912961] ReservationRepo.HasReservationsMoreThan50Days : reached HasReservationsMoreThan50Days in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312150897720] ReservationRepo.GetReservationsByHost : reached GetReservationsByHost in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312165955433] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312170904365] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312174706146] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312178861396] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312183314408] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312188869055] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:41:52Z] [info] [ID-1707277312195113399] ReservationRepo.InsertReservation : Data of created appointment: &{ID:10ed08b4-d168-40b5-8263-2e2e822a073f Period:[2024-02-27 23:00:00 +0000 UTC] ByUserId:657d866ddd7f2ed59c4dff3a AccommodationId:65c12123dac34c985786ecc5 Price:100 Canceled:false}
+[2024-02-07T03:41:52Z] [info] [ID-1707277312196051919] ReservationRepo.InsertReservation : InsertReservation success
+[2024-02-07T03:41:52Z] [info] [ID-1707277312196895047] Reservation created successfully: &{10ed08b4-d168-40b5-8263-2e2e822a073f [2024-02-27 23:00:00 +0000 UTC] 657d866ddd7f2ed59c4dff3a 65c12123dac34c985786ecc5 100 false}
+[2024-02-07T03:41:52Z] [info] [ID-1707277312197736381] AccommodationId: 65c12123dac34c985786ecc5
+[2024-02-07T03:41:58Z] [info] [ID-1707277318635215295] Code after circuit breaker execution
+[2024-02-07T03:41:58Z] [info] [ID-1707277318638176894] ReservationHandler.CreateReservation : CreateReservation finished

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/trace"
 	"log"
 	"recommendations_service/domain"
@@ -16,14 +17,14 @@ const (
 
 type RecommendationNeo4JStore struct {
 	driver neo4j.DriverWithContext
-	logger *log.Logger
+	logger *logrus.Logger
 	tracer trace.Tracer
 }
 
-func NewRecommendationNeo4JStore(driver *neo4j.DriverWithContext, tracer trace.Tracer) domain.RecommendationStore {
+func NewRecommendationNeo4JStore(driver *neo4j.DriverWithContext, tracer trace.Tracer, logger *logrus.Logger) domain.RecommendationStore {
 	return &RecommendationNeo4JStore{
 		driver: *driver,
-		logger: log.Default(),
+		logger: logger,
 		tracer: tracer,
 	}
 }
@@ -32,6 +33,7 @@ func (store *RecommendationNeo4JStore) CreateAccommodation(ctx context.Context, 
 	ctx, span := store.tracer.Start(ctx, "RecommendationStore.CreateAccommodation")
 	defer span.End()
 
+	store.logger.Infoln("RecommendationNeo4JStore.CreateAccommodation : reached CreateAccommodation in store")
 	log.Println("RecommendationStore.CreateAccommodation : CreateAccommodation reached")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
@@ -45,6 +47,7 @@ func (store *RecommendationNeo4JStore) CreateAccommodation(ctx context.Context, 
 				map[string]any{"id": accommodation.ID, "name": accommodation.Name, "ownerId": accommodation.OwnerId})
 			if err != nil {
 				log.Printf("RecommendationStore.CreateAccommodation.Run() : %s", err)
+				store.logger.Errorf("RecommendationNeo4JStore.CreateAccommodation : %s", err)
 				return nil, err
 			}
 
@@ -55,12 +58,13 @@ func (store *RecommendationNeo4JStore) CreateAccommodation(ctx context.Context, 
 			return nil, result.Err()
 		})
 	if err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.CreateAccommodation : %s", err)
 		log.Printf("RecommendationStore.CreateAccommodation.ExecuteWrite() : %s\n", err)
 		return err
 	}
 
 	log.Println("RecommendationStore.CreateAccommodation : CreateAccommodation successful")
-
+	store.logger.Infoln("RecommendationNeo4JStore.CreateAccommodation : CreateAccommodation success")
 	return nil
 }
 
@@ -68,6 +72,7 @@ func (store *RecommendationNeo4JStore) DeleteAccommodation(ctx context.Context, 
 	ctx, span := store.tracer.Start(ctx, "RecommendationStore.DeleteAccommodation")
 	defer span.End()
 
+	store.logger.Infoln("RecommendationNeo4JStore.DeleteAccommodation : DeleteAccommodation reached in store")
 	log.Printf("RecommendationStore.DeleteAccommodation : DeleteAccommodation reached")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
@@ -88,13 +93,14 @@ func (store *RecommendationNeo4JStore) DeleteAccommodation(ctx context.Context, 
 	})
 
 	if err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.DeleteAccommodation : %s", err)
 		log.Printf("RecommendationStore.DeleteAccommodation.ExecuteWrite() : %s", err)
 
 		return err
 	}
 
 	log.Printf("RecommendationStore.DeleteAccommodation : DeleteAccommodation successful")
-
+	store.logger.Infoln("RecommendationNeo4JStore.CreateAccommodation : DeleteAccommodation success")
 	return nil
 }
 
@@ -102,6 +108,7 @@ func (store *RecommendationNeo4JStore) CreateRate(ctx context.Context, rate *dom
 	ctx, span := store.tracer.Start(ctx, "RecommendationStore.CreateRate")
 	defer span.End()
 
+	store.logger.Infoln("RecommendationNeo4JStore.CreateRate : CreateRate reached in store")
 	log.Println("RecommendationStore.CreateRate : CreateRate reached")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
@@ -114,6 +121,7 @@ func (store *RecommendationNeo4JStore) CreateRate(ctx context.Context, rate *dom
 					"r.createdAt = $createdAt, r.updatedAt = $updatedAt, r.byGuestId = $byGuestId, r.forAccommodationId = $forAccommodationId  RETURN r.id + ', from node ' + id(r)",
 				map[string]any{"id": rate.ID, "rate": rate.Rate, "createdAt": rate.CreatedAt, "updatedAt": rate.UpdatedAt, "byGuestId": rate.ByGuestId, "forAccommodationId": rate.ForAccommodationId})
 			if err != nil {
+				store.logger.Errorf("RecommendationNeo4JStore.CreateRate : %s", err)
 				log.Printf("RecommendationStore.CreateRate.Run() : %s", err)
 				return nil, err
 			}
@@ -125,12 +133,13 @@ func (store *RecommendationNeo4JStore) CreateRate(ctx context.Context, rate *dom
 			return nil, result.Err()
 		})
 	if err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.CreateRate : %s", err)
 		log.Printf("RecommendationStore.CreateRate.ExecuteWrite() : %s\n", err)
 		return err
 	}
 
 	log.Println("RecommendationStore.CreateRate : CreateRate successful")
-
+	store.logger.Infoln("RecommendationNeo4JStore.CreateRate : CreateRate success")
 	return nil
 }
 
@@ -138,6 +147,7 @@ func (store *RecommendationNeo4JStore) DeleteRate(ctx context.Context, id *strin
 	ctx, span := store.tracer.Start(ctx, "RecommendationStore.DeleteRate")
 	defer span.End()
 
+	store.logger.Infoln("RecommendationNeo4JStore.DeleteRate : DeleteRate reached in store")
 	log.Printf("RecommendationStore.DeleteRate : DeleteRate reached")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
@@ -150,6 +160,7 @@ func (store *RecommendationNeo4JStore) DeleteRate(ctx context.Context, id *strin
 				"DELETE r",
 			map[string]any{"id": id})
 		if err != nil {
+			store.logger.Errorf("RecommendationNeo4JStore.DeleteRate : %s", err)
 			log.Printf("RecommendationStore.DeleteRate.Run() : %s", err)
 			return nil, err
 		}
@@ -158,13 +169,14 @@ func (store *RecommendationNeo4JStore) DeleteRate(ctx context.Context, id *strin
 	})
 
 	if err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.DeleteRate : %s", err)
 		log.Printf("RecommendationStore.DeleteRate.ExecuteWrite() : %s", err)
 
 		return err
 	}
 
 	log.Printf("RecommendationStore.DeleteRate : DeleteRate successful")
-
+	store.logger.Infoln("RecommendationNeo4JStore.DeleteRate : DeleteRate success")
 	return nil
 }
 
@@ -172,6 +184,7 @@ func (store *RecommendationNeo4JStore) UpdateRate(ctx context.Context, rate *dom
 	ctx, span := store.tracer.Start(ctx, "RecommendationStore.UpdateRate")
 	defer span.End()
 
+	store.logger.Infoln("RecommendationNeo4JStore.UpdateRate : UpdateRate reached in store")
 	log.Printf("RecommendationStore.UpdateRate: UpdateRate reached")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
@@ -187,6 +200,7 @@ func (store *RecommendationNeo4JStore) UpdateRate(ctx context.Context, rate *dom
 
 				map[string]interface{}{"id": rate.ID, "rate": rate.Rate, "updatedAt": rate.UpdatedAt})
 			if err != nil {
+				store.logger.Errorf("RecommendationNeo4JStore.UpdateRate : %s", err)
 				log.Printf("RecommendationStore.UpdateRate.Run(): %s", err)
 				return nil, err
 			}
@@ -208,12 +222,13 @@ func (store *RecommendationNeo4JStore) UpdateRate(ctx context.Context, rate *dom
 		})
 
 	if err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.UpdateRate : %s", err)
 		log.Printf("RecommendationStore.UpdateRate.ExecuteWrite(): %s", err)
 		return nil, err
 	}
 
 	log.Printf("RecommendationStore.UpdateRate: UpdateRate successful")
-
+	store.logger.Infoln("RecommendationNeo4JStore.UpdateRate : UpdateRate success")
 	return request.(*domain.Rate), nil
 }
 
@@ -221,6 +236,7 @@ func (store *RecommendationNeo4JStore) CreateReservation(ctx context.Context, re
 	ctx, span := store.tracer.Start(ctx, "RecommendationStore.CreateReservation")
 	defer span.End()
 
+	store.logger.Infoln("RecommendationNeo4JStore.CreateReservation : CreateReservation reached in store")
 	log.Println("RecommendationStore.CreateReservation : CreateReservation reached")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
@@ -234,6 +250,7 @@ func (store *RecommendationNeo4JStore) CreateReservation(ctx context.Context, re
 					"RETURN res.id + ', from node ' + id(res) AS result",
 				map[string]any{"id": reservation.ID, "period": reservation.Period, "byUserId": reservation.ByUserId, "accommodationId": reservation.AccommodationId})
 			if err != nil {
+				store.logger.Errorf("RecommendationNeo4JStore.CreateReservation : %s", err)
 				log.Printf("RecommendationStore.CreateReservation.Run() : %s", err)
 				return nil, err
 			}
@@ -248,18 +265,21 @@ func (store *RecommendationNeo4JStore) CreateReservation(ctx context.Context, re
 			return nil, result.Err()
 		})
 	if err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.CreateReservation : %s", err)
 		log.Printf("RecommendationStore.CreateReservation.ExecuteWrite() : %s\n", err)
 		return err
 	}
 
 	log.Println("RecommendationStore.CreateReservation : CreateReservation successful")
-
+	store.logger.Infoln("RecommendationNeo4JStore.CreateReservation : CreateReservation success")
 	return nil
 }
 
 func (store *RecommendationNeo4JStore) GetRecommendAccommodationsId(ctx context.Context, id string) ([]string, error) {
 	ctx, span := store.tracer.Start(ctx, "RecommendationStore.GetRecommendAccommodationsId")
 	defer span.End()
+
+	store.logger.Infoln("RecommendationNeo4JStore.GetRecommendAccommodationsId : GetRecommendAccommodationsId reached in store")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
 	defer session.Close(ctx)
@@ -289,6 +309,7 @@ func (store *RecommendationNeo4JStore) GetRecommendAccommodationsId(ctx context.
 			"LIMIT 10;",
 		map[string]interface{}{"userId": id})
 	if err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.GetRecommendAccommodationsId : %s", err)
 		return nil, err
 	}
 
@@ -297,6 +318,7 @@ func (store *RecommendationNeo4JStore) GetRecommendAccommodationsId(ctx context.
 		record := result.Record()
 		accommodationID, found := record.Get("recommendedAccommodationId")
 		if !found {
+			store.logger.Errorf("RecommendationNeo4JStore.GetRecommendAccommodationsId : %s", err)
 			log.Println("Recommended Accommodation ID not found in result")
 			continue
 		}
@@ -304,9 +326,11 @@ func (store *RecommendationNeo4JStore) GetRecommendAccommodationsId(ctx context.
 	}
 
 	if err := result.Err(); err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.GetRecommendAccommodationsId : %s", err)
 		return nil, err
 	}
 
+	store.logger.Infoln("RecommendationNeo4JStore.GetRecommendAccommodationsId : GetRecommendAccommodationsId success")
 	return recommendedAccommodations, nil
 }
 
@@ -314,6 +338,7 @@ func (store *RecommendationNeo4JStore) GetUserByUsername(ctx context.Context, us
 	ctx, span := store.tracer.Start(ctx, "RecommendationNeo4JStore.GetUserByUsername")
 	defer span.End()
 
+	store.logger.Infoln("RecommendationNeo4JStore.GetUserByUsername : GetUserByUsername reached in store")
 	log.Println("RecommendationNeo4JStore.GetUserByUsername : GetUserByUsername reached")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
@@ -326,6 +351,7 @@ func (store *RecommendationNeo4JStore) GetUserByUsername(ctx context.Context, us
 				"RETURN u.id as id, u.username as username, u.userType as userType",
 			map[string]any{"username": username})
 		if err != nil {
+			store.logger.Errorf("RecommendationNeo4JStore.GetUserByUsername : %s", err)
 			log.Printf("RecommendationNeo4JStore.GetUserByUsername.Run() : %s", err)
 			return nil, err
 		}
@@ -339,6 +365,7 @@ func (store *RecommendationNeo4JStore) GetUserByUsername(ctx context.Context, us
 
 			userTypeStr, ok := userType.(string)
 			if !ok {
+				store.logger.Errorf("RecommendationNeo4JStore.GetUserByUsername : %s", err)
 				return nil, fmt.Errorf("userType conversion error")
 			}
 
@@ -348,14 +375,17 @@ func (store *RecommendationNeo4JStore) GetUserByUsername(ctx context.Context, us
 				UserType: domain.UserType(userTypeStr),
 			}
 		} else {
+			store.logger.Errorf("RecommendationNeo4JStore.GetUserByUsername : %s", err)
 			return nil, fmt.Errorf(errors.ErrorRequestNotExists)
 		}
 		return request, nil
 	})
 	if err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.GetUserByUsername : %s", err)
 		log.Printf("RecommendationNeo4JStore.GetUserByUsername.ExecuteRead() : %s", err)
 		return nil, err
 	}
+	store.logger.Infoln("RecommendationNeo4JStore.GetUserByUsername : GetRecommendAccommodationsId success")
 	log.Println("RecommendationNeo4JStore.GetUserByUsername : GetUserByUsername successful")
 
 	return requests.(*domain.User), nil
@@ -365,6 +395,7 @@ func (store *RecommendationNeo4JStore) GetUserByIdUsername(ctx context.Context, 
 	ctx, span := store.tracer.Start(ctx, "RecommendationNeo4JStore.GetUserByUsername")
 	defer span.End()
 
+	store.logger.Infoln("RecommendationNeo4JStore.GetUserByIdUsername : GetUserByIdUsername reached in store")
 	log.Println("RecommendationNeo4JStore.GetUserByUsername : GetUserByUsername reached")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
@@ -377,6 +408,7 @@ func (store *RecommendationNeo4JStore) GetUserByIdUsername(ctx context.Context, 
 				"RETURN u.id as id, u.username as username, u.userType as userType",
 			map[string]any{"id": id})
 		if err != nil {
+			store.logger.Errorf("RecommendationNeo4JStore.GetUserByIdUsername : %s", err)
 			log.Printf("RecommendationNeo4JStore.GetUserByUsername.Run() : %s", err)
 			return nil, err
 		}
@@ -390,6 +422,7 @@ func (store *RecommendationNeo4JStore) GetUserByIdUsername(ctx context.Context, 
 
 			userTypeStr, ok := userType.(string)
 			if !ok {
+				store.logger.Errorf("RecommendationNeo4JStore.GetUserByIdUsername : %s", err)
 				return nil, fmt.Errorf("userType conversion error")
 			}
 
@@ -399,16 +432,18 @@ func (store *RecommendationNeo4JStore) GetUserByIdUsername(ctx context.Context, 
 				UserType: domain.UserType(userTypeStr),
 			}
 		} else {
+			store.logger.Errorf("RecommendationNeo4JStore.GetUserByIdUsername : %s", err)
 			return nil, fmt.Errorf(errors.ErrorRequestNotExists)
 		}
 		return request, nil
 	})
 	if err != nil {
-		log.Printf("RecommendationNeo4JStore.GetUserByUsername.ExecuteRead() : %s", err)
+		store.logger.Errorf("RecommendationNeo4JStore.GetUserByIdUsername : %s", err)
+		log.Printf("RecommendationNeo4JStore.GetUserByIdUsername.ExecuteRead() : %s", err)
 		return nil, err
 	}
 	log.Println("RecommendationNeo4JStore.GetUserByUsername : GetUserByUsername successful")
-
+	store.logger.Infoln("RecommendationNeo4JStore.GetUserByIdUsername : GetUserByIdUsername success")
 	return requests.(*domain.User), nil
 }
 
@@ -416,6 +451,7 @@ func (store *RecommendationNeo4JStore) CreateUser(ctx context.Context, user *dom
 	ctx, span := store.tracer.Start(ctx, "RecommendationStore.SaveUser")
 	defer span.End()
 
+	store.logger.Infoln("RecommendationNeo4JStore.CreateUser : CreateUser reached in store")
 	log.Println("RecommendationStore.SaveUser : SaveUser reached")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
@@ -428,6 +464,7 @@ func (store *RecommendationNeo4JStore) CreateUser(ctx context.Context, user *dom
 					"u.userType = $userType RETURN u.id + ', from node ' + id(u)",
 				map[string]any{"id": user.ID, "username": user.Username, "userType": user.UserType})
 			if err != nil {
+				store.logger.Errorf("RecommendationNeo4JStore.CreateUser : %s", err)
 				log.Printf("RecommendationStore.SaveUser.Run() : %s", err)
 				return nil, err
 			}
@@ -439,12 +476,13 @@ func (store *RecommendationNeo4JStore) CreateUser(ctx context.Context, user *dom
 			return nil, result.Err()
 		})
 	if err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.CreateUser : %s", err)
 		log.Printf("RecommendationStore.SaveUser.ExecuteWrite() : %s\n", err)
 		return err
 	}
 
 	log.Println("RecommendationStore.SaveUser : SaveUser successful")
-
+	store.logger.Infoln("RecommendationNeo4JStore.CreateUser : CreateUser success")
 	return nil
 }
 
@@ -452,6 +490,7 @@ func (store *RecommendationNeo4JStore) DeleteUser(ctx context.Context, id *strin
 	ctx, span := store.tracer.Start(ctx, "RecommendationStore.DeleteUser")
 	defer span.End()
 
+	store.logger.Infoln("RecommendationNeo4JStore.DeleteUser : DeleteUser reached in store")
 	log.Printf("RecommendationStore.DeleteUser : DeleteUser reached")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
@@ -464,6 +503,7 @@ func (store *RecommendationNeo4JStore) DeleteUser(ctx context.Context, id *strin
 				"DELETE u",
 			map[string]any{"id": id})
 		if err != nil {
+			store.logger.Errorf("RecommendationNeo4JStore.DeleteUser : %s", err)
 			log.Printf("RecommendationStore.DeleteUser.Run() : %s", err)
 			return nil, err
 		}
@@ -472,13 +512,14 @@ func (store *RecommendationNeo4JStore) DeleteUser(ctx context.Context, id *strin
 	})
 
 	if err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.DeleteUser : %s", err)
 		log.Printf("RecommendationStore.DeleteUser.ExecuteWrite() : %s", err)
 
 		return err
 	}
 
 	log.Printf("RecommendationStore.DeleteUser : DeleteUser successful")
-
+	store.logger.Infoln("RecommendationNeo4JStore.DeleteUser : DeleteUser success")
 	return nil
 }
 
@@ -486,6 +527,7 @@ func (store *RecommendationNeo4JStore) UpdateUserUsername(ctx context.Context, u
 	ctx, span := store.tracer.Start(ctx, "RecommendationStore.UpdateUserUsername")
 	defer span.End()
 
+	store.logger.Infoln("RecommendationNeo4JStore.UpdateUserUsername : UpdateUserUsername reached in store")
 	log.Printf("RecommendationStore.UpdateUserUsername : UpdateUserUsername reached")
 
 	session := store.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: DATABASE})
@@ -500,6 +542,7 @@ func (store *RecommendationNeo4JStore) UpdateUserUsername(ctx context.Context, u
 					"RETURN user.id as id, user.username as username",
 				map[string]any{"id": user.ID, "username": user.Username})
 			if err != nil {
+				store.logger.Errorf("RecommendationNeo4JStore.UpdateUserUsername : %s", err)
 				log.Printf("RecommendationStore.UpdateUserUsername.Run() : %s", err)
 				log.Printf("Error in creating request node and relationships because of: %s", err.Error())
 				return nil, err
@@ -519,11 +562,12 @@ func (store *RecommendationNeo4JStore) UpdateUserUsername(ctx context.Context, u
 			return request, nil
 		})
 	if err != nil {
+		store.logger.Errorf("RecommendationNeo4JStore.UpdateUserUsername : %s", err)
 		log.Printf("RecommendationStore.UpdateUserUsername.ExecuteWrite() : %s", err)
 		return nil, err
 	}
 
 	log.Printf("RecommendationStore.UpdateUserUsername : UpdateUserUsername successful")
-
+	store.logger.Infoln("RecommendationNeo4JStore.UpdateUserUsername : UpdateUserUsername success")
 	return request.(*domain.User), nil
 }

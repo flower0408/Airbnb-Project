@@ -1,0 +1,9 @@
+[2024-02-07T03:41:43Z] [info] [ID-1707277303153528521] AuthHandler.VerifyRecaptcha : VerifyRecaptcha endpoint reached
+[2024-02-07T03:41:43Z] [info] [ID-1707277303193155505] AuthService.Register : register service reached
+[2024-02-07T03:41:43Z] [info] [ID-1707277303195131013] AuthService.VerifyRecaptcha : Making request to reCAPTCHA API
+[2024-02-07T03:41:43Z] [info] [ID-1707277303946606437] AuthService.VerifyRecaptcha : Successfully received response from reCAPTCHA API
+[2024-02-07T03:41:43Z] [info] [ID-1707277303972876465] AuthHandler.Login : endpoint login reached
+[2024-02-07T03:41:43Z] [info] [ID-1707277303974337080] AuthService.Login : login service reached
+[2024-02-07T03:41:43Z] [info] [ID-1707277303975722012] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:41:43Z] [info] [ID-1707277303991255214] AuthStore.GetOneUser : getOneUser success
+[2024-02-07T03:41:44Z] [info] [ID-1707277304051948613] AuthHandler.Login : endpoint login successful

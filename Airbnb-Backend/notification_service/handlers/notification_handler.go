@@ -55,7 +55,7 @@ func (handler *NotificationHandler) Init(router *mux.Router) {
 	router.HandleFunc("/", handler.CreateNotification).Methods("POST")
 
 	http.Handle("/", router)
-	log.Fatal(http.ListenAndServeTLS(":8005", "notification_service-cert.pem", "notification_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
+	log.Fatal(http.ListenAndServeTLS(":8005", "notification_service-cert.pem", "notification_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1, handler.logger)(router)))
 }
 
 type ValidationError struct {

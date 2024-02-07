@@ -1,0 +1,8 @@
+[2024-02-07T03:34:36Z] [info] [ID-1707276876107955495] RecommendationHandler.GetRecommendAccommodationsId : GetRecommendAccommodationsId endpoint reached
+[2024-02-07T03:34:36Z] [info] [ID-1707276876122487145] RecommendationService.GetUserByUsername : GetUserByUsername service reached
+[2024-02-07T03:34:36Z] [info] [ID-1707276876124835141] RecommendationNeo4JStore.GetUserByUsername : GetUserByUsername reached in store
+[2024-02-07T03:34:44Z] [info] [ID-1707276884192354419] RecommendationNeo4JStore.GetUserByUsername : GetRecommendAccommodationsId success
+[2024-02-07T03:34:44Z] [info] [ID-1707276884196129651] RecommendationService.GetRecommendAccommodationsId : GetRecommendAccommodationsId service reached
+[2024-02-07T03:34:44Z] [info] [ID-1707276884197194203] RecommendationNeo4JStore.GetRecommendAccommodationsId : GetRecommendAccommodationsId reached in store
+[2024-02-07T03:34:47Z] [info] [ID-1707276887241519394] RecommendationNeo4JStore.GetRecommendAccommodationsId : GetRecommendAccommodationsId success
+[2024-02-07T03:34:47Z] [info] [ID-1707276887245339464] RecommendationHandler.GetRecommendAccommodationsId : GetRecommendAccommodationsId success

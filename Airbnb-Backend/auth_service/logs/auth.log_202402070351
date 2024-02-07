@@ -1,0 +1,7 @@
+[2024-02-07T03:51:19Z] [info] [ID-1707277879755730043] AuthHandler.AccountConfirmation : AccountConfirmation endpoint reached
+[2024-02-07T03:51:19Z] [info] [ID-1707277879786789049] AuthService.AccountConfirmation : AccountConfirmation service reached
+[2024-02-07T03:51:19Z] [info] [ID-1707277879810842989] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:51:19Z] [info] [ID-1707277879900997603] AuthStore.GetOneUser : getOneUser success
+[2024-02-07T03:51:19Z] [info] [ID-1707277879902204388] AuthStore.UpdateUserUsername : reached UpdateUserUsername in store
+[2024-02-07T03:51:19Z] [info] [ID-1707277879947064420] AuthStore.UpdateUserUsername : UpdateUserUsername success
+[2024-02-07T03:51:19Z] [info] [ID-1707277879948319530] AuthHandler.AccountConfirmation : Verified account

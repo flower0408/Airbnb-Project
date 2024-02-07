@@ -1,0 +1,85 @@
+[2024-02-07T03:42:01Z] [info] [ID-1707277321671586335] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T03:42:01Z] [info] [ID-1707277321789360829] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:42:01Z] [info] [ID-1707277321791925551] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:42:01Z] [info] [ID-1707277321793377414] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:42:22Z] [info] [ID-1707277342462457555] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T03:42:22Z] [info] [ID-1707277342465063128] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:42:22Z] [info] [ID-1707277342466525035] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:42:22Z] [info] [ID-1707277342467699948] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:42:25Z] [info] [ID-1707277345568782545] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T03:42:25Z] [info] [ID-1707277345571787066] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:42:25Z] [info] [ID-1707277345572869762] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:42:25Z] [info] [ID-1707277345574235863] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:42:29Z] [info] [ID-1707277349771450089] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T03:42:29Z] [info] [ID-1707277349772688439] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:42:29Z] [info] [ID-1707277349773488360] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:42:29Z] [info] [ID-1707277349774417836] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:42:32Z] [info] [ID-1707277352367380408] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T03:42:32Z] [info] [ID-1707277352369898989] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:42:32Z] [info] [ID-1707277352372212152] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:42:32Z] [info] [ID-1707277352376236665] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:42:37Z] [info] [ID-1707277357015578838] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T03:42:37Z] [info] [ID-1707277357017778214] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:42:37Z] [info] [ID-1707277357019318334] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:42:37Z] [info] [ID-1707277357020498777] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:42:46Z] [info] [ID-1707277366736208152] AppointmentHandler.UpdateAppointment : UpdateAppointment endpoint reached
+[2024-02-07T03:42:46Z] [info] [ID-1707277366738144453] AppointmentRepo.UpdateAppointment : reached InsertAppointment in repo
+[2024-02-07T03:42:46Z] [info] [ID-1707277366739361840] AppointmentRepo.GetAppointmentByID : reached GetAppointmentByID in repo
+[2024-02-07T03:42:46Z] [info] [ID-1707277366868282491] ReservationHandler.CheckReservation : CheckReservation endpoint reached
+[2024-02-07T03:42:46Z] [info] [ID-1707277366870226804] ReservationRepo.ReservationExistsForAppointment : reached ReservationExistsForAppointment in repo
+[2024-02-07T03:42:46Z] [info] [ID-1707277366871575287] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:42:46Z] [error] [ID-1707277366879536514] AppointmentRepo.UpdateAppointment : Reservation exists for the appointment. Update not allowed.
+[2024-02-07T03:42:46Z] [error] [ID-1707277366880802915] AppointmentHandler.UpdateAppointment : Reservation exists for the appointment. Update not allowed
+[2024-02-07T03:42:49Z] [info] [ID-1707277369588200421] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:42:49Z] [info] [ID-1707277369590908819] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:42:49Z] [info] [ID-1707277369592493613] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T03:42:49Z] [info] [ID-1707277369594519338] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:43:04Z] [info] [ID-1707277384662277094] AppointmentHandler.CreateAppointment : CreateAppointment endpoint reached
+[2024-02-07T03:43:04Z] [info] [ID-1707277384663167276] AppointmentRepo.InsertAppointment : reached InsertAppointment in repo
+[2024-02-07T03:43:04Z] [info] [ID-1707277384663793443] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:43:04Z] [info] [ID-1707277384741498804] Documents ID: ObjectID("65c2fc48644f61f7e618e905")
+
+[2024-02-07T03:43:04Z] [info] [ID-1707277384742742705] AppointmentRepo.InsertAppointment : Data of created appointment: &{ID:ObjectID("000000000000000000000000") Available:[2024-03-05 23:00:00 +0000 UTC 2024-03-06 23:00:00 +0000 UTC 2024-03-07 23:00:00 +0000 UTC 2024-03-08 23:00:00 +0000 UTC 2024-03-09 23:00:00 +0000 UTC 2024-03-10 23:00:00 +0000 UTC 2024-03-11 23:00:00 +0000 UTC 2024-03-12 23:00:00 +0000 UTC 2024-03-13 23:00:00 +0000 UTC] AccommodationId:65bf0681a3163b8b45ba693f PricePerGuest:25 PricePerAccommodation:0}
+[2024-02-07T03:43:04Z] [info] [ID-1707277384743488971] AppointmentRepo.InsertAppointment : InsertAppointment success
+[2024-02-07T03:43:04Z] [info] [ID-1707277384744191132] AppointmentHandler.CreateAppointment : CreateAppointment finished
+[2024-02-07T03:43:07Z] [info] [ID-1707277387498829406] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T03:43:07Z] [info] [ID-1707277387501994551] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:43:07Z] [info] [ID-1707277387503427592] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:43:07Z] [info] [ID-1707277387505052087] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:43:21Z] [info] [ID-1707277401662602591] AppointmentHandler.UpdateAppointment : UpdateAppointment endpoint reached
+[2024-02-07T03:43:21Z] [info] [ID-1707277401664441546] AppointmentRepo.UpdateAppointment : reached InsertAppointment in repo
+[2024-02-07T03:43:21Z] [info] [ID-1707277401665541728] AppointmentRepo.GetAppointmentByID : reached GetAppointmentByID in repo
+[2024-02-07T03:43:21Z] [info] [ID-1707277401806574844] ReservationHandler.CheckReservation : CheckReservation endpoint reached
+[2024-02-07T03:43:21Z] [info] [ID-1707277401808030928] ReservationRepo.ReservationExistsForAppointment : reached ReservationExistsForAppointment in repo
+[2024-02-07T03:43:21Z] [info] [ID-1707277401809451358] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:43:21Z] [info] [ID-1707277401871665560] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo
+[2024-02-07T03:43:21Z] [error] [ID-1707277401887644017] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401888506134] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401889098959] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401889711884] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401890557906] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401891302287] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401892004014] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401892603068] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401893220370] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401893784141] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401894344658] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401894909651] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401895537588] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401896078706] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401896664069] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401897220169] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401897789939] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [error] [ID-1707277401898412679] AppointmentRepo.UpdateAppointment : Error editing appointment. Cannot add appointment in the past.
+[2024-02-07T03:43:21Z] [info] [ID-1707277401898940637] No reservation found for the appointment. Update allowed.
+[2024-02-07T03:43:21Z] [info] [ID-1707277401938812796] Documents matched: 1
+
+[2024-02-07T03:43:21Z] [info] [ID-1707277401939670937] Documents updated: 1
+
+[2024-02-07T03:43:21Z] [info] [ID-1707277401941576421] AppointmentRepo.UpdateAppointment : Data of updated appointment: &{ID:ObjectID("65c2fc48644f61f7e618e905") Available:[2024-03-01 23:00:00 +0000 UTC 2024-03-02 23:00:00 +0000 UTC 2024-03-03 23:00:00 +0000 UTC 2024-03-04 23:00:00 +0000 UTC 2024-03-05 23:00:00 +0000 UTC 2024-03-06 23:00:00 +0000 UTC 2024-03-07 23:00:00 +0000 UTC 2024-03-08 23:00:00 +0000 UTC 2024-03-09 23:00:00 +0000 UTC 2024-03-10 23:00:00 +0000 UTC 2024-03-11 23:00:00 +0000 UTC 2024-03-12 23:00:00 +0000 UTC 2024-03-13 23:00:00 +0000 UTC 2024-03-14 23:00:00 +0000 UTC 2024-03-15 23:00:00 +0000 UTC 2024-03-16 23:00:00 +0000 UTC 2024-03-17 23:00:00 +0000 UTC 2024-03-18 23:00:00 +0000 UTC] AccommodationId:65bf0681a3163b8b45ba693f PricePerGuest:25 PricePerAccommodation:0}
+[2024-02-07T03:43:21Z] [info] [ID-1707277401942346140] AppointmentRepo.UpdateAppointment : UpdateAppointment success
+[2024-02-07T03:43:21Z] [info] [ID-1707277401942975540] AppointmentHandler.UpdateAppointment : UpdateAppointment finished
+[2024-02-07T03:43:24Z] [info] [ID-1707277404533280672] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T03:43:24Z] [info] [ID-1707277404535999019] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T03:43:24Z] [info] [ID-1707277404627416450] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T03:43:24Z] [info] [ID-1707277404628901336] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo

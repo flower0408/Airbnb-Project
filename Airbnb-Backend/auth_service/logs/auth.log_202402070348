@@ -1,0 +1,205 @@
+[2024-02-07T03:49:44Z] [info] [ID-1707277784323164080] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:49:44Z] [info] [ID-1707277784394136325] AuthService.Register : register service reached
+[2024-02-07T03:49:44Z] [info] [ID-1707277784404419437] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:49:44Z] [error] [ID-1707277784488946277] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:49:44Z] [error] [ID-1707277784841836291] AuthService.Register : Get "https://user_service:8002/mailExist/natasakotaranin@gmail.com": dial tcp: lookup user_service on 127.0.0.11:53: lame referral (user_service unavailable)
+[2024-02-07T03:49:44Z] [error] [ID-1707277784846845676] AuthService.Register : EmailServiceError (user_service unavailable)
+[2024-02-07T03:49:44Z] [error] [ID-1707277784850728705] AuthHandler.Register : EmailServiceError
+[2024-02-07T03:49:44Z] [info] [ID-1707277784877351219] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:49:44Z] [info] [ID-1707277784887325868] AuthService.Register : register service reached
+[2024-02-07T03:49:44Z] [info] [ID-1707277784894533099] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:49:44Z] [error] [ID-1707277784900786609] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:49:45Z] [error] [ID-1707277785142526038] AuthService.Register : Get "https://user_service:8002/mailExist/natasakotaranin@gmail.com": dial tcp: lookup user_service on 127.0.0.11:53: lame referral (user_service unavailable)
+[2024-02-07T03:49:45Z] [error] [ID-1707277785146524854] AuthService.Register : EmailServiceError (user_service unavailable)
+[2024-02-07T03:49:45Z] [error] [ID-1707277785150458911] AuthHandler.Register : EmailServiceError
+[2024-02-07T03:49:45Z] [info] [ID-1707277785187498743] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:49:45Z] [info] [ID-1707277785197352378] AuthService.Register : register service reached
+[2024-02-07T03:49:45Z] [info] [ID-1707277785206415633] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:49:45Z] [error] [ID-1707277785211538782] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:49:45Z] [error] [ID-1707277785457528530] AuthService.Register : Get "https://user_service:8002/mailExist/natasakotaranin@gmail.com": dial tcp: lookup user_service on 127.0.0.11:53: lame referral (user_service unavailable)
+[2024-02-07T03:49:45Z] [error] [ID-1707277785461663985] AuthService.Register : EmailServiceError (user_service unavailable)
+[2024-02-07T03:49:45Z] [error] [ID-1707277785467329014] AuthHandler.Register : EmailServiceError
+[2024-02-07T03:49:45Z] [info] [ID-1707277785480773120] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:49:45Z] [info] [ID-1707277785485887355] AuthService.Register : register service reached
+[2024-02-07T03:49:45Z] [info] [ID-1707277785490601386] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:49:45Z] [error] [ID-1707277785493375786] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:49:45Z] [error] [ID-1707277785494501861] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:49:45Z] [error] [ID-1707277785496080950] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:49:45Z] [info] [ID-1707277785507015422] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:49:45Z] [info] [ID-1707277785511065857] AuthService.Register : register service reached
+[2024-02-07T03:49:45Z] [info] [ID-1707277785514576414] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:49:45Z] [error] [ID-1707277785516787992] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:49:45Z] [error] [ID-1707277785517615870] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:49:45Z] [error] [ID-1707277785518401533] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:49:47Z] [info] [ID-1707277787251351924] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:49:47Z] [info] [ID-1707277787253539123] AuthService.Register : register service reached
+[2024-02-07T03:49:47Z] [info] [ID-1707277787255448486] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:49:47Z] [error] [ID-1707277787257888952] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:49:47Z] [error] [ID-1707277787258909832] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:49:47Z] [error] [ID-1707277787260156567] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:49:48Z] [info] [ID-1707277788713663430] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:49:48Z] [info] [ID-1707277788715556417] AuthService.Register : register service reached
+[2024-02-07T03:49:48Z] [info] [ID-1707277788716963143] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:49:48Z] [error] [ID-1707277788718932039] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:49:48Z] [error] [ID-1707277788719764254] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:49:48Z] [error] [ID-1707277788720568895] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:49:50Z] [info] [ID-1707277790708761384] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:49:50Z] [info] [ID-1707277790711004210] AuthService.Register : register service reached
+[2024-02-07T03:49:50Z] [info] [ID-1707277790721695760] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:49:50Z] [error] [ID-1707277790724917890] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:49:50Z] [error] [ID-1707277790725996842] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:49:50Z] [error] [ID-1707277790726993124] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:49:51Z] [info] [ID-1707277791955323446] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:49:51Z] [info] [ID-1707277791961401803] AuthService.Register : register service reached
+[2024-02-07T03:49:51Z] [info] [ID-1707277791964692722] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:49:52Z] [error] [ID-1707277792107305959] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:49:52Z] [error] [ID-1707277792111020141] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:49:52Z] [error] [ID-1707277792114268504] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:49:55Z] [info] [ID-1707277795770833246] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:49:55Z] [info] [ID-1707277795777922612] AuthService.Register : register service reached
+[2024-02-07T03:49:55Z] [info] [ID-1707277795782864191] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:49:55Z] [error] [ID-1707277795829924381] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:49:56Z] [error] [ID-1707277796105342592] AuthService.Register : Get "https://user_service:8002/mailExist/natasakotaranin@gmail.com": dial tcp: lookup user_service on 127.0.0.11:53: lame referral (user_service unavailable)
+[2024-02-07T03:49:56Z] [error] [ID-1707277796108828468] AuthService.Register : EmailServiceError (user_service unavailable)
+[2024-02-07T03:49:56Z] [error] [ID-1707277796112870215] AuthHandler.Register : EmailServiceError
+[2024-02-07T03:50:08Z] [info] [ID-1707277808966654769] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:08Z] [info] [ID-1707277808973974285] AuthService.Register : register service reached
+[2024-02-07T03:50:08Z] [info] [ID-1707277808977782149] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:09Z] [error] [ID-1707277809035303510] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:09Z] [error] [ID-1707277809307795565] AuthService.Register : Get "https://user_service:8002/mailExist/natasakotaranin@gmail.com": dial tcp: lookup user_service on 127.0.0.11:53: lame referral (user_service unavailable)
+[2024-02-07T03:50:09Z] [error] [ID-1707277809311294537] AuthService.Register : EmailServiceError (user_service unavailable)
+[2024-02-07T03:50:09Z] [error] [ID-1707277809314547045] AuthHandler.Register : EmailServiceError
+[2024-02-07T03:50:10Z] [info] [ID-1707277810781167397] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:10Z] [info] [ID-1707277810785460617] AuthService.Register : register service reached
+[2024-02-07T03:50:10Z] [info] [ID-1707277810788231875] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:10Z] [error] [ID-1707277810790324806] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:10Z] [error] [ID-1707277810791452163] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:10Z] [error] [ID-1707277810792486705] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:11Z] [info] [ID-1707277811715670391] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:11Z] [info] [ID-1707277811718142137] AuthService.Register : register service reached
+[2024-02-07T03:50:11Z] [info] [ID-1707277811720553280] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:11Z] [error] [ID-1707277811724129832] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:11Z] [error] [ID-1707277811725443090] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:11Z] [error] [ID-1707277811726640839] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:12Z] [info] [ID-1707277812356999148] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:12Z] [info] [ID-1707277812359112811] AuthService.Register : register service reached
+[2024-02-07T03:50:12Z] [info] [ID-1707277812361234707] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:12Z] [error] [ID-1707277812364616108] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:12Z] [error] [ID-1707277812366099909] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:12Z] [error] [ID-1707277812367477115] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:12Z] [info] [ID-1707277812927692992] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:12Z] [info] [ID-1707277812928892594] AuthService.Register : register service reached
+[2024-02-07T03:50:12Z] [info] [ID-1707277812929762036] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:12Z] [error] [ID-1707277812933365792] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:12Z] [error] [ID-1707277812934213020] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:12Z] [error] [ID-1707277812934887691] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:13Z] [info] [ID-1707277813439537142] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:13Z] [info] [ID-1707277813442215427] AuthService.Register : register service reached
+[2024-02-07T03:50:13Z] [info] [ID-1707277813444404968] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:13Z] [error] [ID-1707277813449028778] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:13Z] [error] [ID-1707277813449999026] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:13Z] [error] [ID-1707277813450894418] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:13Z] [info] [ID-1707277813958300735] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:13Z] [info] [ID-1707277813960413678] AuthService.Register : register service reached
+[2024-02-07T03:50:13Z] [info] [ID-1707277813961740106] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:13Z] [error] [ID-1707277813964270082] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:13Z] [error] [ID-1707277813965243806] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:13Z] [error] [ID-1707277813966025653] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:14Z] [info] [ID-1707277814501292435] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:14Z] [info] [ID-1707277814505875081] AuthService.Register : register service reached
+[2024-02-07T03:50:14Z] [info] [ID-1707277814511956401] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:14Z] [error] [ID-1707277814514914118] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:14Z] [error] [ID-1707277814515884697] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:14Z] [error] [ID-1707277814516564506] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:15Z] [info] [ID-1707277815023490514] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:15Z] [info] [ID-1707277815025003920] AuthService.Register : register service reached
+[2024-02-07T03:50:15Z] [info] [ID-1707277815026408359] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:15Z] [error] [ID-1707277815028720059] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:15Z] [error] [ID-1707277815029746213] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:15Z] [error] [ID-1707277815030707558] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:15Z] [info] [ID-1707277815587522899] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:15Z] [info] [ID-1707277815588970013] AuthService.Register : register service reached
+[2024-02-07T03:50:15Z] [info] [ID-1707277815590138186] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:15Z] [error] [ID-1707277815592119175] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:15Z] [error] [ID-1707277815593110796] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:15Z] [error] [ID-1707277815594040201] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:16Z] [info] [ID-1707277816069944900] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:16Z] [info] [ID-1707277816072322921] AuthService.Register : register service reached
+[2024-02-07T03:50:16Z] [info] [ID-1707277816073812451] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:16Z] [error] [ID-1707277816076021983] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:16Z] [error] [ID-1707277816076941413] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:16Z] [error] [ID-1707277816077668655] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:16Z] [info] [ID-1707277816623410134] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:16Z] [info] [ID-1707277816625270577] AuthService.Register : register service reached
+[2024-02-07T03:50:16Z] [info] [ID-1707277816626470370] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:16Z] [error] [ID-1707277816628377825] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:16Z] [error] [ID-1707277816629308753] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:16Z] [error] [ID-1707277816630285501] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:17Z] [info] [ID-1707277817139159404] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:17Z] [info] [ID-1707277817140643375] AuthService.Register : register service reached
+[2024-02-07T03:50:17Z] [info] [ID-1707277817143053256] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:17Z] [error] [ID-1707277817145597014] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:17Z] [error] [ID-1707277817146491956] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:17Z] [error] [ID-1707277817147338242] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:17Z] [info] [ID-1707277817626775095] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:17Z] [info] [ID-1707277817628216571] AuthService.Register : register service reached
+[2024-02-07T03:50:17Z] [info] [ID-1707277817629362911] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:17Z] [error] [ID-1707277817631871184] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:17Z] [error] [ID-1707277817633042122] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:17Z] [error] [ID-1707277817634074656] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:18Z] [info] [ID-1707277818128002492] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:18Z] [info] [ID-1707277818129437397] AuthService.Register : register service reached
+[2024-02-07T03:50:18Z] [info] [ID-1707277818130768342] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:18Z] [error] [ID-1707277818132782512] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:18Z] [error] [ID-1707277818133768615] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:18Z] [error] [ID-1707277818134468986] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:18Z] [info] [ID-1707277818626726495] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:18Z] [info] [ID-1707277818627940719] AuthService.Register : register service reached
+[2024-02-07T03:50:18Z] [info] [ID-1707277818629244702] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:18Z] [error] [ID-1707277818631287837] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:18Z] [error] [ID-1707277818632168696] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:18Z] [error] [ID-1707277818632861095] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:19Z] [info] [ID-1707277819071153831] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:19Z] [info] [ID-1707277819072680818] AuthService.Register : register service reached
+[2024-02-07T03:50:19Z] [info] [ID-1707277819074983193] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:19Z] [error] [ID-1707277819082545138] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:19Z] [error] [ID-1707277819083443495] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:19Z] [error] [ID-1707277819084270282] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:19Z] [info] [ID-1707277819618947160] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:19Z] [info] [ID-1707277819621800137] AuthService.Register : register service reached
+[2024-02-07T03:50:19Z] [info] [ID-1707277819623004179] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:19Z] [error] [ID-1707277819625581789] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:19Z] [error] [ID-1707277819979300032] AuthService.Register : Get "https://user_service:8002/mailExist/natasakotaranin@gmail.com": dial tcp: lookup user_service on 127.0.0.11:53: lame referral (user_service unavailable)
+[2024-02-07T03:50:19Z] [error] [ID-1707277819980626836] AuthService.Register : EmailServiceError (user_service unavailable)
+[2024-02-07T03:50:19Z] [error] [ID-1707277819982302571] AuthHandler.Register : EmailServiceError
+[2024-02-07T03:50:21Z] [info] [ID-1707277821181220078] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:21Z] [info] [ID-1707277821185548249] AuthService.Register : register service reached
+[2024-02-07T03:50:21Z] [info] [ID-1707277821187762183] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:21Z] [error] [ID-1707277821239059863] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:21Z] [error] [ID-1707277821239864875] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:21Z] [error] [ID-1707277821240546465] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:22Z] [info] [ID-1707277822120210588] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:22Z] [info] [ID-1707277822122605773] AuthService.Register : register service reached
+[2024-02-07T03:50:22Z] [info] [ID-1707277822124173832] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:22Z] [error] [ID-1707277822127026178] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:22Z] [error] [ID-1707277822128099888] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:22Z] [error] [ID-1707277822129024185] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:23Z] [info] [ID-1707277823016101157] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:23Z] [info] [ID-1707277823017497408] AuthService.Register : register service reached
+[2024-02-07T03:50:23Z] [info] [ID-1707277823018864324] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:23Z] [error] [ID-1707277823022142973] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:23Z] [error] [ID-1707277823023320895] AuthService.Register : circuit breaker is open (user_service unavailable)
+[2024-02-07T03:50:23Z] [error] [ID-1707277823024126377] AuthHandler.Register : circuit breaker is open
+[2024-02-07T03:50:46Z] [info] [ID-1707277846929890065] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:50:46Z] [info] [ID-1707277846934578302] AuthService.Register : register service reached
+[2024-02-07T03:50:46Z] [info] [ID-1707277846936129462] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:50:46Z] [error] [ID-1707277846984617169] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:50:47Z] [info] [ID-1707277847133014707] AuthService.Register : Received meaningful data: %s  EmailOK
+[2024-02-07T03:50:47Z] [info] [ID-1707277847188470691] AuthService.Register : password successfully hashed
+[2024-02-07T03:50:47Z] [info] [ID-1707277847227623769] AuthStore.Register : reached register in store
+[2024-02-07T03:50:47Z] [info] [ID-1707277847239221504] AuthService.Register : UserRegistered in user_service
+[2024-02-07T03:50:47Z] [info] [ID-1707277847240232550] AuthService.Register : Received meaningful data:  UserRegistered
+[2024-02-07T03:50:47Z] [info] [ID-1707277847277653203] AuthService.sendValidationMail : sendValidationMail service reached
+[2024-02-07T03:50:54Z] [info] [ID-1707277854000169437] AuthService.sendValidationMail : sendValidationMail service finished
+[2024-02-07T03:50:54Z] [info] [ID-1707277854003320930] AuthService.Register : register service finished
+[2024-02-07T03:50:54Z] [info] [ID-1707277854004639679] AuthHandler.Register : Registration success

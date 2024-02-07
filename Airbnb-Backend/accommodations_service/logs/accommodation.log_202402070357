@@ -1,0 +1,21 @@
+[2024-02-07T03:58:59Z] [info] [ID-1707278339014593356] AccommodationHandler.GetAll : GetAll endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339072140390] AccommodationRepo.GetAll : reached GetAll in repo
+[2024-02-07T03:58:59Z] [info] [ID-1707278339094360628] AccommodationHandler.GetAll : GetAll finished
+[2024-02-07T03:59:52Z] [info] [ID-1707278392964061145] AccommodationHandler.CreateAccommodation : CreateAccommodation endpoint reached
+[2024-02-07T03:59:52Z] [info] [ID-1707278392965924145] AccommodationHandler.getUserIDFromUserService : getUserIDFromUserService endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393117832050] AccommodationHandler.getUserIDFromUserService : getUserIDFromUserService finished
+[2024-02-07T03:59:53Z] [info] [ID-1707278393129994209] AccommodationRepo.InsertAccommodation : reached InsertAccommodation in repo
+[2024-02-07T03:59:53Z] [info] [ID-1707278393168153601] AccommodationRepo.InsertAccommodation : Data of created accommodation: &{ID:ObjectID("000000000000000000000000") Name:Zlatiborac Description:Dozivecete autenticnu i toplu atmosferu u kojoj cete uzivati Location:{Country:Srbija City:Zlatibor Street:Strazilovska Number:43} Benefits:kuhinja, wifi, TV, parking MinGuest:1 MaxGuest:12 OwnerId:65c2ffcbb596c10367a4bfbe}
+[2024-02-07T03:59:53Z] [info] [ID-1707278393168915883] AccommodationRepo.InsertAccommodation : InsertAccommodation success
+[2024-02-07T03:59:53Z] [info] [ID-1707278393169671896] AccommodationHandler.CreateAccommodation : CreateAccommodation finished
+[2024-02-07T03:59:53Z] [info] [ID-1707278393300538536] AccommodationHandler.UploadImages : UploadImages endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393492699307] AccommodationHandler.GetAll : GetAll endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393495795140] AccommodationRepo.GetAll : reached GetAll in repo
+[2024-02-07T03:59:53Z] [info] [ID-1707278393514822901] AccommodationHandler.GetAll : GetAll finished
+[2024-02-07T03:59:56Z] [info] [ID-1707278396081642801] AccommodationHandler.GetRatesByAccommodation : GetRatesByAccommodation endpoint reached
+[2024-02-07T03:59:56Z] [info] [ID-1707278396084027875] AccommodationRepo.GetRatesByAccommodation : reached GetRatesByAccommodation in repo
+[2024-02-07T03:59:56Z] [info] [ID-1707278396090686146] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-07T03:59:56Z] [info] [ID-1707278396095540170] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-07T03:59:56Z] [info] [ID-1707278396529231611] AccommodationHandler.GetRatesByAccommodation : GetRatesByAccommodation finished
+[2024-02-07T03:59:56Z] [info] [ID-1707278396540034289] AccommodationHandler.GetByID : GetByID finished
+[2024-02-07T03:59:57Z] [info] [ID-1707278397858464072] AccommodationHandler.GetImageURLS : GetImageURLS endpoint reached

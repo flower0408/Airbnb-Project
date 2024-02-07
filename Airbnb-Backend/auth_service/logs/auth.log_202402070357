@@ -1,0 +1,29 @@
+[2024-02-07T03:58:03Z] [info] [ID-1707278283623388677] AuthHandler.Register : Register endpoint reached
+[2024-02-07T03:58:03Z] [info] [ID-1707278283705371960] AuthService.Register : register service reached
+[2024-02-07T03:58:03Z] [info] [ID-1707278283712915965] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:58:03Z] [error] [ID-1707278283780286722] AuthStore.GetOneUser.filterOne() : mongo: no documents in result
+[2024-02-07T03:58:03Z] [info] [ID-1707278283911604968] AuthService.Register : Received meaningful data: %s  EmailOK
+[2024-02-07T03:58:03Z] [info] [ID-1707278283968197095] AuthService.Register : password successfully hashed
+[2024-02-07T03:58:04Z] [info] [ID-1707278284017277767] AuthStore.Register : reached register in store
+[2024-02-07T03:58:04Z] [info] [ID-1707278284021803511] AuthService.Register : UserRegistered in user_service
+[2024-02-07T03:58:04Z] [info] [ID-1707278284022697817] AuthService.Register : Received meaningful data:  UserRegistered
+[2024-02-07T03:58:04Z] [info] [ID-1707278284042512870] AuthService.sendValidationMail : sendValidationMail service reached
+[2024-02-07T03:58:10Z] [info] [ID-1707278290283362153] AuthService.sendValidationMail : sendValidationMail service finished
+[2024-02-07T03:58:10Z] [info] [ID-1707278290286171140] AuthService.Register : register service finished
+[2024-02-07T03:58:10Z] [info] [ID-1707278290287892998] AuthHandler.Register : Registration success
+[2024-02-07T03:58:41Z] [info] [ID-1707278321285909659] AuthHandler.AccountConfirmation : AccountConfirmation endpoint reached
+[2024-02-07T03:58:41Z] [info] [ID-1707278321290508464] AuthService.AccountConfirmation : AccountConfirmation service reached
+[2024-02-07T03:58:41Z] [info] [ID-1707278321305001813] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:58:41Z] [info] [ID-1707278321370610017] AuthStore.GetOneUser : getOneUser success
+[2024-02-07T03:58:41Z] [info] [ID-1707278321371983566] AuthStore.UpdateUserUsername : reached UpdateUserUsername in store
+[2024-02-07T03:58:41Z] [info] [ID-1707278321411733267] AuthStore.UpdateUserUsername : UpdateUserUsername success
+[2024-02-07T03:58:41Z] [info] [ID-1707278321412825619] AuthHandler.AccountConfirmation : Verified account
+[2024-02-07T03:58:57Z] [info] [ID-1707278337944111886] AuthHandler.VerifyRecaptcha : VerifyRecaptcha endpoint reached
+[2024-02-07T03:58:57Z] [info] [ID-1707278337947101447] AuthService.Register : register service reached
+[2024-02-07T03:58:57Z] [info] [ID-1707278337947934932] AuthService.VerifyRecaptcha : Making request to reCAPTCHA API
+[2024-02-07T03:58:58Z] [info] [ID-1707278338693674284] AuthService.VerifyRecaptcha : Successfully received response from reCAPTCHA API
+[2024-02-07T03:58:58Z] [info] [ID-1707278338720282446] AuthHandler.Login : endpoint login reached
+[2024-02-07T03:58:58Z] [info] [ID-1707278338721863662] AuthService.Login : login service reached
+[2024-02-07T03:58:58Z] [info] [ID-1707278338723093780] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:58:58Z] [info] [ID-1707278338783665365] AuthStore.GetOneUser : getOneUser success
+[2024-02-07T03:58:58Z] [info] [ID-1707278338838430187] AuthHandler.Login : endpoint login successful

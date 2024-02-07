@@ -1,0 +1,26 @@
+[2024-02-06T23:12:15Z] [info] [ID-1707261135413159804] PONG
+[2024-02-06T23:12:15Z] [info] [ID-1707261135433624464] Server listening on port 8001
+[2024-02-06T23:13:27Z] [info] [ID-1707261207554703823] AccommodationHandler.GetAll : GetAll endpoint reached
+[2024-02-06T23:13:27Z] [info] [ID-1707261207575477043] AccommodationRepo.GetAll : reached GetAll in repo
+[2024-02-06T23:13:28Z] [info] [ID-1707261208056477566] AccommodationHandler.GetAll : GetAll finished
+[2024-02-06T23:14:12Z] [info] [ID-1707261252968583572] AccommodationHandler.GetAll : GetAll endpoint reached
+[2024-02-06T23:14:12Z] [info] [ID-1707261252970664510] AccommodationRepo.GetAll : reached GetAll in repo
+[2024-02-06T23:14:12Z] [info] [ID-1707261252991037637] AccommodationHandler.GetAll : GetAll finished
+[2024-02-06T23:14:14Z] [info] [ID-1707261254668420960] AccommodationHandler.GetRatesByAccommodation : GetRatesByAccommodation endpoint reached
+[2024-02-06T23:14:14Z] [info] [ID-1707261254671002004] AccommodationRepo.GetRatesByAccommodation : reached GetRatesByAccommodation in repo
+[2024-02-06T23:14:14Z] [info] [ID-1707261254674140444] AccommodationHandler.GetByID : GetByID endpoint reached
+[2024-02-06T23:14:14Z] [info] [ID-1707261254676405198] AccommodationRepo.GetByID : reached GetByID in repo
+[2024-02-06T23:14:14Z] [info] [ID-1707261254732304145] AccommodationHandler.GetByID : GetByID finished
+[2024-02-06T23:14:14Z] [info] [ID-1707261254740076482] AccommodationHandler.GetRatesByAccommodation : GetRatesByAccommodation finished
+[2024-02-06T23:14:14Z] [info] [ID-1707261254770035010] AccommodationHandler.GetImageURLS : GetImageURLS endpoint reached
+[2024-02-06T23:14:14Z] [info] [ID-1707261254808320965] redis: nil
+[2024-02-06T23:14:14Z] [info] [ID-1707261254887068465] Cache hit - set image url
+[2024-02-06T23:14:14Z] [info] [ID-1707261254888704779] AccommodationHandler.GetImageURLS : GetImageURLS finished
+[2024-02-06T23:14:14Z] [info] [ID-1707261254917125338] AccommodationHandler.GetImageContent : GetImageContent endpoint reached
+[2024-02-06T23:14:14Z] [info] [ID-1707261254919142326] AccommodationHandler.GetImageContent : GetImageContent endpoint reached
+[2024-02-06T23:14:14Z] [info] [ID-1707261254945030707] redis: nil
+[2024-02-06T23:14:14Z] [info] [ID-1707261254947168532] redis: nil
+[2024-02-06T23:14:15Z] [info] [ID-1707261255436923107] Cache hit - set image
+[2024-02-06T23:14:15Z] [info] [ID-1707261255439225913] Cache hit - set image
+[2024-02-06T23:14:15Z] [info] [ID-1707261255441221028] AccommodationHandler.GetImageContent : GetImageContent finished
+[2024-02-06T23:14:15Z] [info] [ID-1707261255442821227] AccommodationHandler.GetImageContent : GetImageContent finished

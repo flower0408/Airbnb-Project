@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/gorilla/mux"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -28,6 +30,45 @@ type Server struct {
 	config *config.Config
 }
 
+const (
+	LogFilePath = "/app/logs/recommendation.log"
+)
+
+type CustomFormatter struct{}
+
+func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	entry.Data["id"] = generateUniqueID()
+
+	msg := fmt.Sprintf("[%s] [%s] [%s] %s\n",
+		entry.Time.Format("2006-01-02T15:04:05Z07:00"),
+		entry.Level,
+		entry.Data["id"],
+		entry.Message,
+	)
+
+	return []byte(msg), nil
+}
+
+func generateUniqueID() string {
+	return fmt.Sprintf("ID-%d", time.Now().UnixNano())
+}
+
+func initLogger() {
+	writer, err := rotatelogs.New(
+		LogFilePath+"_%Y%m%d%H%M",
+		rotatelogs.WithRotationTime(24*time.Hour),
+		rotatelogs.WithLocation(time.Local),
+	)
+	if err != nil {
+		Logger.Fatalf("Failed to create rotatelogs hook: %v", err)
+	}
+	Logger.SetOutput(writer)
+
+	Logger.SetFormatter(&CustomFormatter{})
+}
+
+var Logger = logrus.New()
+
 func NewServer(config *config.Config) *Server {
 	return &Server{
 		config: config,
@@ -43,13 +84,15 @@ func (server *Server) initNeo4JDriver(httpClient *http.Client) *neo4j.DriverWith
 	return driver
 }
 
-func (server *Server) initRecommendationStore(driver *neo4j.DriverWithContext, tracer trace.Tracer) domain.RecommendationStore {
-	store := store.NewRecommendationNeo4JStore(driver, tracer)
+func (server *Server) initRecommendationStore(driver *neo4j.DriverWithContext, tracer trace.Tracer, logger *logrus.Logger) domain.RecommendationStore {
+	store := store.NewRecommendationNeo4JStore(driver, tracer, logger)
 
 	return store
 }
 
 func (server *Server) Start() {
+
+	initLogger()
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
@@ -73,19 +116,19 @@ func (server *Server) Start() {
 	tracer := tp.Tracer("recommendations_service")
 
 	neo4jDriver := server.initNeo4JDriver(httpClient)
-	recommendationStore := server.initRecommendationStore(neo4jDriver, tracer)
-	recommendationService := server.initRecommendationService(recommendationStore, tracer)
-	recommendationHandler := server.initRecommendationHandler(recommendationService, tracer)
+	recommendationStore := server.initRecommendationStore(neo4jDriver, tracer, Logger)
+	recommendationService := server.initRecommendationService(recommendationStore, tracer, Logger)
+	recommendationHandler := server.initRecommendationHandler(recommendationService, tracer, Logger)
 
 	server.start(recommendationHandler)
 }
 
-func (server *Server) initRecommendationService(store domain.RecommendationStore, tracer trace.Tracer) *application.RecommendationService {
-	return application.NewRecommendationService(store, tracer)
+func (server *Server) initRecommendationService(store domain.RecommendationStore, tracer trace.Tracer, logger *logrus.Logger) *application.RecommendationService {
+	return application.NewRecommendationService(store, tracer, logger)
 }
 
-func (server *Server) initRecommendationHandler(service *application.RecommendationService, tracer trace.Tracer) *handlers.RecommendationHandler {
-	return handlers.NewRecommendationHandler(service, tracer)
+func (server *Server) initRecommendationHandler(service *application.RecommendationService, tracer trace.Tracer, logger *logrus.Logger) *handlers.RecommendationHandler {
+	return handlers.NewRecommendationHandler(service, tracer, logger)
 }
 
 func (server *Server) start(recommendedHandler *handlers.RecommendationHandler) {

@@ -1,0 +1,13 @@
+[2024-02-07T03:43:51Z] [info] [ID-1707277431127139973] RecommendationHandler.GetRecommendAccommodationsId : GetRecommendAccommodationsId endpoint reached
+[2024-02-07T03:43:51Z] [info] [ID-1707277431149358712] RecommendationService.GetUserByUsername : GetUserByUsername service reached
+[2024-02-07T03:43:51Z] [info] [ID-1707277431150353781] RecommendationNeo4JStore.GetUserByUsername : GetUserByUsername reached in store
+[2024-02-07T03:43:52Z] [info] [ID-1707277432971595590] RecommendationNeo4JStore.GetUserByUsername : GetRecommendAccommodationsId success
+[2024-02-07T03:43:52Z] [info] [ID-1707277432977904178] RecommendationService.GetRecommendAccommodationsId : GetRecommendAccommodationsId service reached
+[2024-02-07T03:43:52Z] [info] [ID-1707277432978646903] RecommendationNeo4JStore.GetRecommendAccommodationsId : GetRecommendAccommodationsId reached in store
+[2024-02-07T03:43:53Z] [info] [ID-1707277433772336774] RecommendationNeo4JStore.GetRecommendAccommodationsId : GetRecommendAccommodationsId success
+[2024-02-07T03:43:53Z] [info] [ID-1707277433776280948] RecommendationHandler.GetRecommendAccommodationsId : GetRecommendAccommodationsId success
+[2024-02-07T03:44:40Z] [info] [ID-1707277480652798368] RecommendationHandler.CreateRate : CreateRate endpoint reached
+[2024-02-07T03:44:40Z] [info] [ID-1707277480656781591] RecommendationService.CreateRate : CreateRate service reached
+[2024-02-07T03:44:40Z] [info] [ID-1707277480662674556] RecommendationNeo4JStore.CreateRate : CreateRate reached in store
+[2024-02-07T03:44:44Z] [info] [ID-1707277484811674036] RecommendationNeo4JStore.CreateRate : CreateRate success
+[2024-02-07T03:44:44Z] [info] [ID-1707277484813972486] RecommendationHandler.CreateRate : CreateRate success

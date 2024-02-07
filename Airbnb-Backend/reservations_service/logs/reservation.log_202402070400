@@ -1,0 +1,4 @@
+[2024-02-07T04:00:12Z] [info] [ID-1707278412034144915] ReservationHandler.GetReservationByAccommodation : GetReservationByUser endpoint reached
+[2024-02-07T04:00:12Z] [info] [ID-1707278412120885564] ReservationRepo.GetReservationByAccommodation : reached GetReservationByAccommodation in repo
+[2024-02-07T04:00:12Z] [info] [ID-1707278412121973652] AppointmentHandler.GetAppointmentsByAccommodation : GetAppointmentsByAccommodation endpoint reached
+[2024-02-07T04:00:12Z] [info] [ID-1707278412123814500] AppointmentRepo.GetAppointmentsByAccommodation : reached GetAppointmentsByAccommodation in repo

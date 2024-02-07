@@ -234,6 +234,7 @@ services:
     networks:
       - network
     volumes:
+      - ./recommendations_service/logs:/app/logs
       - ./api_gateway/cert/recommendations_service/recommendations_service-cert.pem:/recommendations_service-cert.pem
       - ./api_gateway/cert/recommendations_service/recommendations_service-key.pem:/recommendations_service-key.pem
       - ./api_gateway/cert/airbnb_ca/ca-cert.pem:/ca-cert.pem

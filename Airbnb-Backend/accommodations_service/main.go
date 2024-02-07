@@ -59,7 +59,8 @@ func generateUniqueID() string {
 func initLogger() {
 	writer, err := rotatelogs.New(
 		LogFilePath+"_%Y%m%d%H%M",
-		rotatelogs.WithRotationTime(3*time.Minute), // Rotate logs every 15 minutes
+		rotatelogs.WithRotationTime(24*time.Hour),
+		rotatelogs.WithLocation(time.Local),
 	)
 	if err != nil {
 		Logger.Fatalf("Failed to create rotatelogs hook: %v", err)
@@ -277,6 +278,7 @@ func InitializeCasbinMiddleware(modelPath, policyPath string) (func(http.Handler
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			userRole, err := extractUserType(r)
 			if err != nil {
+				Logger.Error("Unauthorized access attempt")
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -284,6 +286,7 @@ func InitializeCasbinMiddleware(modelPath, policyPath string) (func(http.Handler
 			res, err := e.EnforceSafe(userRole, r.URL.Path, r.Method)
 			if err != nil {
 				log.Println("Enforce error:", err)
+				Logger.Error("Error enforcing authorization policy")
 				http.Error(w, "Unauthorized user", http.StatusUnauthorized)
 				return
 			}
@@ -292,6 +295,7 @@ func InitializeCasbinMiddleware(modelPath, policyPath string) (func(http.Handler
 				log.Println("Redirect")
 				next.ServeHTTP(w, r)
 			} else {
+				Logger.Warn("Unauthorized access attempt: forbidden")
 				http.Error(w, "Forbidden", http.StatusForbidden)
 				return
 			}

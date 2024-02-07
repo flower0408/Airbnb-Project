@@ -1,0 +1,5 @@
+[2024-02-07T01:08:34Z] [info] [ID-1707268114225585367] server selection error: context deadline exceeded, current topology: { Type: Unknown, Servers: [{ Addr: accommodations_db:27017, Type: Unknown, Last error: dial tcp: lookup accommodations_db on 127.0.0.11:53: no such host }, ] }
+[2024-02-07T01:08:34Z] [info] [ID-1707268114314743303] server selection error: context deadline exceeded, current topology: { Type: Unknown, Servers: [{ Addr: accommodations_db:27017, Type: Unknown, Last error: dial tcp: lookup accommodations_db on 127.0.0.11:53: no such host }, ] }
+[2024-02-07T01:08:42Z] [panic] [ID-1707268122334620437] no available namenodes: dial tcp: lookup namenode on 127.0.0.11:53: server misbehaving
+[2024-02-07T01:08:52Z] [info] [ID-1707268132224521094] server selection error: context deadline exceeded, current topology: { Type: Unknown, Servers: [{ Addr: accommodations_db:27017, Type: Unknown }, ] }
+[2024-02-07T01:08:52Z] [info] [ID-1707268132275828788] server selection error: context deadline exceeded, current topology: { Type: Unknown, Servers: [{ Addr: accommodations_db:27017, Type: Unknown }, ] }

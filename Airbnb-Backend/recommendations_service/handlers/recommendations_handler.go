@@ -6,6 +6,7 @@ import (
 	"github.com/casbin/casbin"
 	"github.com/cristalhq/jwt/v4"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
@@ -28,12 +29,14 @@ var (
 type RecommendationHandler struct {
 	service *application.RecommendationService
 	tracer  trace.Tracer
+	logger  *logrus.Logger
 }
 
-func NewRecommendationHandler(service *application.RecommendationService, tracer trace.Tracer) *RecommendationHandler {
+func NewRecommendationHandler(service *application.RecommendationService, tracer trace.Tracer, logger *logrus.Logger) *RecommendationHandler {
 	return &RecommendationHandler{
 		service: service,
 		tracer:  tracer,
+		logger:  logger,
 	}
 }
 
@@ -60,7 +63,7 @@ func (handler *RecommendationHandler) Init(router *mux.Router) {
 	router.HandleFunc("/recommended", handler.GetRecommendAccommodationsId).Methods("GET")
 
 	http.Handle("/", router)
-	log.Fatal(http.ListenAndServeTLS(":8006", "recommendations_service-cert.pem", "recommendations_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
+	log.Fatal(http.ListenAndServeTLS(":8006", "recommendations_service-cert.pem", "recommendations_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1, handler.logger)(router)))
 }
 
 type ValidationError struct {
@@ -87,9 +90,12 @@ func (handler *RecommendationHandler) GetRecommendAccommodationsId(writer http.R
 	ctx, span := handler.tracer.Start(req.Context(), "RecommendationHandler.GetRecommendAccommodationsId")
 	defer span.End()
 
+	handler.logger.Infoln("RecommendationHandler.GetRecommendAccommodationsId : GetRecommendAccommodationsId endpoint reached")
+
 	log.Println("RecommendationHandler.GetRecommendAccommodationsId: GetRecommendAccommodationsId reached") // Extract username from request
 	tokenString, err := extractTokenFromHeader(req)
 	if err != nil {
+		handler.logger.Errorf("UserHandler.GetRecommendAccommodationsId : No token found")
 		span.SetStatus(codes.Error, "No token found")
 		writer.WriteHeader(http.StatusBadRequest)
 		writer.Write([]byte("No token found"))
@@ -98,6 +104,7 @@ func (handler *RecommendationHandler) GetRecommendAccommodationsId(writer http.R
 
 	username, err := handler.service.ExtractUsernameFromToken(tokenString)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.GetRecommendAccommodationsId : Error parsing token")
 		fmt.Println("Error extracting username:", err)
 		span.SetStatus(codes.Error, "Error parsing token")
 		writer.WriteHeader(http.StatusBadRequest)
@@ -107,6 +114,7 @@ func (handler *RecommendationHandler) GetRecommendAccommodationsId(writer http.R
 
 	user, err := handler.service.GetUserByUsername(ctx, username)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.GetRecommendAccommodationsId : Internal server error")
 		log.Printf("RecommendationHandler.GetRecommendAccommodationsId: GetUserByUsername error: %s", err)
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte("Internal server error"))
@@ -115,6 +123,7 @@ func (handler *RecommendationHandler) GetRecommendAccommodationsId(writer http.R
 
 	recommendations, err := handler.service.GetRecommendAccommodationsId(ctx, user.ID)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.GetRecommendAccommodationsId : Internal server error")
 		log.Printf("RecommendationHandler.GetRecommendAccommodationsId: %s", err)
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte("Internal server error"))
@@ -127,6 +136,7 @@ func (handler *RecommendationHandler) GetRecommendAccommodationsId(writer http.R
 
 	jsonResponse, err := json.Marshal(response)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.GetRecommendAccommodationsId : Internal server error")
 		log.Printf("Error encoding JSON response: %s", err)
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte("Internal server error"))
@@ -137,6 +147,7 @@ func (handler *RecommendationHandler) GetRecommendAccommodationsId(writer http.R
 	writer.WriteHeader(http.StatusOK)
 	writer.Write(jsonResponse)
 
+	handler.logger.Infoln("RecommendationHandler.GetRecommendAccommodationsId : GetRecommendAccommodationsId success")
 	log.Println("RecommendationHandler.GetRecommendAccommodationsId: GetRecommendAccommodationsId successful")
 }
 
@@ -144,9 +155,12 @@ func (handler *RecommendationHandler) ChangeUsername(writer http.ResponseWriter,
 	ctx, span := handler.tracer.Start(request.Context(), "UserHandler.ChangeUsername")
 	defer span.End()
 
+	handler.logger.Infoln("RecommendationHandler.ChangeUsername : ChangeUsername endpoint reached")
+
 	var username domain.UsernameChange
 	err := json.NewDecoder(request.Body).Decode(&username)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.ChangeUsername : Status bad request")
 		log.Println(err)
 		span.SetStatus(codes.Error, "Status bad request")
 		http.Error(writer, err.Error(), http.StatusBadRequest)
@@ -156,6 +170,7 @@ func (handler *RecommendationHandler) ChangeUsername(writer http.ResponseWriter,
 	status, statusCode, err := handler.service.ChangeUsername(ctx, username)
 
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.ChangeUsername : Error in ChangeUsername")
 		span.SetStatus(codes.Error, err.Error())
 		log.Println("Error in ChangeUsername:", err)
 		var errorMessage string
@@ -173,7 +188,7 @@ func (handler *RecommendationHandler) ChangeUsername(writer http.ResponseWriter,
 		http.Error(writer, errorMessage, statusCode)
 		return
 	}
-
+	handler.logger.Infoln("RecommendationHandler.ChangeUsername : ChangeUsername success")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -181,23 +196,26 @@ func (handler *RecommendationHandler) DeleteUser(writer http.ResponseWriter, req
 	ctx, span := handler.tracer.Start(req.Context(), "RecommendationHandler.DeleteUser")
 	defer span.End()
 
+	handler.logger.Infoln("RecommendationHandler.DeleteUser : DeleteUser endpoint reached")
 	log.Println("RecommendationHandler.DeleteUser : DeleteUser reached")
 
 	vars := mux.Vars(req)
 	userId, ok := vars["id"]
 	if !ok {
+		handler.logger.Errorf("RecommendationHandler.DeleteUser : Error status bad request")
 		log.Println("RecommendationHandler.DeleteUser.Vars() : bad request")
 		http.Error(writer, errors.BadRequestError, http.StatusBadRequest)
 	}
 
 	err := handler.service.DeleteUser(ctx, &userId)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.DeleteUser : Status bad request")
 		log.Println("RecommendationHandler.DeleteUser.DeclineRequest() : %s", err)
 		http.Error(writer, errors.BadRequestError, http.StatusBadRequest)
 	}
 
 	log.Println("RecommendationHandler.DeleteUser : DeleteUser successful")
-
+	handler.logger.Infoln("RecommendationHandler.DeleteUser : DeleteUser success")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -205,11 +223,13 @@ func (handler *RecommendationHandler) CreateUser(writer http.ResponseWriter, req
 	ctx, span := handler.tracer.Start(req.Context(), "RecommendationHandler.CreateUser")
 	defer span.End()
 
+	handler.logger.Infoln("RecommendationHandler.CreateUser : CreateUser endpoint reached")
 	log.Printf("RecommendationHandler.CreateUser : CreateUser reached")
 
 	var request domain.User
 	err := json.NewDecoder(req.Body).Decode(&request)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.CreateUser : Error status bad request")
 		log.Printf("RecommendationHandler.CreateUser.Decode() : %s", err)
 		http.Error(writer, "bad request", http.StatusBadRequest)
 		return
@@ -217,13 +237,14 @@ func (handler *RecommendationHandler) CreateUser(writer http.ResponseWriter, req
 
 	err = handler.service.CreateUser(ctx, &request)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.CreateUser : Error status bad request")
 		log.Printf("RecommendationHandler.CreateUser.CreateUser() : %s", err)
 		http.Error(writer, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	log.Printf("RecommendationHandler.CreateUser : CreateUser successful")
-
+	handler.logger.Infoln("RecommendationHandler.CreateUser : CreateUser success")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -231,11 +252,13 @@ func (handler *RecommendationHandler) CreateAccommodation(writer http.ResponseWr
 	ctx, span := handler.tracer.Start(req.Context(), "RecommendationHandler.CreateAccommodation")
 	defer span.End()
 
+	handler.logger.Infoln("RecommendationHandler.CreateAccommodation : CreateAccommodation endpoint reached")
 	log.Printf("RecommendationHandler.CreateAccommodation : CreateAccommodation reached")
 
 	var request domain.Accommodation
 	err := json.NewDecoder(req.Body).Decode(&request)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.CreateAccommodation : Error status bad request")
 		log.Printf("RecommendationHandler.CreateAccommodation.Decode() : %s", err)
 		http.Error(writer, "bad request", http.StatusBadRequest)
 		return
@@ -243,13 +266,14 @@ func (handler *RecommendationHandler) CreateAccommodation(writer http.ResponseWr
 
 	err = handler.service.CreateAccommodation(ctx, &request)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.CreateAccommodation : Error internal server error")
 		log.Printf("RecommendationHandler.CreateAccommodation.CreateAccommodation() : %s", err)
 		http.Error(writer, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	log.Printf("RecommendationHandler.CreateAccommodation : CreateAccommodation successful")
-
+	handler.logger.Infoln("RecommendationHandler.CreateAccommodation : CreateAccommodation success")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -257,23 +281,26 @@ func (handler *RecommendationHandler) DeleteAccommodation(writer http.ResponseWr
 	ctx, span := handler.tracer.Start(req.Context(), "RecommendationHandler.DeleteAccommodation")
 	defer span.End()
 
+	handler.logger.Infoln("RecommendationHandler.DeleteAccommodation : DeleteAccommodation endpoint reached")
 	log.Println("RecommendationHandler.DeleteAccommodation : DeleteAccommodation reached")
 
 	vars := mux.Vars(req)
 	accommodationId, ok := vars["id"]
 	if !ok {
+		handler.logger.Errorf("RecommendationHandler.DeleteAccommodation : Error bad request")
 		log.Println("RecommendationHandler.DeleteAccommodation.Vars() : bad request")
 		http.Error(writer, errors.BadRequestError, http.StatusBadRequest)
 	}
 
 	err := handler.service.DeleteAccommodation(ctx, &accommodationId)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.DeleteAccommodation : Error bad request")
 		log.Println("RecommendationHandler.DeleteAccommodation.DeclineRequest() : %s", err)
 		http.Error(writer, errors.BadRequestError, http.StatusBadRequest)
 	}
 
 	log.Println("RecommendationHandler.DeleteAccommodation : DeleteAccommodation successful")
-
+	handler.logger.Infoln("RecommendationHandler.DeleteAccommodation : DeleteAccommodation success")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -281,11 +308,13 @@ func (handler *RecommendationHandler) CreateRate(writer http.ResponseWriter, req
 	ctx, span := handler.tracer.Start(req.Context(), "RecommendationHandler.CreateRate")
 	defer span.End()
 
+	handler.logger.Infoln("RecommendationHandler.CreateRate : CreateRate endpoint reached")
 	log.Printf("RecommendationHandler.CreateRate : CreateRate reached")
 
 	var request domain.Rate
 	err := json.NewDecoder(req.Body).Decode(&request)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.CreateRate : Error bad request")
 		log.Printf("RecommendationHandler.CreateRate.Decode() : %s", err)
 		http.Error(writer, "bad request", http.StatusBadRequest)
 		return
@@ -293,13 +322,14 @@ func (handler *RecommendationHandler) CreateRate(writer http.ResponseWriter, req
 
 	err = handler.service.CreateRate(ctx, &request)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.CreateRate : Error internal server error")
 		log.Printf("RecommendationHandler.CreateRate.CreateRate() : %s", err)
 		http.Error(writer, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	log.Printf("RecommendationHandler.CreateRate : CreateRate successful")
-
+	handler.logger.Infoln("RecommendationHandler.CreateRate : CreateRate success")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -307,23 +337,26 @@ func (handler *RecommendationHandler) DeleteRate(writer http.ResponseWriter, req
 	ctx, span := handler.tracer.Start(req.Context(), "RecommendationHandler.DeleteRate")
 	defer span.End()
 
+	handler.logger.Infoln("RecommendationHandler.DeleteRate : DeleteRate endpoint reached")
 	log.Println("RecommendationHandler.DeleteRate : DeleteRate reached")
 
 	vars := mux.Vars(req)
 	rateId, ok := vars["id"]
 	if !ok {
+		handler.logger.Errorf("RecommendationHandler.DeleteRate : Error bad request")
 		log.Println("RecommendationHandler.DeleteRate.Vars() : bad request")
 		http.Error(writer, errors.BadRequestError, http.StatusBadRequest)
 	}
 
 	err := handler.service.DeleteRate(ctx, &rateId)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.DeleteRate : Error bad request")
 		log.Println("RecommendationHandler.DeleteRate.DeclineRequest() : %s", err)
 		http.Error(writer, errors.BadRequestError, http.StatusBadRequest)
 	}
 
 	log.Println("RecommendationHandler.DeleteRate : DeleteRate successful")
-
+	handler.logger.Infoln("RecommendationHandler.DeleteRate : DeleteRate success")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -331,11 +364,13 @@ func (handler *RecommendationHandler) UpdateRate(writer http.ResponseWriter, req
 	ctx, span := handler.tracer.Start(req.Context(), "FollowHandler.AcceptRequest")
 	defer span.End()
 
+	handler.logger.Infoln("RecommendationHandler.UpdateRate : UpdateRate endpoint reached")
 	log.Println("RecommendationHandler.UpdateRate : UpdateRate reached")
 
 	var rate domain.Rate
 	err := json.NewDecoder(req.Body).Decode(&rate)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.UpdateRate : Error bad request")
 		log.Printf("RecommendationHandler.UpdateRate.Decode() : %s\n", err)
 		http.Error(writer, errors.BadRequestError, http.StatusBadRequest)
 		return
@@ -343,13 +378,14 @@ func (handler *RecommendationHandler) UpdateRate(writer http.ResponseWriter, req
 
 	err = handler.service.UpdateRate(ctx, &rate)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.UpdateRate : Error bad request")
 		log.Printf("RecommendationHandler.UpdateRate.AcceptRequest() : %s\n", err)
 		http.Error(writer, errors.BadRequestError, http.StatusBadRequest)
 		return
 	}
 
 	log.Println("RecommendationHandler.UpdateRate : UpdateRate successful")
-
+	handler.logger.Infoln("RecommendationHandler.UpdateRate : UpdateRate success")
 	writer.WriteHeader(http.StatusOK)
 }
 
@@ -357,11 +393,13 @@ func (handler *RecommendationHandler) CreateReservation(writer http.ResponseWrit
 	ctx, span := handler.tracer.Start(req.Context(), "RecommendationHandler.CreateReservation")
 	defer span.End()
 
+	handler.logger.Infoln("RecommendationHandler.CreateReservation : CreateReservation endpoint reached")
 	log.Printf("RecommendationHandler.CreateReservation : CreateReservation reached")
 
 	var request domain.Reservation
 	err := json.NewDecoder(req.Body).Decode(&request)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.CreateReservation : Error bad request")
 		log.Printf("RecommendationHandler.CreateReservation.Decode() : %s", err)
 		http.Error(writer, "bad request", http.StatusBadRequest)
 		return
@@ -369,13 +407,14 @@ func (handler *RecommendationHandler) CreateReservation(writer http.ResponseWrit
 
 	err = handler.service.CreateReservation(ctx, &request)
 	if err != nil {
+		handler.logger.Errorf("RecommendationHandler.CreateReservation : Error internal server error")
 		log.Printf("RecommendationHandler.CreateReservation.CreateRate() : %s", err)
 		http.Error(writer, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	log.Printf("RecommendationHandler.CreateReservation : CreateReservation successful")
-
+	handler.logger.Infoln("RecommendationHandler.CreateReservation : CreateReservation success")
 	writer.WriteHeader(http.StatusOK)
 }
 

@@ -1,0 +1,8 @@
+[2024-02-07T03:36:15Z] [info] [ID-1707276975564238953] NotificationHandler.CreateNotification : CreateNotification endpoint reached
+[2024-02-07T03:36:15Z] [info] [ID-1707276975597175453] NotificationService.CreateNotification : CreateNotification service reached
+[2024-02-07T03:36:15Z] [info] [ID-1707276975599162524] NotificationMongoDBStore.CreateNotification : reached CreateNotification in store
+[2024-02-07T03:36:15Z] [info] [ID-1707276975762089120] NotificationMongoDBStore.CreateNotification : Data of created notification: %+v &{ObjectID("65c2faaf2be769927c8e547a") 65bdefb7d03a85351a91d5fd 65bdef13d03a85351a91d5fb Guest for period [2024-02-16 23:00:00 +0000 UTC 2024-02-17 23:00:00 +0000 UTC] created reservation for accommodation  Dvorac 2024-02-07 03:36:15.599116465 +0000 UTC m=+334.021574403}
+[2024-02-07T03:36:15Z] [info] [ID-1707276975763532103] NotificationMongoDBStore.CreateNotification : CreateNotification success
+[2024-02-07T03:36:15Z] [info] [ID-1707276975764691094] NotificationService.getUserDetails : getUserDetails service reached
+[2024-02-07T03:36:15Z] [info] [ID-1707276975787335769] NotificationService.sendValidationMail : sendValidationMail service reached
+[2024-02-07T03:36:25Z] [error] [ID-1707276985824758119] NotificationService.sendValidationMail : Failed to send verification mail

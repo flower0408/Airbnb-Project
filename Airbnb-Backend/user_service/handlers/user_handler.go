@@ -67,7 +67,7 @@ func (handler *UserHandler) Init(router *mux.Router) {
 	router.HandleFunc("/isHighlighted/{id}", handler.IsHighlighted).Methods("GET")
 
 	http.Handle("/", router)
-	log.Fatal(http.ListenAndServeTLS(":8002", "user_service-cert.pem", "user_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
+	log.Fatal(http.ListenAndServeTLS(":8002", "user_service-cert.pem", "user_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1, handler.logger)(router)))
 }
 
 type ValidationError struct {

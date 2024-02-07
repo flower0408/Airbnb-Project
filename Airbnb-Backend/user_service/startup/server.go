@@ -57,7 +57,8 @@ func generateUniqueID() string {
 func initLogger() {
 	writer, err := rotatelogs.New(
 		LogFilePath+"_%Y%m%d%H%M",
-		rotatelogs.WithRotationTime(3*time.Minute), // Rotate logs every 15 minutes
+		rotatelogs.WithRotationTime(24*time.Hour),
+		rotatelogs.WithLocation(time.Local),
 	)
 	if err != nil {
 		Logger.Fatalf("Failed to create rotatelogs hook: %v", err)

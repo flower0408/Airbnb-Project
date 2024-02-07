@@ -1,0 +1,5 @@
+[2024-02-07T03:45:23Z] [info] [ID-1707277523709934578] RecommendationHandler.CreateAccommodation : CreateAccommodation endpoint reached
+[2024-02-07T03:45:23Z] [info] [ID-1707277523730958069] RecommendationService.CreateAccommodation : CreateAccommodation service reached
+[2024-02-07T03:45:23Z] [info] [ID-1707277523732337981] RecommendationNeo4JStore.CreateAccommodation : reached CreateAccommodation in store
+[2024-02-07T03:45:24Z] [info] [ID-1707277524274279721] RecommendationNeo4JStore.CreateAccommodation : CreateAccommodation success
+[2024-02-07T03:45:24Z] [info] [ID-1707277524276716339] RecommendationHandler.CreateAccommodation : CreateAccommodation success

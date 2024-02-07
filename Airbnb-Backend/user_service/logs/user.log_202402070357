@@ -1,0 +1,152 @@
+[2024-02-07T03:58:03Z] [info] [ID-1707278283855758605] UserHandler.MailExist : Profile endpoint reached
+[2024-02-07T03:58:03Z] [info] [ID-1707278283890996989] UserService.DoesEmailExist : DoesEmailExist service reached
+[2024-02-07T03:58:03Z] [info] [ID-1707278283891845927] UserMongoDBStore.GetByEmail : reached GetByEmail in store
+[2024-02-07T03:58:03Z] [error] [ID-1707278283906789592] UserService.DoesEmailExist : Error mail exist
+[2024-02-07T03:58:03Z] [error] [ID-1707278283908521029] UserHandler.MailExist : Mail not found
+[2024-02-07T03:58:03Z] [info] [ID-1707278283979753346] UserHandler.Register : Register endpoint reached
+[2024-02-07T03:58:03Z] [info] [ID-1707278283982456286] UserService.Register : Register service reached
+[2024-02-07T03:58:03Z] [info] [ID-1707278283983529209] UserService.Register : register service finished
+[2024-02-07T03:58:03Z] [info] [ID-1707278283984334473] UserMongoDBStore.Register : reached Register in store
+[2024-02-07T03:58:04Z] [info] [ID-1707278284014169110] UserMongoDBStore.Register : Register success
+[2024-02-07T03:58:04Z] [info] [ID-1707278284015753539] UserHandler.Register : Registration success
+[2024-02-07T03:58:58Z] [info] [ID-1707278338929406460] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-07T03:58:58Z] [info] [ID-1707278338930454605] UserService.GetOneUser : GetOneUser service reached
+[2024-02-07T03:58:58Z] [info] [ID-1707278338931225599] UserMongoDBStore.GetOneUser : reached GetOneUser in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339156411611] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339160104870] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339162364606] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339188751870] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339192270495] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339194198592] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339196750490] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339198816136] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339200614506] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339202166709] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339203926243] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339205891173] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339208028072] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339213854794] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339216050799] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339218082436] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339222694853] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339224811353] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339226361073] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339228434150] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339230217627] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339232659327] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339235231374] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339239253657] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339241928334] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339246941500] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339248161224] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339249214937] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339250959038] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339252155458] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339253683056] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339255309066] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339257231014] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339260770801] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339262835215] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339264909394] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339272293357] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339275410042] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339277188512] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339278772862] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339280374898] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339282433253] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339284306912] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339286435208] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339288462528] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339292491693] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339294564239] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339296541447] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339303479917] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339306410503] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339308482238] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339310973158] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339315576561] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339318929267] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:58:59Z] [info] [ID-1707278339331400965] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339334470242] UserService.Get : Get service reached
+[2024-02-07T03:58:59Z] [info] [ID-1707278339337136846] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:01Z] [info] [ID-1707278341070544326] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-07T03:59:01Z] [info] [ID-1707278341072156906] UserService.GetOneUser : GetOneUser service reached
+[2024-02-07T03:59:01Z] [info] [ID-1707278341072854362] UserMongoDBStore.GetOneUser : reached GetOneUser in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393048326569] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393049598168] UserService.GetOneUser : GetOneUser service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393050124277] UserMongoDBStore.GetOneUser : reached GetOneUser in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393533690278] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393534954696] UserService.GetOneUser : GetOneUser service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393536317993] UserMongoDBStore.GetOneUser : reached GetOneUser in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393612022971] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393615675156] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393618238260] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393635681374] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393638977368] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393641333500] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393650415308] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393653901340] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393656981270] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393668419081] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393672592479] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393675162632] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393683311488] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393685393566] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393687836911] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393690883274] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393695506043] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393697554514] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393699441607] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393701316072] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393703215352] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393705350835] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393707324430] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393708916999] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393710657365] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393713431746] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393716731195] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393718579233] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393721026954] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393723468117] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393725075207] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393726907593] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393729665120] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393732057705] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393733591511] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393735173906] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393736427529] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393737883646] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393739632775] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393741052912] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393749812046] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393751820750] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393766409661] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393768124383] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393770074775] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393771890358] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393773950494] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393775822856] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393780883151] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393782430506] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393783696146] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393790766426] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393792905092] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393794796712] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393803443399] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393806054009] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393808085536] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:53Z] [info] [ID-1707278393820837293] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393822800464] UserService.Get : Get service reached
+[2024-02-07T03:59:53Z] [info] [ID-1707278393824409606] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:56Z] [info] [ID-1707278396124985379] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-07T03:59:56Z] [info] [ID-1707278396133410344] UserService.GetOneUser : GetOneUser service reached
+[2024-02-07T03:59:56Z] [info] [ID-1707278396134351187] UserMongoDBStore.GetOneUser : reached GetOneUser in store
+[2024-02-07T03:59:57Z] [info] [ID-1707278397091051213] UserHandler.GetOne : GetOne endpoint reached
+[2024-02-07T03:59:57Z] [info] [ID-1707278397092558273] UserService.GetOneUser : GetOneUser service reached
+[2024-02-07T03:59:57Z] [info] [ID-1707278397093239981] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:57Z] [info] [ID-1707278397093990727] UserService.Get : Get service reached
+[2024-02-07T03:59:57Z] [info] [ID-1707278397094781388] UserMongoDBStore.Get : reached Get in store
+[2024-02-07T03:59:57Z] [info] [ID-1707278397095701632] UserMongoDBStore.GetOneUser : reached GetOneUser in store
+[2024-02-07T03:59:59Z] [info] [ID-1707278399520178939] UserHandler.Get : Get endpoint reached
+[2024-02-07T03:59:59Z] [info] [ID-1707278399544728123] UserService.Get : Get service reached
+[2024-02-07T03:59:59Z] [info] [ID-1707278399545725924] UserMongoDBStore.Get : reached Get in store

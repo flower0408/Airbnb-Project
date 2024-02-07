@@ -1,0 +1,29 @@
+[2024-02-07T03:33:58Z] [info] [ID-1707276838650280131] AuthHandler.Login : endpoint login reached
+[2024-02-07T03:33:58Z] [info] [ID-1707276838688059369] AuthService.Login : login service reached
+[2024-02-07T03:33:58Z] [info] [ID-1707276838689510819] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:33:58Z] [info] [ID-1707276838839635877] AuthStore.GetOneUser : getOneUser success
+[2024-02-07T03:33:58Z] [info] [ID-1707276838899836212] AuthHandler.Login : endpoint login successful
+[2024-02-07T03:34:15Z] [info] [ID-1707276855234846951] AuthHandler.Login : endpoint login reached
+[2024-02-07T03:34:15Z] [info] [ID-1707276855236413635] AuthService.Login : login service reached
+[2024-02-07T03:34:15Z] [info] [ID-1707276855239093373] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:34:15Z] [info] [ID-1707276855247146640] AuthStore.GetOneUser : getOneUser success
+[2024-02-07T03:34:15Z] [info] [ID-1707276855312809131] AuthHandler.Login : endpoint login successful
+[2024-02-07T03:35:27Z] [info] [ID-1707276927793554716] AuthHandler.VerifyRecaptcha : VerifyRecaptcha endpoint reached
+[2024-02-07T03:35:27Z] [info] [ID-1707276927797438351] AuthService.Register : register service reached
+[2024-02-07T03:35:27Z] [info] [ID-1707276927798966787] AuthService.VerifyRecaptcha : Making request to reCAPTCHA API
+[2024-02-07T03:35:28Z] [info] [ID-1707276928630194003] AuthService.VerifyRecaptcha : Successfully received response from reCAPTCHA API
+[2024-02-07T03:35:28Z] [info] [ID-1707276928649566195] AuthHandler.Login : endpoint login reached
+[2024-02-07T03:35:28Z] [info] [ID-1707276928651804592] AuthService.Login : login service reached
+[2024-02-07T03:35:28Z] [info] [ID-1707276928653658857] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:35:28Z] [info] [ID-1707276928740019683] AuthStore.GetOneUser : getOneUser success
+[2024-02-07T03:35:28Z] [error] [ID-1707276928795242713] AuthService.Login.CompareHashAndPassword() : password not same
+[2024-02-07T03:35:28Z] [error] [ID-1707276928796191629] AuthHandler.Login : wrong password
+[2024-02-07T03:35:59Z] [info] [ID-1707276959021547534] AuthHandler.VerifyRecaptcha : VerifyRecaptcha endpoint reached
+[2024-02-07T03:35:59Z] [info] [ID-1707276959024666773] AuthService.Register : register service reached
+[2024-02-07T03:35:59Z] [info] [ID-1707276959025510865] AuthService.VerifyRecaptcha : Making request to reCAPTCHA API
+[2024-02-07T03:35:59Z] [info] [ID-1707276959183373208] AuthService.VerifyRecaptcha : Successfully received response from reCAPTCHA API
+[2024-02-07T03:35:59Z] [info] [ID-1707276959204758275] AuthHandler.Login : endpoint login reached
+[2024-02-07T03:35:59Z] [info] [ID-1707276959206965630] AuthService.Login : login service reached
+[2024-02-07T03:35:59Z] [info] [ID-1707276959207940669] AuthStore.GetOneUser : reached getOneUser in store
+[2024-02-07T03:35:59Z] [info] [ID-1707276959281783453] AuthStore.GetOneUser : getOneUser success
+[2024-02-07T03:35:59Z] [info] [ID-1707276959340395133] AuthHandler.Login : endpoint login successful

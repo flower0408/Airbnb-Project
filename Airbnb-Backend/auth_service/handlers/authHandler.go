@@ -97,7 +97,7 @@ func (handler *AuthHandler) Init(router *mux.Router) {
 	router.HandleFunc("/deleteUser", handler.DeleteUser).Methods("DELETE")
 
 	http.Handle("/", router)
-	log.Fatal(http.ListenAndServeTLS(":8003", "auth_service-cert.pem", "auth_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1)(router)))
+	log.Fatal(http.ListenAndServeTLS(":8003", "auth_service-cert.pem", "auth_service-key.pem", casbinAuthorization.CasbinMiddleware(CasbinMiddleware1, handler.logger)(router)))
 }
 
 func (handler *AuthHandler) logoutHandler(w http.ResponseWriter, r *http.Request) {

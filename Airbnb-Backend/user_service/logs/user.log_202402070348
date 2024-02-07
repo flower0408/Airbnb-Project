@@ -1,0 +1,11 @@
+[2024-02-07T03:50:47Z] [info] [ID-1707277847068137853] UserHandler.MailExist : Profile endpoint reached
+[2024-02-07T03:50:47Z] [info] [ID-1707277847094820198] UserService.DoesEmailExist : DoesEmailExist service reached
+[2024-02-07T03:50:47Z] [info] [ID-1707277847095488427] UserMongoDBStore.GetByEmail : reached GetByEmail in store
+[2024-02-07T03:50:47Z] [error] [ID-1707277847130013597] UserService.DoesEmailExist : Error mail exist
+[2024-02-07T03:50:47Z] [error] [ID-1707277847130968148] UserHandler.MailExist : Mail not found
+[2024-02-07T03:50:47Z] [info] [ID-1707277847198056170] UserHandler.Register : Register endpoint reached
+[2024-02-07T03:50:47Z] [info] [ID-1707277847199905602] UserService.Register : Register service reached
+[2024-02-07T03:50:47Z] [info] [ID-1707277847200818019] UserService.Register : register service finished
+[2024-02-07T03:50:47Z] [info] [ID-1707277847201461891] UserMongoDBStore.Register : reached Register in store
+[2024-02-07T03:50:47Z] [info] [ID-1707277847225108332] UserMongoDBStore.Register : Register success
+[2024-02-07T03:50:47Z] [info] [ID-1707277847226016122] UserHandler.Register : Registration success
