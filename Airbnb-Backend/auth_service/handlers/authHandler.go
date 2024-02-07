@@ -10,8 +10,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/andjelabjekovic/logovi"
 	"github.com/casbin/casbin"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"github.com/sony/gobreaker"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -29,9 +31,14 @@ import (
 const EmailServiceUnavailableStatusCode = 55
 
 type AuthHandler struct {
-	service *application.AuthService
-	store   *store.AuthMongoDBStore
-	cb      *gobreaker.CircuitBreaker
+	logger            *log.Logger
+	service           *application.AuthService
+	store             *store.AuthMongoDBStore
+	cb                *gobreaker.CircuitBreaker
+	writeError        func(msg string)
+	writeInfo         func(msg string)
+	writeRequestError func(r *http.Request, msg string)
+	writeRequestInfo  func(r *http.Request, msg string)
 }
 
 var (
@@ -43,10 +50,17 @@ var (
 	accommodationServicePort = os.Getenv("ACCOMMODATIONS_SERVICE_PORT")
 )
 
-func NewAuthHandler(service *application.AuthService) *AuthHandler {
+var logger, loggingMiddleware, writeInfo, writeError, writeRequestInfo, writeRequestError = logovi.LogInit("/logs/logfile.log", "auth_service")
+
+func NewAuthHandler(l *log.Logger, e func(msg string), i func(msg string), re func(r *http.Request, msg string), ri func(r *http.Request, msg string), service *application.AuthService) *AuthHandler {
 	return &AuthHandler{
-		service: service,
-		cb:      CircuitBreaker("accommodationService"),
+		service:           service,
+		cb:                CircuitBreaker("accommodationService"),
+		logger:            l,
+		writeError:        e,
+		writeInfo:         i,
+		writeRequestError: re,
+		writeRequestInfo:  ri,
 	}
 }
 

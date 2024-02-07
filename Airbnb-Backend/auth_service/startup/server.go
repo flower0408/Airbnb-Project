@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-var _, loggingMiddleware, _, _, _, _ = logovi.LogInit("/logs/logfile.log", "auth_service")
+var logger, loggingMiddleware, writeInfo, writeError, writeRequestInfo, writeRequestError = logovi.LogInit("/logs/logfile.log", "accommodation_service")
 
 type Server struct {
 	config *config.Config
@@ -90,7 +90,7 @@ func (server *Server) initAuthService(store domain.AuthStore, cache domain.AuthC
 }
 
 func (server *Server) initAuthHandler(service *application.AuthService) *handlers.AuthHandler {
-	return handlers.NewAuthHandler(service)
+	return handlers.NewAuthHandler(logger, writeError, writeInfo, writeRequestInfo, writeRequestError, service)
 }
 
 func (server *Server) start(authHandler *handlers.AuthHandler) {
