@@ -16,6 +16,8 @@ This Airbnb application is a comprehensive platform designed to offer a user-fri
 4. Node.js
 5. Visual Studio Code
 
+#### [Trello Board](https://trello.com/b/8IKkRMf6/mrs-team13)
+
 ## Installation and Setup
 To run this project locally, follow these steps:
 
